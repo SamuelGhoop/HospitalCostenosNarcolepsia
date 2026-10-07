@@ -1,0 +1,11 @@
+# Todo archivo de texto se guarda y se descarga con saltos de línea LF.
+# Así gofmt no marca los .go como mal formateados al clonar en Windows
+# (Git for Windows trae core.autocrlf=true, que los convertiría a CRLF).
+* text=auto eol=lf
+
+# Recursos binarios del juego (sprites, fuentes, sonidos): nunca convertir.
+*.png binary
+*.ttf binary
+*.otf binary
+*.wav binary
+*.ogg binary

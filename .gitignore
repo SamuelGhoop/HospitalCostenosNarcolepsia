@@ -1,0 +1,13 @@
+# Binarios que generan go build / go test
+*.exe
+*.exe~
+*.test
+*.out
+
+# Cobertura de tests
+coverage.*
+*.coverprofile
+
+# Configuración local de editores
+.idea/
+.vscode/
