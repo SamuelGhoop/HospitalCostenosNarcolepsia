@@ -28,6 +28,7 @@ var (
 	ErrAlreadyHired     = errors.New("esa persona ya trabaja en el hospital")
 	ErrNoStaffAvailable = errors.New("no hay personal disponible para atender")
 	ErrDoctorFull       = errors.New("el médico ya tiene el cupo de pacientes lleno")
+	ErrAlreadyHasDoctor = errors.New("el paciente ya tiene otro médico tratante")
 
 	// Estados del paciente.
 	ErrAlreadyAsleep = errors.New("el paciente ya está dormido")
