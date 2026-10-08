@@ -180,7 +180,7 @@ La demo es un **tipo aparte**, `game.Demo`, con métodos `Next()`, `Skip()`, `Sn
 | 11 | El camillero lleva a Wilfrido a la 101 | `AssignRoom` |
 | 12 | Shift Report con las 4 consultas finales | `PatientsInHallway`, `MyEpisodes`, `Rooms`, `SevereReport` |
 
-- Las ubicaciones de `main.go` se ubican en el mapa así: "cafetería" → Cafetería, "fila de radiología" → Radiología, "pasillo 2" → Hallway 2. **"Pista de champeta del patio" no existe en el mapa**: se ubica en el Lobby, salvo que Samuel decida agregar un patio (⏳ pendiente para F2).
+- Las ubicaciones de `main.go` se ubican en el mapa así: "cafetería" → Cafetería, "fila de radiología" → Radiología, "pasillo 2" → Hallway 2. **"Pista de champeta del patio" no existe en el mapa**: se ubica en el **Lobby** (decisión de Samuel, 2026-10-08). Es consistente con el evento *Picó de champeta*, que pone los bafles ahí. En la interfaz el Lobby se rotula **RECEPCIÓN**, que además es la ubicación con la que llega todo paciente en el modelo ("recepción").
 - El resultado de cada paso sale del modelo real, no de texto fijo.
 - Paso 11: `AssignRoom` no involucra a ningún Attender. El camillero se anima llevando a Wilfrido, pero el subtítulo muestra solo la llamada real (`h.AssignRoom(P-004) → habitación 101`).
 
@@ -315,19 +315,22 @@ La demo es un **tipo aparte**, `game.Demo`, con métodos `Next()`, `Skip()`, `Sn
 ### 10.1 Pantalla
 - Resolución lógica **640 × 360**; ventana 1280 × 720 (×2), pantalla completa ×3. Escalado entero, filtro *nearest*.
 - Tiles de **16 × 16 px**; personajes en cuadros de **16 × 24 px**.
+- **Mapa**: `hospital.dc.html` dibuja un mundo de **464 × 261** (también 16:9). `gui/ui/layout.go` copia sus coordenadas tal cual (para poder compararlas con la maqueta) y las escala a 640 × 360 multiplicando por 640/464 y redondeando. Las proporciones quedan iguales y los personajes se dibujan a 1× en su cuadro de 16 × 24.
+- **Idioma**: todos los textos de la interfaz van en español. Las maquetas están en inglés, pero solo son referencia visual; los textos se escriben en el código, y los estados salen del `String()` del modelo ("disponible", "ocupada", "dormido en el pasillo").
 
 ### 10.2 Escenas (otra interfaz)
 ```go
 type Scene interface {
-    Update() error
+    Update() (Scene, error) // devuelve la escena que sigue: ella misma si no cambia
     Draw(screen *ebiten.Image)
 }
 ```
-`ui.App` implementa `ebiten.Game` y delega en la escena actual: Title, Demo, Hospital, Hiring, Report, GameOver. Pausa y Settings son capas encima.
+`ui.App` implementa `ebiten.Game` y delega en la escena actual: Title, Demo, Hospital, Hiring, Report, GameOver. Pausa y Settings son capas encima. Como `Update` devuelve la escena siguiente, `App` cambia de pantalla sin un `switch` y las escenas no necesitan guardar un puntero a la `App`.
 
 ### 10.3 Sprites y animaciones
 - Personajes por capas: cuerpo (tono de piel), pelo, camisa y sombrero. La camisa va en escala de grises y se tiñe con `ColorScale`.
 - Spritesheet PNG: **una fila por animación, una columna por cuadro**, cuadros de 16 × 24 px. La animación hacia la derecha es la de la izquierda volteada con `GeoM.Scale(-1, 1)`.
+- Primer sprite: `gui/assets/sprites/patient_body_skin1.png` (cuerpo base), de 64 × 240 px = 4 columnas × 10 filas. Las filas van en el orden de la tabla: quieto, caminar abajo, caminar arriba, caminar izquierda, aviso de sueño, desplomarse, dormido en el piso, dormido en cama, despertarse y alta. Las animaciones de 2 cuadros dejan vacías las columnas 3 y 4.
 
 | Animación | Cuadros | Duración por cuadro |
 |---|---|---|
@@ -340,6 +343,7 @@ type Scene interface {
 | Despertarse | 4 | 150 ms (no se repite) |
 | Alta (saluda) | 4 | 150 ms |
 
+- **Cuadros de personaje acostado**: los cuadros 3 y 4 de *Desplomarse*, todos los de *Dormido en el piso* y *Dormido en cama*, y el cuadro 1 de *Despertarse* ya vienen dibujados **en horizontal dentro del mismo cuadro de 16 × 24 px**. Se dibujan tal cual, **sin rotarlos** (nada de `GeoM.Rotate`). Así todos los cuadros miden lo mismo y se recortan de la hoja igual que los demás.
 - El personal y los personajes de eventos usan el mismo formato con sus animaciones (atender, empujar camilla…).
 - Las animaciones avanzan por ticks de `Update` (60/s), nunca con `time.Sleep`.
 
@@ -401,9 +405,10 @@ Prioridad si el tiempo no alcanza: F1 → F2 → F3 → F4 → F5 → F6. **F2 e
 3. F1.1–F1.4: reloj y motor, `StaffMember` + despacho, pacientes, llegadas y camas, y economía, reputación y derrota.
 4. F3 → F6.
 
-### 12.1 Decisiones pendientes
-- ⏳ **Idioma de la interfaz**: las maquetas mezclan inglés (CONTINUE, NEW ROUND, OCCUPIED, Shift Report, Hallway) y español. Se decide antes de F2.
-- ⏳ **"Pista de champeta del patio"**: va al Lobby o se agrega un patio al mapa. Se decide antes de F2.
+### 12.1 Decisiones tomadas antes de F2 (2026-10-08)
+- ✅ **Idioma de la interfaz**: español en todo (sección 10.1). Las maquetas en inglés son solo referencia visual.
+- ✅ **"Pista de champeta del patio"**: va en el Lobby, rotulado RECEPCIÓN (sección 4.1).
+- ✅ El "despierto" en masculino que aparece con pacientes mujeres viene del `String()` del modelo congelado, y se deja así.
 - Velocidad del tiempo (×2, ×3): fuera de alcance por ahora; si se quiere, va como constante en `config.go`.
 
 ---

@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<div ref="{{ rootRef }}" onMouseEnter="{{ enter }}" onMouseLeave="{{ leave }}" style="position:relative;width:100%;font-family:'Press Start 2P',monospace;cursor:{{ cursor }}">
+  <sc-if value="{{ hasInd }}" hint-placeholder-val="{{ false }}">
+    <div style="position:absolute;left:{{ indLeft }};bottom:100%;transform:translateX(-50%);margin-bottom:0.25cqw;display:flex;align-items:center;gap:0.2cqw;pointer-events:none">
+      <sc-if value="{{ showDot }}" hint-placeholder-val="{{ false }}">
+        <div style="width:0.85cqw;height:0.85cqw;box-sizing:border-box;background:{{ dotColor }};border:0.2cqw solid #141414;box-shadow:inset -0.15cqw -0.15cqw 0 {{ dotShade }}"></div>
+      </sc-if>
+      <sc-if value="{{ showBubble }}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex;align-items:center;gap:0.3cqw;background:{{ bubbleBg }};border:0.2cqw solid #141414;padding:0.25cqw 0.35cqw;font-size:0.55cqw;line-height:1;color:#ffffff;white-space:nowrap;box-shadow:inset -0.15cqw -0.15cqw 0 {{ bubbleShade }},0.15cqw 0.25cqw 0 rgba(0,0,0,0.22)">
+          <span>{{ bubbleText }}</span>
+          <sc-if value="{{ hasTimer }}" hint-placeholder-val="{{ false }}">
+            <span style="display:flex;align-items:center;gap:0.2cqw">
+              <svg viewBox="0 0 7 8" shape-rendering="crispEdges" style="width:0.6cqw;height:0.69cqw;display:block">
+                <rect x="2" y="0" width="3" height="1" fill="#141414"></rect><rect x="3" y="1" width="1" height="1" fill="#141414"></rect>
+                <rect x="1" y="2" width="5" height="1" fill="#141414"></rect><rect x="0" y="3" width="1" height="4" fill="#141414"></rect><rect x="6" y="3" width="1" height="4" fill="#141414"></rect><rect x="1" y="7" width="5" height="1" fill="#141414"></rect>
+                <rect x="1" y="3" width="5" height="4" fill="#ffffff"></rect><rect x="3" y="3" width="1" height="2" fill="#141414"></rect><rect x="4" y="5" width="1" height="1" fill="#141414"></rect>
+              </svg>
+              <span>{{ tiempo }}</span>
+            </span>
+          </sc-if>
+        </div>
+      </sc-if>
+      <sc-if value="{{ showBolts }}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex;gap:0.08cqw;background:#fbf8ef;border:0.2cqw solid #141414;padding:0.15cqw 0.2cqw">
+          <sc-for list="{{ bolts }}" as="b" hint-placeholder-count="0">
+            <svg viewBox="0 0 7 9" shape-rendering="crispEdges" style="width:0.55cqw;height:0.7cqw;display:block"><path fill="#141414" d="{{ b.k }}"></path><path fill="{{ b.c }}" d="{{ b.f }}"></path></svg>
+          </sc-for>
+        </div>
+      </sc-if>
+    </div>
+  </sc-if>
+
+  <svg viewBox="{{ vb }}" shape-rendering="crispEdges" style="display:block;width:100%;height:auto;overflow:visible">
+    <path fill="rgba(60,40,10,0.22)" d="{{ shadow }}"></path>
+    <path fill="#141414" d="{{ d.K }}"></path>
+    <path fill="#a86b45" d="{{ d.S }}"></path><path fill="#7f4d30" d="{{ d.s }}"></path>
+    <path fill="#f3e7c4" d="{{ d.H }}"></path><path fill="#d8c79a" d="{{ d.h }}"></path>
+    <path fill="{{ hair }}" d="{{ d.D }}"></path>
+    <path fill="{{ shirt }}" d="{{ d.F }}"></path><path fill="{{ shirtShade }}" d="{{ d.f }}"></path>
+    <path fill="#e5484d" d="{{ d.R }}"></path><path fill="#ffffff" d="{{ d.W }}"></path><path fill="#ffd23f" d="{{ d.Y }}"></path>
+    <path fill="#2fb84f" d="{{ d.G }}"></path><path fill="#1f8a3a" d="{{ d.g }}"></path>
+    <path fill="#f5a623" d="{{ d.P }}"></path><path fill="#c97f12" d="{{ d.p }}"></path>
+    <path fill="#3a3f47" d="{{ d.n }}"></path>
+    <path fill="#fbf8ef" d="{{ d.C }}"></path><path fill="#d4cdbf" d="{{ d.c }}"></path>
+    <path fill="#22b8b0" d="{{ d.T }}"></path><path fill="#1a9c9a" d="{{ d.t }}"></path>
+    <path fill="#8a909a" d="{{ d.A }}"></path><path fill="#9ddcf7" d="{{ d.L }}"></path>
+  </svg>
+
+  <sc-if value="{{ showTag }}" hint-placeholder-val="{{ false }}">
+    <div style="position:absolute;left:{{ tagLeft }};right:{{ tagRight }};top:{{ tagTop }};transform:{{ tagTransform }};margin:{{ tagMargin }};pointer-events:none;display:flex;flex-direction:column;gap:0.2cqw;background:#fbf8ef;border:0.2cqw solid {{ tagBorder }};padding:0.2cqw 0.3cqw;font-size:0.6cqw;line-height:1;color:#141414;white-space:nowrap">
+      <span>{{ id }}</span>
+      <span>{{ nombre }}</span>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:120,&quot;height&quot;:200},&quot;tipo&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;paciente&quot;,&quot;doctor&quot;,&quot;camillero&quot;],&quot;default&quot;:&quot;paciente&quot;,&quot;tsType&quot;:&quot;'paciente'|'doctor'|'camillero'&quot;},&quot;estado&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;despierto&quot;,&quot;caminando&quot;,&quot;piso&quot;,&quot;cama&quot;],&quot;default&quot;:&quot;despierto&quot;,&quot;tsType&quot;:&quot;'despierto'|'caminando'|'piso'|'cama'&quot;},&quot;id&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;P-001&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;nombre&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;Carmelo P.&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;nivel&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;mild&quot;,&quot;moderate&quot;,&quot;severe&quot;],&quot;default&quot;:&quot;mild&quot;,&quot;tsType&quot;:&quot;'mild'|'moderate'|'severe'&quot;},&quot;tiempo&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;ocupado&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;},&quot;etiquetas&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;},&quot;etiqueta&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;abajo&quot;,&quot;cama&quot;,&quot;lado&quot;,&quot;izquierda&quot;],&quot;default&quot;:&quot;abajo&quot;,&quot;tsType&quot;:&quot;'abajo'|'cama'|'lado'|'izquierda'&quot;},&quot;camisa&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;azul&quot;,&quot;turquesa&quot;,&quot;verde&quot;,&quot;roja&quot;],&quot;default&quot;:&quot;azul&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;pelo&quot;:{&quot;editor&quot;:&quot;color&quot;,&quot;default&quot;:&quot;#2a1d14&quot;,&quot;options&quot;:[&quot;#2a1d14&quot;,&quot;#6b4320&quot;,&quot;#c97f12&quot;],&quot;tsType&quot;:&quot;string&quot;},&quot;onHover&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;(info: object | null, rect?: DOMRect) =&gt; void&quot;}}">
+class Component extends DCLogic {
+  // Mapas de sprite (vista frontal 3/4 para el mapa top-down). '.' = vacío; el contorno negro se genera solo.
+  static PAT_OPEN = [
+    '...HHHH...', '.HKHKHKHK.', '..SSSSSS..', '..SKSSKS..', '..SSSSSs..', '...SSSs...', '.FFRFFYFf.',
+    'SFYWYFRFfS', 'SFFYFGFFfS', 's.FFFFFf.s', '..PPPPPp..', '..PPp.Pp..', '..SS..Ss..', '..nn..nn..',
+  ];
+  static PAT_CLOSED = [
+    '...HHHH...', '.HKHKHKHK.', '..SSSSSS..', '..KKSSKK..', '..SSSSSs..', '...SKKs...', '.FFRFFYFf.',
+    'SFYWYFRFfS', 'SFFYFGFFfS', 's.FFFFFf.s', '..PPPPPp..', '..PPp.Pp..', '..SS..Ss..', '..nn..nn..',
+  ];
+  static PAT_WALK = [
+    '...HHHH...', '.HKHKHKHK.', '..SSSSSS..', '..SKSSKS..', '..SSSSSs..', '...SSSs...', '.FFRFFYFf.',
+    'SFYWYFRFfS', 'SFFYFGFFfS', 's.FFFFFf.s', '..PPPPPp..', '.PPp..Pp..', '.SS....Ss.', '.nn....nn.',
+  ];
+  static BED_HEAD = ['..DDDD..', '.DDDDDD.', '.DSSSSD.', '.KKSSKK.', '.SSSSSs.', '..SKKs..', 'FFFFFFFf'];
+  static DOC = [
+    '...DDDD...', '..DDDDDD..', '..DSSSSD..', '..SKSSKS..', '..SSSSSs..', '...SSSs...', '.CCCTTCCc.',
+    'CCCATTACCc', 'CCCCAACCCc', 'SCCCCCCCcS', '..TTTTTt..', '..TTt.Tt..', '..TT..Tt..', '..nn..nn..',
+  ];
+  static ORD = [
+    '...GGGG...', '..GGGGGg..', '..SSSSSS..', '..SKSSKS..', '..SSSSSs..', '...SSSs...', '.GGGGGGGg.',
+    'GGGWGGGGgg', 'GGGGGGGGgg', 'SGGGGGGGgS', '..gggggg..', '..ggg.gg..', '..gg..gg..', '..nn..nn..',
+  ];
+  static STRETCHER = [
+    '..AAAAAAAAAAAAAAAAAAAAA', 'RRAWWWLLLLLLLLLLLLLLLLA', 'R.AWWWLLLLLLLLLLLLLLLLA', 'R.AWWWLLLLLLLLLLLLLLLLA',
+    'R.AWWWLLLLLLLLLLLLLLLLA', 'RRAWWWLLLLLLLLLLLLLLLLA', '..AAAAAAAAAAAAAAAAAAAAA',
+  ];
+  static BOLT = ['...XX', '..XX.', '.XX..', 'XXXXX', '..XX.', '.XX..', '.X...'];
+
+  rootRef = React.createRef();
+
+  rotCCW(map) {
+    const H = map.length, W = map[0].length, out = [];
+    for (let y = 0; y < W; y++) { let row = ''; for (let x = 0; x < H; x++) row += map[x][W - 1 - y]; out.push(row); }
+    return out;
+  }
+
+  build(map, ox, oy, acc) {
+    const filled = new Set(), seen = new Set(), push = (c, x, y) => { acc[c] = (acc[c] || '') + `M${x + ox} ${y + oy}h1v1h-1z`; };
+    map.forEach((row, y) => [...row].forEach((ch, x) => { if (ch !== '.') filled.add(x + ',' + y); }));
+    map.forEach((row, y) => [...row].forEach((ch, x) => {
+      if (ch === '.') return;
+      push(ch, x, y);
+      [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(([dx, dy]) => {
+        const k = (x + dx) + ',' + (y + dy);
+        if (!filled.has(k) && !seen.has(k)) { seen.add(k); push('K', x + dx, y + dy); }
+      });
+    }));
+    return acc;
+  }
+
+  // datos para el tooltip del mapa (ID, nombre, rol, nivel y estado)
+  info() {
+    const p = this.props, tipo = p.tipo ?? 'paciente', estado = p.estado ?? 'despierto', isPat = tipo === 'paciente';
+    const lv = this.level();
+    let estadoTxt, estadoColor;
+    if (isPat) {
+      estadoTxt = { despierto: 'AWAKE', caminando: 'ARRIVING', piso: 'ASLEEP · HALLWAY', cama: 'ASLEEP · BED' }[estado];
+      estadoColor = { despierto: '#2fb84f', caminando: '#2fb84f', piso: '#e5484d', cama: '#2f6fd6' }[estado];
+      if (estado === 'piso' && p.tiempo) estadoTxt += ' ' + p.tiempo;
+    } else {
+      estadoTxt = p.ocupado ? 'BUSY' : 'FREE';
+      estadoColor = p.ocupado ? '#e5484d' : '#2fb84f';
+    }
+    return {
+      id: p.id ?? '', nombre: p.nombre ?? '',
+      idColor: isPat ? '#141414' : '#2f6fd6',
+      hasRol: !isPat, rol: tipo === 'doctor' ? 'DOCTOR' : 'CAMILLERO',
+      hasLevel: isPat && !!lv, nivel: lv ? lv.txt : '', bolts: lv ? lv.bolts : [],
+      estado: estadoTxt, estadoColor,
+    };
+  }
+
+  level() {
+    const C = Component;
+    if (!C._bolt) C._bolt = this.build(C.BOLT, 1, 1, {});
+    const lv = { mild: [1, '#ffd23f', 'MILD'], moderate: [2, '#f5a623', 'MODERATE'], severe: [3, '#e5484d', 'SEVERE'] }[this.props.nivel];
+    return lv ? { txt: lv[2], bolts: Array.from({ length: lv[0] }, () => ({ c: lv[1], k: C._bolt.K, f: C._bolt.X })) } : null;
+  }
+
+  renderVals() {
+    const C = Component;
+    const tipo = this.props.tipo ?? 'paciente';
+    const estado = this.props.estado ?? 'despierto';
+    const key = tipo + '|' + estado;
+    if (this._key !== key) {
+      this._key = key;
+      const d = {};
+      let W, H;
+      if (tipo === 'doctor') { this.build(C.DOC, 0, 0, d); W = 10; H = 14; }
+      else if (tipo === 'camillero') { this.build(C.STRETCHER, 12, 5, d); this.build(C.ORD, 0, 0, d); W = 35; H = 14; }
+      else if (estado === 'piso') { const m = this.rotCCW(C.PAT_CLOSED); this.build(m, 0, 0, d); W = m[0].length; H = m.length; }
+      else if (estado === 'caminando') { this.build(C.PAT_WALK, 0, 0, d); W = 10; H = 14; }
+      else if (estado === 'cama') { this.build(C.BED_HEAD, 0, 0, d); W = 8; H = 7; }
+      else { this.build(C.PAT_OPEN, 0, 0, d); W = 10; H = 14; }
+      const shadow = estado === 'cama' && tipo === 'paciente' ? '' : `M1 ${H}h${W - 1}v2h-${W - 1}z`;
+      this._sprite = { d, vb: `-1 -1 ${W + 2} ${H + 2}`, shadow };
+    }
+    const shirts = { azul: ['#2f6fd6', '#2152a8'], turquesa: ['#22b8b0', '#1a9c9a'], verde: ['#2fb84f', '#1f8a3a'], roja: ['#e5484d', '#b8323a'] };
+    const [shirt, shirtShade] = shirts[this.props.camisa ?? 'azul'] || shirts.azul;
+    const isPat = tipo === 'paciente';
+    const asleep = isPat && (estado === 'piso' || estado === 'cama');
+    const bubble = !isPat ? null : estado === 'piso' ? ['Zzz!', '#c4302b', '#8f2420'] : estado === 'cama' ? ['Zzz', '#2f6fd6', '#2152a8'] : null;
+    const lv = asleep ? this.level() : null;
+    const hasId = !!this.props.id;
+    const ocupado = !!this.props.ocupado;
+    const pos = this.props.etiqueta ?? 'abajo';
+    const place = {
+      abajo: ['50%', 'auto', '100%', 'translateX(-50%)', '0.25cqw 0 0 0'],
+      cama: ['100%', 'auto', '100%', 'none', '0.2cqw 0 0 0.4cqw'],
+      lado: ['100%', 'auto', '50%', 'translateY(-50%)', '0 0 0 0.4cqw'],
+      izquierda: ['auto', '100%', '50%', 'translateY(-50%)', '0 0.4cqw 0 0'],
+    }[pos] || ['50%', 'auto', '100%', 'translateX(-50%)', '0.25cqw 0 0 0'];
+    return {
+      ...this._sprite,
+      rootRef: this.rootRef,
+      enter: () => { if (hasId && this.props.onHover && this.rootRef.current) this.props.onHover(this.info(), this.rootRef.current.getBoundingClientRect()); },
+      leave: () => { if (hasId && this.props.onHover) this.props.onHover(null); },
+      cursor: hasId ? 'pointer' : 'default',
+      shirt, shirtShade,
+      hair: this.props.pelo ?? '#2a1d14',
+      // siempre visibles: punto libre/ocupado del staff · burbuja Zzz · rayitos solo si duerme
+      showDot: !isPat,
+      dotColor: ocupado ? '#e5484d' : '#2fb84f', dotShade: ocupado ? '#b8323a' : '#1f8a3a',
+      showBubble: !!bubble,
+      bubbleText: bubble ? bubble[0] : '', bubbleBg: bubble ? bubble[1] : '#2f6fd6', bubbleShade: bubble ? bubble[2] : '#2152a8',
+      hasTimer: isPat && estado === 'piso' && !!this.props.tiempo,
+      tiempo: this.props.tiempo ?? '',
+      showBolts: !!lv,
+      bolts: lv ? lv.bolts : [],
+      hasInd: !isPat || !!bubble,
+      // el camillero comparte sprite con la camilla: el punto va sobre su cabeza (col. 5 de 37), no al centro
+      indLeft: tipo === 'camillero' ? '16.2%' : '50%',
+      // etiqueta de ID + nombre: solo mientras se mantiene Alt
+      showTag: hasId && !!this.props.etiquetas,
+      id: this.props.id ?? '', nombre: this.props.nombre ?? '',
+      tagBorder: isPat ? '#141414' : '#2f6fd6',
+      tagLeft: place[0], tagRight: place[1], tagTop: place[2], tagTransform: place[3], tagMargin: place[4],
+    };
+  }
+}
+</script>
+</body>
+</html>

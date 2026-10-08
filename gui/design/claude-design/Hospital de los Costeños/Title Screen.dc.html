@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<style>
+/* =====================================================================
+   ANIMACIONES — todas por pasos (steps) y en bucle salvo indicación.
+   Clase CSS            Elemento                         Animación                              Duración
+   -------------------  -------------------------------  -------------------------------------  ---------------------------------
+   anim-olas            Líneas de olas del mar           vaivén horizontal 4 px                 2.4s steps(4) alternate infinite
+   anim-espuma          Espuma de la orilla              vaivén horizontal opuesto 4 px         1.8s steps(4) alternate infinite
+   anim-hojas           Copas de las 2 palmeras          balanceo ±2°                           3s steps(4) alternate infinite (2ª: delay -1.5s)
+   anim-nubes           Nubes (2)                        izquierda → derecha, 1 px por paso     90s / 130s steps(362) linear infinite
+   anim-zzz-logo        "Zzz" del logo (3 letras)        sube, crece y se desvanece             2.4s steps(6) infinite, desfase 0.8s
+   anim-zzz-paciente    "Zzz" del paciente (3 letras)    sube, crece y se desvanece             3s steps(6) infinite, desfase 1s
+   anim-respirar        Torso + cabeza del paciente      sube y baja 1-2 px                     4s steps(1) infinite
+   anim-cabeceo         Cabeza del paciente              cabeceo ocasional                      6s steps(1) infinite
+   anim-parpadeo        "PRESS ENTER"                    parpadeo                               1.2s steps(1) infinite
+   anim-cursor          Cursor ▶ del menú                rebote horizontal                      0.7s steps(2) infinite
+   anim-check           ✔ de la opción seleccionada      pop al marcarse                        0.3s steps(3), 1 vez
+   anim-confirmar       Fila del menú al confirmar       parpadeo (Enter / clic)                0.15s steps(1) × 3
+   Estáticos: hospital, sol, logo (excepto Zzz), arena, troncos.
+   ===================================================================== */
+html,body{margin:0;height:100%;background:#141414;}a{color:#2f6fd6;}a:hover{color:#e5484d;}
+@keyframes anim-olas{from{transform:translateX(0)}to{transform:translateX(1.19%)}}
+@keyframes anim-espuma{from{transform:translateX(0)}to{transform:translateX(-1.19%)}}
+@keyframes anim-hojas{from{transform:rotate(-2deg)}to{transform:rotate(2deg)}}
+@keyframes anim-nubes{from{transform:translateX(0)}to{transform:translateX(861.9%)}}
+@keyframes anim-zzz-logo{0%{transform:translateY(40%) scale(.6);opacity:0}30%{opacity:1}100%{transform:translateY(-60%) scale(1.3);opacity:0}}
+@keyframes anim-zzz-paciente{0%{transform:translateY(2px) scale(.6);opacity:0}30%{opacity:1}100%{transform:translateY(-4px) scale(1.25);opacity:0}}
+@keyframes anim-respirar{0%{transform:translateY(0)}25%{transform:translateY(-1px)}50%{transform:translateY(-2px)}75%{transform:translateY(-1px)}100%{transform:translateY(0)}}
+@keyframes anim-cabeceo{0%,70%{transform:translate(0,0)}78%{transform:translate(1px,1px)}86%{transform:translate(1px,2px)}94%{transform:translate(0,1px)}100%{transform:translate(0,0)}}
+@keyframes anim-parpadeo{0%{opacity:1}50%{opacity:0}}
+@keyframes anim-cursor{0%,100%{transform:translateX(0)}50%{transform:translateX(-35%)}}
+@keyframes anim-check{0%{transform:scale(.4)}50%{transform:scale(1.25)}100%{transform:scale(1)}}
+@keyframes anim-confirmar{0%{opacity:1}50%{opacity:.35}}
+.anim-olas{animation:anim-olas 2.4s steps(4) infinite alternate}
+.anim-espuma{animation:anim-espuma 1.8s steps(4) infinite alternate}
+.anim-hojas{animation:anim-hojas 3s steps(4) infinite alternate;transform-origin:51% 56%}
+.anim-nubes{animation:anim-nubes 90s steps(362) infinite linear}
+.anim-zzz-logo{animation:anim-zzz-logo 2.4s steps(6) infinite;transform-origin:left bottom}
+.anim-zzz-paciente{animation:anim-zzz-paciente 3s steps(6) infinite;transform-box:fill-box;transform-origin:center}
+.anim-respirar{animation:anim-respirar 4s steps(1) infinite}
+.anim-cabeceo{animation:anim-cabeceo 6s steps(1) infinite}
+.anim-parpadeo{animation:anim-parpadeo 1.2s steps(1) infinite}
+.anim-cursor{animation:anim-cursor .7s steps(2) infinite}
+.anim-check{animation:anim-check .3s steps(3) 1 both;transform-origin:left bottom}
+.anim-confirmar{animation:anim-confirmar .15s steps(1) 3}
+</style>
+</helmet>
+<div style="width:100vw;height:100vh;display:flex;align-items:center;justify-content:center;background:#141414;overflow:hidden">
+  <div data-screen-label="Title Screen" style="position:relative;width:min(100vw,177.78vh);aspect-ratio:16/9;container-type:inline-size;overflow:hidden;font-family:'Press Start 2P',monospace;background:#58c4f0;user-select:none">
+    <canvas ref="{{ fondoRef }}" width="320" height="180" style="position:absolute;inset:0;width:100%;height:100%;image-rendering:pixelated;display:block"></canvas>
+    <canvas ref="{{ nube1Ref }}" class="anim-nubes" width="42" height="15" style="position:absolute;left:-13.125%;top:31.667%;width:13.125%;height:auto;image-rendering:pixelated;display:block;animation-delay:-20.4s"></canvas>
+    <canvas ref="{{ nube2Ref }}" class="anim-nubes" width="42" height="15" style="position:absolute;left:-13.125%;top:16.111%;width:13.125%;height:auto;image-rendering:pixelated;display:block;animation-duration:130s;animation-delay:-110.6s"></canvas>
+    <canvas ref="{{ olasRef }}" class="anim-olas" width="336" height="28" style="position:absolute;left:-2.5%;top:55.556%;width:105%;height:auto;image-rendering:pixelated;display:block"></canvas>
+    <canvas ref="{{ espumaRef }}" class="anim-espuma" width="336" height="5" style="position:absolute;left:-2.5%;top:68.333%;width:105%;height:auto;image-rendering:pixelated;display:block"></canvas>
+    <canvas ref="{{ sueloRef }}" width="320" height="180" style="position:absolute;inset:0;width:100%;height:100%;image-rendering:pixelated;display:block"></canvas>
+    <canvas ref="{{ copa1Ref }}" class="anim-hojas" width="66" height="34" style="position:absolute;left:-2.8125%;top:46.111%;width:20.625%;height:auto;image-rendering:pixelated;display:block"></canvas>
+    <canvas ref="{{ copa2Ref }}" class="anim-hojas" width="66" height="34" style="position:absolute;left:46.5625%;top:49.444%;width:20.625%;height:auto;image-rendering:pixelated;display:block;animation-delay:-1.5s"></canvas>
+    <dc-import name="PacienteDormido" camisa="azul" style="position:absolute;left:4.6875%;top:62.222%;width:9.375%" hint-size="30px,47px"></dc-import>
+
+    <div style="position:absolute;left:0;right:0;top:1.5%;display:flex;flex-direction:column;align-items:center;gap:0.8cqw;pointer-events:none;z-index:3">
+      <div style="font-size:2.9cqw;line-height:1.2;color:#ffffff;letter-spacing:0.1cqw;text-shadow:0.3cqw 0 0 #141414,-0.3cqw 0 0 #141414,0 0.3cqw 0 #141414,0 -0.3cqw 0 #141414,0.3cqw 0.3cqw 0 #141414,-0.3cqw 0.3cqw 0 #141414,0.3cqw -0.3cqw 0 #141414,-0.3cqw -0.3cqw 0 #141414,0 0.6cqw 0 #141414,0.3cqw 0.6cqw 0 #141414,-0.3cqw 0.6cqw 0 #141414,0.4cqw 1cqw 0 rgba(0,0,0,0.22)">HOSPITAL DE LOS</div>
+      <div aria-label="COSTEÑOS" style="font-size:5.6cqw;line-height:1.2;color:#ffd23f;letter-spacing:0.2cqw;margin-top:2.6cqw;position:relative;z-index:0;text-shadow:0.5cqw 0 0 #141414,-0.5cqw 0 0 #141414,0 0.5cqw 0 #141414,0 -0.5cqw 0 #141414,0.5cqw 0.5cqw 0 #141414,-0.5cqw 0.5cqw 0 #141414,0.5cqw -0.5cqw 0 #141414,-0.5cqw -0.5cqw 0 #141414,0 0.8cqw 0 #c4302b,0 1.1cqw 0 #c4302b,0.5cqw 1.1cqw 0 #141414,-0.5cqw 1.1cqw 0 #141414,0 1.6cqw 0 #141414,0.5cqw 1.6cqw 0 #141414,-0.5cqw 1.6cqw 0 #141414,0.6cqw 2.2cqw 0 rgba(0,0,0,0.22)">COSTE<span style="position:relative">N<svg viewBox="-3 -3 25 17" shape-rendering="crispEdges" style="position:absolute;left:-0.0625em;top:{{ tildeTop }};width:1.0417em;height:0.7083em;overflow:visible;z-index:-1">
+            <defs><g id="tilde-n"><rect x="3" y="0" width="6" height="3"></rect><rect x="15" y="0" width="3" height="3"></rect><rect x="0" y="3" width="3" height="3"></rect><rect x="9" y="3" width="6" height="3"></rect></g></defs>
+            <use href="#tilde-n" fill="rgba(0,0,0,0.22)" transform="translate(2.57 9.43)"></use>
+            <use href="#tilde-n" fill="#141414" transform="translate(0 6.86)"></use><use href="#tilde-n" fill="#141414" transform="translate(2.14 6.86)"></use><use href="#tilde-n" fill="#141414" transform="translate(-2.14 6.86)"></use>
+            <use href="#tilde-n" fill="#141414" transform="translate(2.14 4.71)"></use><use href="#tilde-n" fill="#141414" transform="translate(-2.14 4.71)"></use>
+            <use href="#tilde-n" fill="#c4302b" transform="translate(0 4.71)"></use><use href="#tilde-n" fill="#c4302b" transform="translate(0 3.43)"></use>
+            <use href="#tilde-n" fill="#141414" transform="translate(2.14 0)"></use><use href="#tilde-n" fill="#141414" transform="translate(-2.14 0)"></use><use href="#tilde-n" fill="#141414" transform="translate(0 2.14)"></use><use href="#tilde-n" fill="#141414" transform="translate(0 -2.14)"></use>
+            <use href="#tilde-n" fill="#141414" transform="translate(2.14 2.14)"></use><use href="#tilde-n" fill="#141414" transform="translate(-2.14 2.14)"></use><use href="#tilde-n" fill="#141414" transform="translate(2.14 -2.14)"></use><use href="#tilde-n" fill="#141414" transform="translate(-2.14 -2.14)"></use>
+            <use href="#tilde-n" fill="#ffd23f"></use>
+          </svg></span>OS</div>
+      <div style="position:relative;margin-top:1cqw">
+        <div style="display:flex;align-items:center;gap:1.2cqw;background:#2f6fd6;border:0.45cqw solid #141414;padding:0.9cqw 1.8cqw 1.2cqw;box-shadow:inset 0 -0.5cqw 0 #2152a8,0.5cqw 0.7cqw 0 rgba(0,0,0,0.22)">
+          <svg viewBox="0 0 18 12" shape-rendering="crispEdges" style="width:2.8cqw;height:auto;display:block">
+            <rect x="2" y="1" width="14" height="10" fill="#141414"></rect>
+            <rect x="0" y="0" width="3" height="3" fill="#141414"></rect><rect x="15" y="0" width="3" height="3" fill="#141414"></rect><rect x="0" y="9" width="3" height="3" fill="#141414"></rect><rect x="15" y="9" width="3" height="3" fill="#141414"></rect>
+            <rect x="2" y="2" width="14" height="8" fill="#ffffff"></rect>
+            <rect x="1" y="1" width="2" height="2" fill="#ffffff"></rect><rect x="15" y="1" width="2" height="2" fill="#ffffff"></rect><rect x="1" y="9" width="2" height="2" fill="#ffffff"></rect><rect x="15" y="9" width="2" height="2" fill="#ffffff"></rect>
+            <rect x="3" y="8" width="12" height="2" fill="#c4cad6"></rect><rect x="14" y="3" width="2" height="6" fill="#c4cad6"></rect><rect x="15" y="9" width="2" height="2" fill="#c4cad6"></rect>
+            <rect x="6" y="5" width="3" height="1" fill="#c4cad6"></rect><rect x="9" y="6" width="2" height="1" fill="#c4cad6"></rect>
+          </svg>
+          <div style="font-size:1.5cqw;color:#ffffff;line-height:1;white-space:nowrap">con Narcolepsia</div>
+        </div>
+        <div style="position:absolute;left:100%;top:0;width:12cqw;height:0;color:#ffffff;line-height:1;text-shadow:0.25cqw 0 0 #141414,-0.25cqw 0 0 #141414,0 0.25cqw 0 #141414,0 -0.25cqw 0 #141414,0.25cqw 0.25cqw 0 #141414,-0.25cqw 0.25cqw 0 #141414,0.25cqw -0.25cqw 0 #141414,-0.25cqw -0.25cqw 0 #141414">
+          <span class="anim-zzz-logo" style="position:absolute;left:0.6cqw;bottom:-2cqw;font-size:1.1cqw">z</span>
+          <span class="anim-zzz-logo" style="position:absolute;left:4.1cqw;bottom:-1.4cqw;font-size:1.5cqw;animation-delay:-0.8s">Z</span>
+          <span class="anim-zzz-logo" style="position:absolute;left:9.1cqw;bottom:0;font-size:2cqw;animation-delay:-1.6s">Z</span>
+        </div>
+      </div>
+    </div>
+
+    <div style="position:absolute;left:63%;top:39%;width:29%;transform:rotate(2.5deg);filter:drop-shadow(0.8cqw 1cqw 0 rgba(40,25,0,0.28))">
+      <div style="position:relative;background:#b9773f;border:0.45cqw solid #141414;padding:2.6cqw 1.6cqw 1.3cqw;box-shadow:inset -0.6cqw -0.6cqw 0 #8f5a2c,inset 0.4cqw 0.4cqw 0 #d08f55">
+        <div style="position:absolute;left:30%;width:40%;top:-1.6cqw;height:3.6cqw;background:#c9ced6;border:0.45cqw solid #141414;box-shadow:inset 0 -0.8cqw 0 #8a909a,inset 0.4cqw 0.4cqw 0 #eef1f5;z-index:2;display:flex;justify-content:center;padding-top:0.5cqw;box-sizing:border-box">
+          <div style="width:3cqw;height:0.9cqw;background:#141414"></div>
+        </div>
+        <div style="background:#fbf8ef;border:0.4cqw solid #141414;padding:2cqw 1.4cqw 1.6cqw;box-shadow:inset -0.5cqw -0.5cqw 0 #e3ddcc;display:flex;flex-direction:column;gap:1.6cqw">
+          <div style="display:flex;justify-content:space-between;align-items:center;font-size:0.95cqw;color:#2f6fd6;padding-bottom:0.9cqw;border-bottom:0.3cqw solid #141414">
+            <span>CHECKLIST</span><span style="color:#e5484d">TURNO 01</span>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:0.6cqw">
+            <sc-for list="{{ items }}" as="item" hint-placeholder-count="5">
+              <div class="{{ item.cls }}" onMouseEnter="{{ item.select }}" onClick="{{ item.confirm }}" style="display:flex;align-items:center;gap:0.9cqw;padding:0.55cqw 0.6cqw;cursor:pointer;background:{{ item.bg }}">
+                <div style="width:1.4cqw;height:1.4cqw;flex:none">
+                  <sc-if value="{{ item.on }}" hint-placeholder-val="{{ false }}">
+                    <svg class="anim-cursor" viewBox="0 0 7 7" shape-rendering="crispEdges" style="width:1.4cqw;height:1.4cqw;display:block">
+                      <rect x="0" y="0" width="3" height="7" fill="#141414"></rect><rect x="3" y="1" width="2" height="5" fill="#141414"></rect><rect x="5" y="2" width="1" height="3" fill="#141414"></rect><rect x="6" y="3" width="1" height="1" fill="#141414"></rect>
+                      <rect x="1" y="1" width="1" height="5" fill="#e5484d"></rect><rect x="2" y="2" width="2" height="3" fill="#e5484d"></rect><rect x="4" y="3" width="1" height="1" fill="#e5484d"></rect>
+                    </svg>
+                  </sc-if>
+                </div>
+                <div style="position:relative;width:1.8cqw;height:1.8cqw;flex:none;background:#ffffff;border:0.35cqw solid #141414;box-sizing:border-box">
+                  <sc-if value="{{ item.on }}" hint-placeholder-val="{{ false }}">
+                    <svg class="anim-check" viewBox="0 0 9 8" shape-rendering="crispEdges" style="position:absolute;left:-0.1cqw;top:-1.1cqw;width:2.6cqw;height:auto">
+                      <rect x="6" y="0" width="3" height="3" fill="#141414"></rect><rect x="4" y="2" width="4" height="3" fill="#141414"></rect><rect x="2" y="4" width="4" height="4" fill="#141414"></rect><rect x="0" y="3" width="3" height="3" fill="#141414"></rect><rect x="1" y="5" width="3" height="2" fill="#141414"></rect>
+                      <rect x="7" y="1" width="1" height="1" fill="#2fb84f"></rect><rect x="5" y="3" width="2" height="1" fill="#2fb84f"></rect><rect x="3" y="5" width="2" height="2" fill="#2fb84f"></rect><rect x="1" y="4" width="1" height="1" fill="#2fb84f"></rect><rect x="2" y="5" width="1" height="1" fill="#2fb84f"></rect><rect x="6" y="2" width="1" height="1" fill="#2fb84f"></rect><rect x="4" y="4" width="1" height="1" fill="#2fb84f"></rect>
+                    </svg>
+                  </sc-if>
+                </div>
+                <div style="font-size:1.45cqw;line-height:1;color:{{ item.color }};white-space:nowrap">{{ item.label }}</div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="anim-parpadeo" style="position:absolute;left:0;width:61%;bottom:5.5%;text-align:center;font-size:1.6cqw;color:#ffffff;pointer-events:none;text-shadow:0.3cqw 0 0 #141414,-0.3cqw 0 0 #141414,0 0.3cqw 0 #141414,0 -0.3cqw 0 #141414,0.3cqw 0.3cqw 0 #141414,-0.3cqw 0.3cqw 0 #141414,0.3cqw -0.3cqw 0 #141414,-0.3cqw -0.3cqw 0 #141414">PRESS ENTER</div>
+    <div style="position:absolute;right:2.5%;bottom:3.5%;font-size:0.85cqw;color:#141414;pointer-events:none;white-space:nowrap">v1.0 · Universidad EIA · OOP en Go</div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { sel: 0, flash: false };
+  labels = ['CONTINUE', 'NEW ROUND', 'SETTINGS', 'CREDITS', 'EXIT'];
+  fondoRef = React.createRef(); nube1Ref = React.createRef(); nube2Ref = React.createRef();
+  olasRef = React.createRef(); espumaRef = React.createRef(); sueloRef = React.createRef();
+  copa1Ref = React.createRef(); copa2Ref = React.createRef();
+
+  componentDidMount() {
+    this.draw();
+    // coloca la virgulilla 1 px de fuente por encima del trazo superior de la N
+    document.fonts.load('100px "Press Start 2P"').then(() => {
+      const m = document.createElement('canvas').getContext('2d');
+      m.font = '100px "Press Start 2P"';
+      const t = m.measureText('N');
+      if (t.fontBoundingBoxAscent) this.setState({ tildeTop: ((t.fontBoundingBoxAscent - t.actualBoundingBoxAscent) / 100 - 0.5) + 'em' });
+    });
+    this.onKey = (e) => {
+      const n = this.labels.length;
+      if (e.key === 'ArrowDown' || e.key === 's') { e.preventDefault(); this.setState(s => ({ sel: (s.sel + 1) % n })); }
+      if (e.key === 'ArrowUp' || e.key === 'w') { e.preventDefault(); this.setState(s => ({ sel: (s.sel + n - 1) % n })); }
+      if (e.key === 'Enter') { e.preventDefault(); this.confirm(this.state.sel); }
+    };
+    window.addEventListener('keydown', this.onKey);
+  }
+  componentWillUnmount() { window.removeEventListener('keydown', this.onKey); clearTimeout(this.t); }
+
+  confirm(i) {
+    clearTimeout(this.t);
+    this.setState({ sel: i, flash: false }, () => requestAnimationFrame(() => {
+      this.setState({ flash: true });
+      this.t = setTimeout(() => this.setState({ flash: false }), 450);
+    }));
+    window.dispatchEvent(new CustomEvent('menu-select', { detail: this.labels[i] }));
+  }
+
+  draw() {
+    const K = '#141414';
+    const ctx = (ref) => { const c = ref.current; if (!c) return null; const g = c.getContext('2d'); g.imageSmoothingEnabled = false; return g; };
+    const R = (g, x, y, w, h, col) => { g.fillStyle = col; g.fillRect(x, y, w, h); };
+    const shadow = (g, cx, cy, rx, ry) => {
+      for (let dy = -ry; dy <= ry; dy++) {
+        const h = Math.round(rx * Math.sqrt(1 - (dy / (ry + 0.5)) ** 2));
+        R(g, cx - h, cy + dy, h * 2, 1, 'rgba(90,60,10,0.22)');
+      }
+    };
+    const make = (w, h, fn) => {
+      const W = w + 2, H = h + 2, o = document.createElement('canvas');
+      o.width = W; o.height = H;
+      const k = o.getContext('2d');
+      fn((a, b, cw, ch, col) => { k.fillStyle = col; k.fillRect(a + 1, b + 1, cw, ch); });
+      const d = k.getImageData(0, 0, W, H), p = d.data, m = new Uint8Array(W * H);
+      for (let i = 0; i < W * H; i++) m[i] = p[i * 4 + 3] > 0 ? 1 : 0;
+      for (let yy = 0; yy < H; yy++) for (let xx = 0; xx < W; xx++) {
+        const i = yy * W + xx; if (m[i]) continue;
+        if ((xx > 0 && m[i - 1]) || (xx < W - 1 && m[i + 1]) || (yy > 0 && m[i - W]) || (yy < H - 1 && m[i + W])) {
+          p[i * 4] = p[i * 4 + 1] = p[i * 4 + 2] = 20; p[i * 4 + 3] = 255;
+        }
+      }
+      k.putImageData(d, 0, 0);
+      return o;
+    };
+    const put = (g, o, x, y, flip) => {
+      if (flip) { g.save(); g.translate(x - 1 + o.width, y - 1); g.scale(-1, 1); g.drawImage(o, 0, 0); g.restore(); }
+      else g.drawImage(o, x - 1, y - 1);
+    };
+
+    // fondo: cielo, sol, mar
+    const f = ctx(this.fondoRef);
+    if (f) {
+      R(f, 0, 0, 320, 100, '#58c4f0'); R(f, 0, 0, 320, 24, '#46b3e6'); R(f, 0, 82, 320, 18, '#86d6f4');
+      put(f, make(28, 28, (r) => {
+        for (let y = 0; y < 28; y++) for (let x = 0; x < 28; x++) {
+          const dx = x - 13.5, dy = y - 13.5, dd = Math.sqrt(dx * dx + dy * dy);
+          if (dd <= 13.6) r(x, y, 1, 1, (dx + dy > 9 && dd > 9) ? '#f5a623' : '#ffd23f');
+        }
+        r(7, 7, 3, 2, '#fff2a6'); r(6, 9, 2, 2, '#fff2a6');
+      }), 14, 14);
+      R(f, 0, 100, 320, 28, '#22b8b0'); R(f, 0, 100, 320, 5, '#1a9c9a');
+    }
+    // nubes
+    const cloud = make(40, 13, (r) => { r(10, 0, 12, 4, '#fff'); r(24, 2, 8, 3, '#fff'); r(4, 3, 28, 5, '#fff'); r(0, 7, 40, 6, '#fff'); r(0, 11, 40, 2, '#d3e6f1'); r(4, 7, 4, 1, '#d3e6f1'); });
+    const n1 = ctx(this.nube1Ref), n2 = ctx(this.nube2Ref);
+    if (n1) put(n1, cloud, 1, 1);
+    if (n2) put(n2, cloud, 1, 1, true);
+    // olas y espuma (franjas más anchas que la escena para el vaivén)
+    const o = ctx(this.olasRef);
+    if (o) [[8, 0], [14, 13], [20, 6]].forEach(([y, off]) => { for (let x = off; x < 336; x += 26) R(o, x, y, 7, 1, '#bff1ea'); });
+    const e = ctx(this.espumaRef);
+    if (e) { R(e, 0, 2, 336, 3, '#eafbf7'); for (let x = 0; x < 336; x += 8) R(e, x, 1, 4, 1, '#eafbf7'); }
+
+    // suelo: arena, hospital, troncos, sombras
+    const g = ctx(this.sueloRef);
+    if (g) {
+      R(g, 0, 128, 320, 4, '#e0bd73'); R(g, 0, 132, 320, 48, '#f3d68e');
+      for (let i = 0; i < 140; i++) R(g, (i * 73 + (i % 7) * 11) % 320, 134 + (i * 37) % 44, 2, 1, '#dcb76a');
+      shadow(g, 106, 162, 70, 5);
+      put(g, make(124, 90, (r) => {
+        r(50, 0, 24, 16, '#fbf8ef'); r(50, 13, 24, 3, '#d9d3c5'); r(50, 16, 24, 1, K);
+        r(58, 2, 8, 12, K); r(54, 5, 16, 6, K);
+        r(59, 3, 6, 10, '#2fb84f'); r(55, 6, 14, 4, '#2fb84f'); r(59, 10, 6, 3, '#1f8a3a'); r(55, 9, 14, 1, '#1f8a3a');
+        r(0, 17, 124, 8, '#e5484d'); r(0, 23, 124, 2, '#b8323a'); r(0, 25, 124, 1, K);
+        r(4, 26, 116, 60, '#efeadf'); r(110, 26, 10, 60, '#d4cdbf'); r(4, 26, 116, 2, '#d4cdbf');
+        r(4, 53, 116, 1, K); r(4, 54, 116, 3, '#c9c2b2'); r(4, 57, 116, 1, K);
+        const win = (x, y) => {
+          r(x, y, 14, 14, K); r(x + 1, y + 1, 12, 12, '#9ddcf7'); r(x + 1, y + 8, 12, 5, '#6cc0e8');
+          r(x + 7, y + 1, 1, 12, K); r(x + 1, y + 7, 12, 1, K);
+          r(x + 2, y + 2, 2, 1, '#ffffff'); r(x + 2, y + 3, 1, 1, '#ffffff');
+          r(x - 1, y + 14, 16, 2, '#c9c2b2'); r(x - 1, y + 16, 16, 1, K); r(x - 1, y + 14, 1, 2, K); r(x + 14, y + 14, 1, 2, K);
+        };
+        [10, 32, 54, 76, 98].forEach(x => win(x, 32));
+        [10, 32, 76, 98].forEach(x => win(x, 63));
+        r(51, 62, 22, 24, K); r(52, 63, 20, 23, '#2f6fd6'); r(52, 80, 20, 6, '#2152a8');
+        r(53, 64, 7, 7, '#9ddcf7'); r(64, 64, 7, 7, '#9ddcf7'); r(53, 64, 2, 1, '#ffffff');
+        r(61, 62, 2, 24, K); r(58, 74, 1, 3, '#ffd23f'); r(65, 74, 1, 3, '#ffd23f');
+        r(47, 57, 30, 1, K); r(47, 58, 30, 3, '#e5484d'); r(47, 61, 30, 1, K); r(47, 57, 1, 5, K); r(76, 57, 1, 5, K);
+        r(46, 86, 32, 1, K); r(46, 87, 32, 3, '#c9ccd2'); r(46, 89, 32, 1, '#a2a7b0');
+      }), 36, 72);
+      const trunk = make(64, 72, (r) => {
+        for (let y = 18; y < 72; y++) {
+          const t = (71 - y) / 53, x = 22 + Math.round(t * t * 8);
+          r(x, y, 6, 1, (y % 5 === 0) ? '#7a4c26' : '#b07a45'); r(x + 4, y, 2, 1, '#8f5f33');
+        }
+      });
+      shadow(g, 18, 156, 14, 3);
+      shadow(g, 29, 158, 10, 2);
+      put(g, trunk, -8, 84);
+      shadow(g, 176, 162, 15, 3);
+      put(g, trunk, 150, 90, true);
+    }
+
+    // copas de palmera (mismo sistema de coordenadas que el tronco)
+    const crown = make(64, 32, (r) => {
+      r(26, 16, 12, 7, K); r(27, 17, 4, 5, '#6b4320'); r(32, 17, 5, 5, '#6b4320'); r(28, 17, 1, 1, '#9a6a3a'); r(33, 17, 1, 1, '#9a6a3a');
+      const frond = (dx, dy, dr, len) => {
+        for (let t = 0; t <= len; t++) {
+          const x = Math.round(32 + dx * t), y = Math.round(15 + dy * t + dr * t * t), th = t < len * 0.55 ? 3 : 2;
+          r(x, y, 2, th, '#3cb54a'); r(x, y + th - 1, 2, 1, '#23863a');
+          if (t % 2 === 0 && t > 2 && t < len) r(x, y + th, 1, 2, '#23863a');
+        }
+      };
+      frond(-1.6, -0.2, 0.06, 16); frond(1.6, -0.2, 0.06, 16);
+      frond(-1.2, -0.9, 0.07, 12); frond(1.2, -0.9, 0.07, 12);
+      frond(-0.9, 0.3, 0.05, 10); frond(0.9, 0.3, 0.05, 10);
+      r(28, 12, 8, 4, '#3cb54a'); r(28, 15, 8, 1, '#23863a');
+    });
+    const c1 = ctx(this.copa1Ref), c2 = ctx(this.copa2Ref);
+    if (c1) put(c1, crown, 1, 1);
+    if (c2) put(c2, crown, 1, 1, true);
+  }
+
+  renderVals() {
+    const { sel, flash } = this.state;
+    return {
+      fondoRef: this.fondoRef, nube1Ref: this.nube1Ref, nube2Ref: this.nube2Ref,
+      olasRef: this.olasRef, espumaRef: this.espumaRef, sueloRef: this.sueloRef,
+      copa1Ref: this.copa1Ref, copa2Ref: this.copa2Ref,
+      tildeTop: this.state.tildeTop || '-0.5em',
+      items: this.labels.map((label, i) => ({
+        label,
+        on: i === sel,
+        cls: (i === sel && flash) ? 'anim-confirmar' : '',
+        bg: i === sel ? '#ffe27a' : 'transparent',
+        color: i === sel ? '#2f6fd6' : '#141414',
+        select: () => { if (this.state.sel !== i) this.setState({ sel: i }); },
+        confirm: () => this.confirm(i),
+      })),
+    };
+  }
+}
+</script>
+</body>
+</html>

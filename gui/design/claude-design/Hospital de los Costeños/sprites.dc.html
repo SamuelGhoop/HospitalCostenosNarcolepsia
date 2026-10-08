@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
+<style>html,body{margin:0;background:#d9dde2;}a{color:#2f6fd6;}a:hover{color:#e5484d;}</style>
+</helmet>
+<div data-screen-label="Sprites" style="min-height:100vh;box-sizing:border-box;padding:40px 24px 56px;background:#d9dde2;color:#141414;font-family:'VT323',monospace;display:flex;flex-direction:column;align-items:center;gap:28px">
+  <div style="width:100%;max-width:1320px;display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px 24px">
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div style="font-family:'Press Start 2P',monospace;font-size:18px;line-height:1.3">SPRITES · PACIENTE COSTEÑO</div>
+      <div style="font-size:24px;line-height:1">Capas: cuerpo base (piel 1) · camisa lisa</div>
+    </div>
+    <div style="font-size:24px;line-height:1;color:#5a616b">Cuadros de 16 × 24 px · fondo transparente</div>
+  </div>
+
+  <div style="width:100%;max-width:1320px;display:flex;flex-wrap:wrap;gap:28px;align-items:flex-start">
+    <div style="flex:1 1 760px;box-sizing:border-box;background:#f4f3ee;border:4px solid #141414;box-shadow:6px 6px 0 rgba(20,20,20,0.22);padding:20px 24px 24px;display:flex;flex-direction:column;gap:20px">
+      <div style="font-family:'Press Start 2P',monospace;font-size:12px;line-height:1">SPRITESHEETS</div>
+      <div style="display:flex;flex-wrap:wrap;gap:32px;align-items:flex-start">
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <div style="font-size:20px;line-height:1">TAMAÑO REAL</div>
+          <div style="display:flex;gap:16px">
+            <div style="display:flex;flex-direction:column;gap:6px">
+              <canvas ref="{{ bodyRef }}" width="64" height="240" style="display:block;width:64px;height:240px;image-rendering:pixelated;border:2px solid #141414;background-color:#ffffff;background-image:repeating-conic-gradient(#e3e5e8 0% 25%, #ffffff 0% 50%);background-size:8px 8px"></canvas>
+              <div style="font-size:18px;line-height:1">Cuerpo</div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:6px">
+              <canvas ref="{{ shirtRef }}" width="64" height="240" style="display:block;width:64px;height:240px;image-rendering:pixelated;border:2px solid #141414;background-color:#8a909a;background-image:repeating-conic-gradient(#7a808a 0% 25%, #8a909a 0% 50%);background-size:8px 8px"></canvas>
+              <div style="font-size:18px;line-height:1">Camisa</div>
+            </div>
+          </div>
+          <div style="font-size:18px;line-height:1;color:#5a616b">64 × 240 px cada uno</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <div style="font-size:20px;line-height:1">AMPLIADO ×4</div>
+          <div style="display:grid;grid-template-columns:auto auto auto;column-gap:12px;row-gap:4px">
+            <div></div>
+            <div style="font-size:20px;line-height:1;padding:0 2px">CUERPO</div>
+            <div style="font-size:20px;line-height:1;padding:0 2px">CAMISA LISA</div>
+            <div></div>
+            <div style="display:flex;padding:0 2px">
+              <div style="width:64px;text-align:center;font-size:18px;line-height:1;color:#5a616b">1</div>
+              <div style="width:64px;text-align:center;font-size:18px;line-height:1;color:#5a616b">2</div>
+              <div style="width:64px;text-align:center;font-size:18px;line-height:1;color:#5a616b">3</div>
+              <div style="width:64px;text-align:center;font-size:18px;line-height:1;color:#5a616b">4</div>
+            </div>
+            <div style="display:flex;padding:0 2px">
+              <div style="width:64px;text-align:center;font-size:18px;line-height:1;color:#5a616b">1</div>
+              <div style="width:64px;text-align:center;font-size:18px;line-height:1;color:#5a616b">2</div>
+              <div style="width:64px;text-align:center;font-size:18px;line-height:1;color:#5a616b">3</div>
+              <div style="width:64px;text-align:center;font-size:18px;line-height:1;color:#5a616b">4</div>
+            </div>
+            <div style="display:flex;flex-direction:column;padding:2px 0">
+              <div style="height:96px;display:flex;flex-direction:column;justify-content:center;align-items:flex-end;gap:4px;text-align:right"><div style="font-size:20px;line-height:1">1 QUIETO</div><div style="font-size:18px;line-height:1;color:#5a616b">2 cuadros</div></div>
+              <div style="height:96px;display:flex;flex-direction:column;justify-content:center;align-items:flex-end;gap:4px;text-align:right"><div style="font-size:20px;line-height:1">2 CAMINAR ABAJO</div><div style="font-size:18px;line-height:1;color:#5a616b">4 cuadros</div></div>
+              <div style="height:96px;display:flex;flex-direction:column;justify-content:center;align-items:flex-end;gap:4px;text-align:right"><div style="font-size:20px;line-height:1">3 CAMINAR ARRIBA</div><div style="font-size:18px;line-height:1;color:#5a616b">4 cuadros</div></div>
+              <div style="height:96px;display:flex;flex-direction:column;justify-content:center;align-items:flex-end;gap:4px;text-align:right"><div style="font-size:20px;line-height:1">4 CAMINAR IZQUIERDA</div><div style="font-size:18px;line-height:1;color:#5a616b">4 cuadros</div></div>
+              <div style="height:96px;display:flex;flex-direction:column;justify-content:center;align-items:flex-end;gap:4px;text-align:right"><div style="font-size:20px;line-height:1">5 AVISO DE SUEÑO</div><div style="font-size:18px;line-height:1;color:#5a616b">4 cuadros</div></div>
+              <div style="height:96px;display:flex;flex-direction:column;justify-content:center;align-items:flex-end;gap:4px;text-align:right"><div style="font-size:20px;line-height:1">6 DESPLOMARSE</div><div style="font-size:18px;line-height:1;color:#5a616b">4 cuadros</div></div>
+              <div style="height:96px;display:flex;flex-direction:column;justify-content:center;align-items:flex-end;gap:4px;text-align:right"><div style="font-size:20px;line-height:1">7 DORMIDO EN EL PISO</div><div style="font-size:18px;line-height:1;color:#5a616b">2 cuadros</div></div>
+              <div style="height:96px;display:flex;flex-direction:column;justify-content:center;align-items:flex-end;gap:4px;text-align:right"><div style="font-size:20px;line-height:1">8 DORMIDO EN CAMA</div><div style="font-size:18px;line-height:1;color:#5a616b">2 cuadros</div></div>
+              <div style="height:96px;display:flex;flex-direction:column;justify-content:center;align-items:flex-end;gap:4px;text-align:right"><div style="font-size:20px;line-height:1">9 DESPERTARSE</div><div style="font-size:18px;line-height:1;color:#5a616b">4 cuadros</div></div>
+              <div style="height:96px;display:flex;flex-direction:column;justify-content:center;align-items:flex-end;gap:4px;text-align:right"><div style="font-size:20px;line-height:1">10 ALTA</div><div style="font-size:18px;line-height:1;color:#5a616b">4 cuadros</div></div>
+            </div>
+            <canvas ref="{{ bodyBig }}" width="256" height="960" style="display:block;width:256px;height:960px;image-rendering:pixelated;border:2px solid #141414;background-color:#ffffff;background-image:repeating-conic-gradient(#e3e5e8 0% 25%, #ffffff 0% 50%);background-size:16px 16px"></canvas>
+            <canvas ref="{{ shirtBig }}" width="256" height="960" style="display:block;width:256px;height:960px;image-rendering:pixelated;border:2px solid #141414;background-color:#8a909a;background-image:repeating-conic-gradient(#7a808a 0% 25%, #8a909a 0% 50%);background-size:16px 16px"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="flex:1 1 420px;box-sizing:border-box;background:#f4f3ee;border:4px solid #141414;box-shadow:6px 6px 0 rgba(20,20,20,0.22);padding:20px 24px 24px;display:flex;flex-direction:column;gap:20px">
+      <div style="font-family:'Press Start 2P',monospace;font-size:12px;line-height:1.4">VISTA PREVIA ×4 · CUERPO + CAMISA</div>
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div style="font-size:20px;line-height:1">Tinte de la camisa</div>
+        <div style="display:flex;flex-wrap:wrap;align-items:center;gap:14px">
+          <sc-for list="{{ swatches }}" as="s" hint-placeholder-count="6">
+            <button type="button" title="{{ s.name }}" onClick="{{ s.pick }}" style="width:32px;height:32px;padding:0;box-sizing:border-box;border:3px solid #141414;background:{{ s.c }};box-shadow:{{ s.ring }};cursor:pointer"></button>
+          </sc-for>
+          <input type="color" value="{{ tint }}" onChange="{{ onPick }}" title="Otro color" style="width:44px;height:34px;box-sizing:border-box;border:3px solid #141414;padding:0;background:#f4f3ee;cursor:pointer">
+          <div style="font-size:20px;line-height:1;color:#5a616b">{{ tintLabel }}</div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:24px 20px">
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <canvas ref="{{ prev0 }}" width="64" height="96" style="display:block;width:64px;height:96px;image-rendering:pixelated;border:3px solid #141414;background-color:#eceae4;background-image:repeating-conic-gradient(#e1ddd3 0% 25%, #eceae4 0% 50%);background-size:48px 48px;box-shadow:4px 4px 0 rgba(20,20,20,0.18)"></canvas>
+          <div style="font-size:20px;line-height:1">QUIETO</div>
+          <div style="font-size:18px;line-height:1;color:#5a616b">2 cuadros · 2 fps</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <canvas ref="{{ prev1 }}" width="64" height="96" style="display:block;width:64px;height:96px;image-rendering:pixelated;border:3px solid #141414;background-color:#eceae4;background-image:repeating-conic-gradient(#e1ddd3 0% 25%, #eceae4 0% 50%);background-size:48px 48px;box-shadow:4px 4px 0 rgba(20,20,20,0.18)"></canvas>
+          <div style="font-size:20px;line-height:1">CAMINAR ABAJO</div>
+          <div style="font-size:18px;line-height:1;color:#5a616b">4 cuadros · {{ fps }} fps</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <canvas ref="{{ prev2 }}" width="64" height="96" style="display:block;width:64px;height:96px;image-rendering:pixelated;border:3px solid #141414;background-color:#eceae4;background-image:repeating-conic-gradient(#e1ddd3 0% 25%, #eceae4 0% 50%);background-size:48px 48px;box-shadow:4px 4px 0 rgba(20,20,20,0.18)"></canvas>
+          <div style="font-size:20px;line-height:1">CAMINAR ARRIBA</div>
+          <div style="font-size:18px;line-height:1;color:#5a616b">4 cuadros · {{ fps }} fps</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <canvas ref="{{ prev3 }}" width="64" height="96" style="display:block;width:64px;height:96px;image-rendering:pixelated;border:3px solid #141414;background-color:#eceae4;background-image:repeating-conic-gradient(#e1ddd3 0% 25%, #eceae4 0% 50%);background-size:48px 48px;box-shadow:4px 4px 0 rgba(20,20,20,0.18)"></canvas>
+          <div style="font-size:20px;line-height:1">CAMINAR IZQUIERDA</div>
+          <div style="font-size:18px;line-height:1;color:#5a616b">4 cuadros · {{ fps }} fps</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <canvas ref="{{ prev4 }}" width="64" height="96" style="display:block;width:64px;height:96px;image-rendering:pixelated;border:3px solid #141414;background-color:#eceae4;background-image:repeating-conic-gradient(#e1ddd3 0% 25%, #eceae4 0% 50%);background-size:48px 48px;box-shadow:4px 4px 0 rgba(20,20,20,0.18)"></canvas>
+          <div style="font-size:20px;line-height:1">AVISO DE SUEÑO</div>
+          <div style="font-size:18px;line-height:1;color:#5a616b">4 cuadros · 4 fps</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <canvas ref="{{ prev5 }}" width="64" height="96" style="display:block;width:64px;height:96px;image-rendering:pixelated;border:3px solid #141414;background-color:#eceae4;background-image:repeating-conic-gradient(#e1ddd3 0% 25%, #eceae4 0% 50%);background-size:48px 48px;box-shadow:4px 4px 0 rgba(20,20,20,0.18)"></canvas>
+          <div style="font-size:20px;line-height:1">DESPLOMARSE</div>
+          <div style="font-size:18px;line-height:1;color:#5a616b">4 cuadros · 5 fps</div>
+          <div style="font-size:18px;line-height:1;color:#5a616b">se reproduce una vez</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <canvas ref="{{ prev6 }}" width="64" height="96" style="display:block;width:64px;height:96px;image-rendering:pixelated;border:3px solid #141414;background-color:#eceae4;background-image:repeating-conic-gradient(#e1ddd3 0% 25%, #eceae4 0% 50%);background-size:48px 48px;box-shadow:4px 4px 0 rgba(20,20,20,0.18)"></canvas>
+          <div style="font-size:20px;line-height:1">DORMIDO EN EL PISO</div>
+          <div style="font-size:18px;line-height:1;color:#5a616b">2 cuadros · 2 fps</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <canvas ref="{{ prev7 }}" width="64" height="96" style="display:block;width:64px;height:96px;image-rendering:pixelated;border:3px solid #141414;background-color:#eceae4;background-image:repeating-conic-gradient(#e1ddd3 0% 25%, #eceae4 0% 50%);background-size:48px 48px;box-shadow:4px 4px 0 rgba(20,20,20,0.18)"></canvas>
+          <div style="font-size:20px;line-height:1">DORMIDO EN CAMA</div>
+          <div style="font-size:18px;line-height:1;color:#5a616b">2 cuadros · 1,5 fps</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <canvas ref="{{ prev8 }}" width="64" height="96" style="display:block;width:64px;height:96px;image-rendering:pixelated;border:3px solid #141414;background-color:#eceae4;background-image:repeating-conic-gradient(#e1ddd3 0% 25%, #eceae4 0% 50%);background-size:48px 48px;box-shadow:4px 4px 0 rgba(20,20,20,0.18)"></canvas>
+          <div style="font-size:20px;line-height:1">DESPERTARSE</div>
+          <div style="font-size:18px;line-height:1;color:#5a616b">4 cuadros · 3 fps</div>
+          <div style="font-size:18px;line-height:1;color:#5a616b">se reproduce una vez</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <canvas ref="{{ prev9 }}" width="64" height="96" style="display:block;width:64px;height:96px;image-rendering:pixelated;border:3px solid #141414;background-color:#eceae4;background-image:repeating-conic-gradient(#e1ddd3 0% 25%, #eceae4 0% 50%);background-size:48px 48px;box-shadow:4px 4px 0 rgba(20,20,20,0.18)"></canvas>
+          <div style="font-size:20px;line-height:1">ALTA</div>
+          <div style="font-size:18px;line-height:1;color:#5a616b">4 cuadros · 6 fps</div>
+        </div>
+      </div>
+      <div style="border-top:2px solid rgba(20,20,20,0.15);padding-top:20px;display:flex;flex-direction:column;gap:16px">
+        <div style="display:flex;flex-wrap:wrap;align-items:center;gap:12px 16px">
+          <button type="button" onClick="{{ saveBody }}" style="font-family:'Press Start 2P',monospace;font-size:12px;line-height:1;color:#ffffff;background:#2f6fd6;border:4px solid #141414;padding:14px 18px;box-shadow:inset -4px -4px 0 #2152a8,4px 4px 0 rgba(20,20,20,0.25);cursor:pointer" style-hover="background:#3d7de0" style-active="transform:translate(2px,2px);box-shadow:inset -4px -4px 0 #2152a8,2px 2px 0 rgba(20,20,20,0.25)">DESCARGAR PNG</button>
+          <div style="display:flex;flex-direction:column;gap:4px">
+            <div style="font-size:20px;line-height:1">patient_body_skin1.png</div>
+            <sc-if value="{{ savedBody }}" hint-placeholder-val="{{ false }}"><div style="font-size:18px;line-height:1;color:#1f8a3a">Descargado</div></sc-if>
+          </div>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;align-items:center;gap:12px 16px">
+          <button type="button" onClick="{{ saveShirt }}" style="font-family:'Press Start 2P',monospace;font-size:12px;line-height:1;color:#ffffff;background:#2f6fd6;border:4px solid #141414;padding:14px 18px;box-shadow:inset -4px -4px 0 #2152a8,4px 4px 0 rgba(20,20,20,0.25);cursor:pointer" style-hover="background:#3d7de0" style-active="transform:translate(2px,2px);box-shadow:inset -4px -4px 0 #2152a8,2px 2px 0 rgba(20,20,20,0.25)">DESCARGAR PNG</button>
+          <div style="display:flex;flex-direction:column;gap:4px">
+            <div style="font-size:20px;line-height:1">patient_shirt_lisa.png · escala de grises</div>
+            <sc-if value="{{ savedShirt }}" hint-placeholder-val="{{ false }}"><div style="font-size:18px;line-height:1;color:#1f8a3a">Descargado</div></sc-if>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;fps&quot;:{&quot;editor&quot;:&quot;range&quot;,&quot;min&quot;:4,&quot;max&quot;:12,&quot;step&quot;:1,&quot;unit&quot;:&quot;fps&quot;,&quot;default&quot;:8,&quot;tsType&quot;:&quot;number&quot;},&quot;cuadricula&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;}}">
+class Component extends DCLogic {
+  // Dos spritesheets de 64×240 (4 columnas × 10 filas de cuadros 16×24), alineados píxel por píxel:
+  //   patient_body_skin1.png  — cuerpo base
+  //   patient_shirt_lisa.png  — camisa lisa en escala de grises (el juego la tiñe multiplicando por un color)
+  // Filas: 1 quieto (2) · 2 caminar abajo (4) · 3 caminar arriba (4) · 4 caminar izquierda (4)
+  //        5 aviso de sueño (4) · 6 desplomarse (4, el último acostado) · 7 dormido en el piso (2)
+  //        8 dormido en cama (2) · 9 despertarse (4, el último = quieto 1) · 10 alta: saluda (4).
+  // Cada parte se dibuja con contorno negro de 1 px y luego su relleno. La camisa se genera con la
+  // misma pose que el cuerpo en cada cuadro, así que siempre calza encima.
+  static PAL = {
+    K: '#141414', E: '#141414',
+    S: '#a86b45', s: '#7f4d30',
+    P: '#f5a623', p: '#c97f12',
+    W: '#fbf8ef', w: '#d4cdbf',
+    B: '#2f6fd6', b: '#2152a8',
+    M: '#7a2a2a', L: '#9ddcf7', R: '#d9826a',
+  };
+  static SHIRT_PAL = { K: '#141414', W: '#ffffff', G: '#b4b4b4', D: '#7a7a7a' };
+  static SWATCHES = [['#2f6fd6', 'Azul'], ['#e5484d', 'Rojo'], ['#2fb84f', 'Verde'], ['#ffd23f', 'Amarillo'], ['#22b8b0', 'Turquesa'], ['#f5a623', 'Naranja']];
+
+  // ---------- cuerpo ----------
+  static headF(eyes, mouth) {
+    const r6 = { open: '...sSSESSESss...', drowsy: '...sSKKSSKKss...', closed: '...sSSSSSSSss...' }[eyes];
+    const r7 = { open: '...sSSESSESss...', drowsy: '...sSSESSESss...', closed: '...sSKKSSKKss...' }[eyes];
+    return { y: 4, r: ['.....SSSSSS.....', '....SSSSSSSs....', r6, r7, '....SSSSSSSs....', mouth === 'smile' ? '.....SKMMKs.....' : mouth ? '.....SSKKSs.....' : '.....SSSSSs.....'] };
+  }
+  static HEAD_B = { y: 4, r: ['.....SSSSSS.....', '....SSSSSSSs....', '...sSSSSSSSss...', '...sSSSSSSSss...', '....SSSSSSSs....', '.....ssssss.....'] };
+  static TORSO_F = { y: 11, r: ['.....SSSSSs.....', '.....SSSSSs.....', '.....SSSSSs.....', '.....SSsSSs.....', '.....SSSSSs.....'] };
+  static TORSO_B = { y: 11, r: ['.....SSSSSs.....', '.....SsSSss.....', '.....SSSSSs.....', '.....SSSSSs.....', '.....SSSSSs.....'] };
+  static LOW_F = { y: 16, r: ['.....PPPPPp.....', '.....PPPPPp.....', '.....PP..Pp.....', '.....SS..Ss.....', '....SWS..SWs....', '....BBB..BBb....'] };
+  static LOW_F_L = { y: 16, r: ['.....PPPPPp.....', '.....PPPPPp.....', '.....PP..Pp.....', '.....SS..SWs....', '.....SS..BBb....', '....SWS.........', '....BBB.........'] };
+  static LOW_F_R = { y: 16, r: ['.....PPPPPp.....', '.....PPPPPp.....', '.....PP..Pp.....', '....SWS..Ss.....', '....BBB..Ss.....', '.........SWs....', '.........BBb....'] };
+  static LOW_BEND = { y: 18, r: ['.....PPPPPp.....', '.....PPPPPp.....', '....PPp..PPp....', '....SWS..SWs....', '....BBB..BBb....'] };
+  static LOW_SIT = { y: 20, r: ['.....PPPPPp.....', '...SSPP..PpSs...', '..BB........BB..'] };
+  static HEAD_S = { y: 4, r: ['.....SSSSSS.....', '....SSSSSSSs....', '....SESSssSs....', '....SESSssSs....', '...SSSSSSSSs....', '....SSSSSSs.....'] };
+  static TORSO_S = { y: 11, r: ['.....Ssssss.....', '.....Ssssss.....', '.....Ssssss.....', '....SSsssss.....', '.....Ssssss.....'] };
+  static ARM_S_DOWN = { y: 11, r: ['.........SS.....', '.........SS.....', '.........SS.....', '.........SS.....', '..........SS....'] };
+  static ARM_S_FWD = { y: 11, r: ['........SS......', '.......SS.......', '......SS........', '....SSS.........', '..SSS...........'] };
+  static ARM_S_BACK = { y: 11, r: ['........SS......', '........SS......', '.........SS.....', '..........SS....', '...........SS...'] };
+  static LOW_S = { y: 16, r: ['.....PPPPPp.....', '.....PPPPPp.....', '......PPPp......', '......SSSs......', '.....SWSSs......', '....BBBBBb......'] };
+  static LOW_S_A = { y: 16, r: ['.....PPPPPp.....', '.....PPPPPp.....', '.....PP..pp.....', '....SS....ss....', '...SWS....ss....', '..BBBB....bbb...'] };
+  static LOW_S_B = { y: 16, r: ['.....PPPPPp.....', '.....PPPPPp.....', '.....pp..PP.....', '....ss....SS....', '...sws....SW....', '..bbbb....BBB...'] };
+  static lieHead(eyes, mouth) {
+    const g = ['...s............', '..SSS...........', '.SSSSS..........', '.SSSSS..........', '.SSSSS..........',
+      '.SSSSS..........', '.SSSSS..........', '.SSSSs..........', '..sss...........', '...s............'].map((s) => s.split(''));
+    const set = (x, y, c) => { g[y - 12][x] = c; };
+    if (eyes === 'open') [[2, 15], [3, 15], [2, 18], [3, 18]].forEach(([x, y]) => set(x, y, 'E'));
+    else [[3, 14], [3, 15], [3, 18], [3, 19]].forEach(([x, y]) => set(x, y, 'K'));
+    if (mouth === 'drool') { set(5, 16, 'M'); set(5, 17, 'M'); set(5, 18, 'L'); }
+    if (mouth === 'smile') { set(4, 16, 'K'); set(4, 17, 'K'); set(4, 14, 'R'); set(4, 19, 'R'); }
+    return { y: 12, r: g.map((a) => a.join('')) };
+  }
+  static ARM_UP_L = { y: 7, r: ['.SS.............', '.SS.............', '.SS.............', '..SS............', '..SS............'] };
+  static ARM_UP_R = { y: 7, r: ['.............Ss.', '.............Ss.', '.............Ss.', '............Ss..', '............Ss..'] };
+  static WAVE_IN_R = { y: 7, r: ['............Ss..', '............Ss..', '............Ss..', '............Ss..', '............Ss..'] };
+  static LIE_TORSO = { y: 14, r: ['.......SSSS.....', '.......SSSS.....', '.......SSSS.....', '.......SSSS.....', '.......SSSS.....', '.......ssss.....'] };
+  static LIE_ARM_T = { y: 11, r: ['.......SSSS.....', '.......SSSS.....'] };
+  static LIE_ARM_B = { y: 21, r: ['.......SSSS.....', '.......ssss.....'] };
+  static LIE_LOW = { y: 13, r: ['..............B.', '...........PPSB.', '...........PPWB.', '...........P....', '...........P....', '...........PPWB.', '...........ppsb.', '..............b.'] };
+
+  // ---------- camisa lisa (W blanco · G sombra · D cuello) ----------
+  static SH_TORSO_F = { y: 11, r: ['.....WGDDGG.....', '.....WWWWWG.....', '.....WWWWWG.....', '.....WWWWWG.....', '.....WWWWWG.....'] };
+  static SH_TORSO_B = { y: 11, r: ['.....WGGGGG.....', '.....WWWWWG.....', '.....WWWWWG.....', '.....WWWWWG.....', '.....WWWWWG.....'] };
+  static SH_TORSO_S = { y: 11, r: ['.....GDWWWG.....', '.....WWWWWG.....', '.....WWWWWG.....', '....WWWWWWG.....', '.....WWWWWG.....'] };
+  // acostado: el ruedo queda en x10 para no tapar la pantaloneta (x11–12)
+  static SH_LIE_TORSO = { y: 14, r: ['.......WWW......', '.......WWW......', '.......DWW......', '.......DWW......', '.......WWW......', '.......GGG......'] };
+  static SH_LIE_SLV_T = { y: 11, r: ['.......W........', '.......W........'] };
+  static SH_LIE_SLV_B = { y: 21, r: ['.......G........', '.......G........'] };
+
+  static rgba(pal) {
+    const o = {};
+    for (const k in pal) { const h = pal[k]; o[k] = [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)]; }
+    return o;
+  }
+
+  // cada cuadro devuelve { body, shirt }: listas de partes con el mismo desplazamiento de pose
+  static ROWS() {
+    const M = Component;
+    const P = (m, dy = 0, dx = 0, o = {}) => ({ m, dy, dx, soft: !!o.soft, cut: o.cut || null });
+    const arm = (str, n) => ({ y: 11, r: Array(n).fill(str) });
+    const L = (n) => arm('..SS............', n), R = (n) => arm('............Ss..', n);
+    const gray = (rows) => rows.map((s) => s.replace(/S/g, 'W').replace(/s/g, 'G'));
+    // manga corta: las 2 filas del brazo junto al hombro (arriba si cuelga, abajo si está levantado)
+    const sleeve = (part, raised) => ({ y: raised ? part.y + part.r.length - 2 : part.y, r: gray(raised ? part.r.slice(-2) : part.r.slice(0, 2)) });
+    const front = (low, up, nl, nr, head = M.headF('open'), o = {}) => {
+      const dx = o.dx || 0, hy = o.hy || 0, isBack = !!o.back;
+      const under = [], over = [], sleeves = [];
+      [[nl, L], [nr, R]].forEach(([a, mk]) => {
+        const raised = typeof a !== 'number', part = raised ? a : mk(a);
+        (raised ? over : under).push(P(part, up, dx));
+        sleeves.push(P(sleeve(part, raised), up, dx));
+      });
+      return {
+        body: [P(isBack ? M.TORSO_B : M.TORSO_F, up, dx), P(low), ...under, P(head, up + hy, dx), ...over],
+        shirt: [P(isBack ? M.SH_TORSO_B : M.SH_TORSO_F, up, dx), ...sleeves],
+      };
+    };
+    const back = (low, up, nl, nr) => front(low, up, nl, nr, M.HEAD_B, { back: true });
+    // de perfil el brazo va delante del torso: la camisa deja un hueco para el antebrazo y le pone manga encima
+    const side = (low, up, a) => {
+      const cut = new Set();
+      a.r.forEach((row, j) => { if (j >= 2) [...row].forEach((ch, x) => { if (ch !== '.') cut.add(x + ',' + (a.y + j + up)); }); });
+      const slv = a.r.slice(0, 2).map((row) => {
+        const c = [...row];
+        [...row].forEach((ch, x) => { if (ch !== '.' && x > 0 && row[x - 1] === '.') c[x - 1] = 'W'; });
+        const last = c.lastIndexOf('S');
+        return c.map((ch, x) => (ch === 'S' ? (x === last ? 'G' : 'W') : ch)).join('');
+      });
+      return {
+        body: [P(M.TORSO_S, up), P(low), P(a, up, 0, { soft: true }), P(M.HEAD_S, up)],
+        shirt: [P(M.SH_TORSO_S, up, 0, { cut }), P({ y: a.y, r: slv }, up)],
+      };
+    };
+    const lie = (dy, head = M.lieHead('closed'), chest = 0) => ({
+      body: [P(M.LIE_TORSO, dy + chest), P(M.LIE_LOW, dy), P(M.LIE_ARM_T, dy + chest), P(M.LIE_ARM_B, dy + chest), P(head, dy)],
+      shirt: [P(M.SH_LIE_TORSO, dy + chest), P(M.SH_LIE_SLV_T, dy + chest), P(M.SH_LIE_SLV_B, dy + chest)],
+    });
+    const heel = (m) => ({ y: m.y, r: m.r.map((s) => s.replace(/W/g, 'S')) });
+    const closed = M.headF('closed');
+    const floor = M.lieHead('closed', 'drool'), bed = M.lieHead('closed', 'smile'), smile = M.headF('open', 'smile');
+    return [
+      [front(M.LOW_F, 0, 5, 5), front(M.LOW_F, 1, 5, 5)],
+      [front(M.LOW_F_L, 1, 4, 6), front(M.LOW_F, 0, 5, 5), front(M.LOW_F_R, 1, 6, 4), front(M.LOW_F, 0, 5, 5)],
+      [back(heel(M.LOW_F_L), 1, 4, 6), back(heel(M.LOW_F), 0, 5, 5), back(heel(M.LOW_F_R), 1, 6, 4), back(heel(M.LOW_F), 0, 5, 5)],
+      [side(M.LOW_S_A, 1, M.ARM_S_BACK), side(M.LOW_S, 0, M.ARM_S_DOWN), side(M.LOW_S_B, 1, M.ARM_S_FWD), side(M.LOW_S, 0, M.ARM_S_DOWN)],
+      [front(M.LOW_F, 0, 5, 5, M.headF('drowsy')), front(M.LOW_F, 0, 6, 6, closed, { dx: -1, hy: 1 }), front(M.LOW_F, 1, 6, 6, closed, { dx: 1, hy: 1 }), front(M.LOW_F, 0, 5, 5, M.headF('open', true))],
+      [front(M.LOW_BEND, 2, 5, 5, closed, { hy: 1 }), front(M.LOW_SIT, 4, 5, 5, closed, { hy: 1, dx: -1 }), lie(-2), lie(0)],
+      [lie(0, floor), lie(0, floor, -1)],
+      [lie(0, bed), lie(0, bed, -1)],
+      [lie(0, M.lieHead('open')), front(M.LOW_SIT, 4, 5, 5, M.headF('open')), front(M.LOW_F, 0, M.ARM_UP_L, M.ARM_UP_R, M.headF('closed', true)), front(M.LOW_F, 0, 5, 5)],
+      [front(M.LOW_F, 0, 5, M.ARM_UP_R, smile), front(M.LOW_F, 0, 5, M.WAVE_IN_R, smile), front(M.LOW_F, 0, 5, M.ARM_UP_R, smile), front(M.LOW_F, 0, 5, M.WAVE_IN_R, smile)],
+    ];
+  }
+
+  state = { saved: null, tint: '#2f6fd6' };
+  bodyRef = React.createRef(); shirtRef = React.createRef();
+  bodyBig = React.createRef(); shirtBig = React.createRef();
+  prev0 = React.createRef(); prev1 = React.createRef(); prev2 = React.createRef();
+  prev3 = React.createRef(); prev4 = React.createRef(); prev5 = React.createRef();
+  prev6 = React.createRef(); prev7 = React.createRef(); prev8 = React.createRef(); prev9 = React.createRef();
+  last = new Array(10).fill(-1);
+
+  componentDidMount() {
+    this.build();
+    const loop = (t) => { this.tick(t); this.raf = requestAnimationFrame(loop); };
+    this.raf = requestAnimationFrame(loop);
+  }
+  componentWillUnmount() { cancelAnimationFrame(this.raf); clearTimeout(this.savedT); }
+  componentDidUpdate(p) { if (p.cuadricula !== this.props.cuadricula) this.build(); }
+
+  frame(spec, C) {
+    const W = 16, H = 24, d = new Uint8ClampedArray(W * H * 4), cb = new Array(W * H).fill('');
+    const put = (x, y, ch) => {
+      if (x < 0 || y < 0 || x >= W || y >= H) return;
+      const i = y * W + x, c = C[ch];
+      d[i * 4] = c[0]; d[i * 4 + 1] = c[1]; d[i * 4 + 2] = c[2]; d[i * 4 + 3] = 255; cb[i] = ch;
+    };
+    spec.forEach(({ m, dy, dx, soft, cut }) => {
+      const px = [];
+      m.r.forEach((row, j) => [...row].forEach((ch, x) => {
+        if (ch === '.') return;
+        const X = x + dx, Y = m.y + j + dy;
+        if (!cut || !cut.has(X + ',' + Y)) px.push([X, Y, ch]);
+      }));
+      const has = new Set(px.map(([x, y]) => x + ',' + y));
+      px.forEach(([x, y]) => [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(([ax, ay]) => {
+        const nx = x + ax, ny = y + ay, k = nx + ',' + ny;
+        if (has.has(k) || (cut && cut.has(k)) || nx < 0 || ny < 0 || nx >= W || ny >= H) return;
+        const cur = cb[ny * W + nx];
+        put(nx, ny, soft && (cur === 'S' || cur === 's') ? 's' : 'K');
+      }));
+      px.forEach(([x, y, ch]) => put(x, y, ch));
+    });
+    return new ImageData(d, W, H);
+  }
+
+  enlarge(src, dst) {
+    if (!dst) return;
+    const b = dst.getContext('2d');
+    b.imageSmoothingEnabled = false;
+    b.clearRect(0, 0, 256, 960);
+    b.drawImage(src, 0, 0, 64, 240, 0, 0, 256, 960);
+    if (this.props.cuadricula ?? true) {
+      b.fillStyle = 'rgba(47,111,214,0.45)';
+      for (let x = 64; x < 256; x += 64) b.fillRect(x, 0, 1, 960);
+      for (let y = 96; y < 960; y += 96) b.fillRect(0, y, 256, 1);
+    }
+  }
+
+  build() {
+    const bs = this.bodyRef.current, ss = this.shirtRef.current;
+    if (!bs || !ss) return;
+    const gb = bs.getContext('2d'), gs = ss.getContext('2d');
+    gb.imageSmoothingEnabled = false; gs.imageSmoothingEnabled = false;
+    gb.clearRect(0, 0, 64, 240); gs.clearRect(0, 0, 64, 240);
+    const CB = Component.rgba(Component.PAL), CS = Component.rgba(Component.SHIRT_PAL);
+    Component.ROWS().forEach((row, r) => row.forEach((fr, f) => {
+      gb.putImageData(this.frame(fr.body, CB), f * 16, r * 24);
+      gs.putImageData(this.frame(fr.shirt, CS), f * 16, r * 24);
+    }));
+    this.enlarge(bs, this.bodyBig.current);
+    this.enlarge(ss, this.shirtBig.current);
+    this.retint();
+  }
+
+  // tinte igual al del juego: cada canal se multiplica por el color elegido (el negro sigue negro)
+  retint() {
+    const ss = this.shirtRef.current; if (!ss) return;
+    const c = this.tinted || (this.tinted = document.createElement('canvas'));
+    c.width = 64; c.height = 240;
+    const g = c.getContext('2d');
+    g.clearRect(0, 0, 64, 240);
+    g.drawImage(ss, 0, 0);
+    const img = g.getImageData(0, 0, 64, 240), p = img.data, t = this.state.tint;
+    const k = [1, 3, 5].map((i) => parseInt(t.slice(i, i + 2), 16) / 255);
+    for (let i = 0; i < p.length; i += 4) { p[i] *= k[0]; p[i + 1] *= k[1]; p[i + 2] *= k[2]; }
+    g.putImageData(img, 0, 0);
+    this.last = new Array(10).fill(-1);
+  }
+
+  setTint(c) { if (/^#[0-9a-fA-F]{6}$/.test(c)) this.setState({ tint: c }, () => this.retint()); }
+
+  tick(t) {
+    const body = this.bodyRef.current, shirt = this.tinted;
+    if (!body || !shirt) return;
+    const fps = this.props.fps ?? 8;
+    const rows = [[2, 2], [4, fps], [4, fps], [4, fps], [4, 4], [4, 5, 1200], [2, 2], [2, 1.5], [4, 3, 1200], [4, 6]];
+    const refs = [this.prev0, this.prev1, this.prev2, this.prev3, this.prev4, this.prev5, this.prev6, this.prev7, this.prev8, this.prev9];
+    rows.forEach(([n, f, hold], r) => {
+      const step = 1000 / f;
+      const i = hold ? Math.min(n - 1, Math.floor((t % ((n - 1) * step + hold)) / step)) : Math.floor(t / step) % n;
+      if (this.last[r] === i) return;
+      const c = refs[r].current; if (!c) return;
+      this.last[r] = i;
+      const g = c.getContext('2d');
+      g.imageSmoothingEnabled = false;
+      g.clearRect(0, 0, 64, 96);
+      g.drawImage(body, i * 16, r * 24, 16, 24, 0, 0, 64, 96);
+      g.drawImage(shirt, i * 16, r * 24, 16, 24, 0, 0, 64, 96);
+    });
+  }
+
+  save(canvas, name, key) {
+    if (!canvas) return;
+    canvas.toBlob((blob) => {
+      if (!blob) return;
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = name;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+      this.setState({ saved: key });
+      clearTimeout(this.savedT);
+      this.savedT = setTimeout(() => this.setState({ saved: null }), 2500);
+    }, 'image/png');
+  }
+
+  renderVals() {
+    const tint = this.state.tint;
+    return {
+      bodyRef: this.bodyRef, shirtRef: this.shirtRef, bodyBig: this.bodyBig, shirtBig: this.shirtBig,
+      prev0: this.prev0, prev1: this.prev1, prev2: this.prev2, prev3: this.prev3, prev4: this.prev4,
+      prev5: this.prev5, prev6: this.prev6, prev7: this.prev7, prev8: this.prev8, prev9: this.prev9,
+      fps: this.props.fps ?? 8,
+      tint, tintLabel: tint.toUpperCase(),
+      swatches: Component.SWATCHES.map(([c, name]) => ({
+        c, name,
+        ring: c.toLowerCase() === tint.toLowerCase() ? '0 0 0 3px #f4f3ee, 0 0 0 6px #141414' : 'none',
+        pick: () => this.setTint(c),
+      })),
+      onPick: (e) => this.setTint(e.target.value),
+      saveBody: () => this.save(this.bodyRef.current, 'patient_body_skin1.png', 'body'),
+      saveShirt: () => this.save(this.shirtRef.current, 'patient_shirt_lisa.png', 'shirt'),
+      savedBody: this.state.saved === 'body',
+      savedShirt: this.state.saved === 'shirt',
+    };
+  }
+}
+</script>
+</body>
+</html>

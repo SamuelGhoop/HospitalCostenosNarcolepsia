@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<style>html,body{margin:0;height:100%;background:#141414;}a{color:#2f6fd6;}a:hover{color:#e5484d;}</style>
+</helmet>
+<div style="width:100vw;height:100vh;display:flex;align-items:center;justify-content:center;background:#141414;overflow:hidden">
+  <div ref="{{ rootRef }}" data-screen-label="Hospital Map" style="position:relative;width:min(100vw,177.78vh);aspect-ratio:16/9;container-type:inline-size;overflow:hidden;font-family:'Press Start 2P',monospace;background:#f3d68e;user-select:none">
+    <canvas ref="{{ worldRef }}" width="928" height="522" style="position:absolute;inset:0;width:100%;height:100%;image-rendering:pixelated;display:block"></canvas>
+
+    <div style="position:absolute;left:11.422%;top:23.372%;font-size:0.7cqw;line-height:1;color:#141414;white-space:nowrap">ROOM 101</div>
+    <div style="position:absolute;left:32.759%;top:23.372%;font-size:0.7cqw;line-height:1;color:#141414;white-space:nowrap">ROOM 102</div>
+    <div style="position:absolute;left:54.095%;top:23.372%;font-size:0.7cqw;line-height:1;color:#141414;white-space:nowrap">ROOM 103</div>
+    <div style="position:absolute;left:90.086%;top:23.372%;font-size:0.7cqw;line-height:1;color:#141414;white-space:nowrap">RADIOLOGY</div>
+    <div style="position:absolute;left:2.586%;top:28.736%;font-size:0.7cqw;line-height:1;color:#141414;white-space:nowrap">HALLWAY 1</div>
+    <div style="position:absolute;left:65.086%;top:65.134%;font-size:0.7cqw;line-height:1;color:#141414;white-space:nowrap">HALLWAY 2</div>
+    <div style="position:absolute;left:2.371%;top:65.9%;font-size:0.7cqw;line-height:1;color:#141414;white-space:nowrap">CAFETERIA</div>
+    <div style="position:absolute;left:28.879%;top:65.9%;font-size:0.7cqw;line-height:1;color:#141414;white-space:nowrap">LOBBY</div>
+    <div style="position:absolute;left:89.224%;top:65.9%;font-size:0.7cqw;line-height:1;color:#141414;white-space:nowrap">STAFF ROOM</div>
+
+    <div style="position:absolute;left:11.207%;top:26.628%;transform:translate(-50%,-50%);background:#c4302b;border:0.25cqw solid #141414;padding:0.3cqw 0.4cqw;font-size:0.6cqw;line-height:1;color:#ffffff;white-space:nowrap;box-shadow:inset -0.2cqw -0.2cqw 0 #8f2420,0.25cqw 0.35cqw 0 rgba(0,0,0,0.22)">OCCUPIED</div>
+    <div style="position:absolute;left:32.543%;top:26.628%;transform:translate(-50%,-50%);background:#1f8a3a;border:0.25cqw solid #141414;padding:0.3cqw 0.4cqw;font-size:0.6cqw;line-height:1;color:#ffffff;white-space:nowrap;box-shadow:inset -0.2cqw -0.2cqw 0 #16692b,0.25cqw 0.35cqw 0 rgba(0,0,0,0.22)">AVAILABLE</div>
+    <div style="position:absolute;left:53.879%;top:26.628%;transform:translate(-50%,-50%);background:#c4302b;border:0.25cqw solid #141414;padding:0.3cqw 0.4cqw;font-size:0.6cqw;line-height:1;color:#ffffff;white-space:nowrap;box-shadow:inset -0.2cqw -0.2cqw 0 #8f2420,0.25cqw 0.35cqw 0 rgba(0,0,0,0.22)">OCCUPIED</div>
+
+    <dc-import name="Personaje" tipo="paciente" estado="cama" id="P-002" nombre="Yolanda M." nivel="severe" etiqueta="cama" camisa="azul" etiquetas="{{ alt }}" on-hover="{{ hover }}" style="position:absolute;left:10.776%;top:9.119%;width:2.586%" hint-size="2.586%,4.1%"></dc-import>
+    <dc-import name="Personaje" tipo="paciente" estado="cama" id="P-004" nombre="Nelly A." nivel="moderate" etiqueta="cama" camisa="verde" etiquetas="{{ alt }}" on-hover="{{ hover }}" style="position:absolute;left:53.448%;top:9.119%;width:2.586%" hint-size="2.586%,4.1%"></dc-import>
+    <dc-import name="Personaje" tipo="doctor" id="D-01" nombre="Dr. Ospina" ocupado="{{ true }}" pelo="#2a1d14" etiquetas="{{ alt }}" on-hover="{{ hover }}" style="position:absolute;left:5.172%;top:11.494%;width:3.103%" hint-size="3.103%,7.4%"></dc-import>
+    <dc-import name="Personaje" tipo="doctor" id="D-02" nombre="Dr. Mendoza" ocupado="{{ false }}" pelo="#6b4320" etiquetas="{{ alt }}" on-hover="{{ hover }}" style="position:absolute;left:67.026%;top:49.042%;width:3.103%" hint-size="3.103%,7.4%"></dc-import>
+    <dc-import name="Personaje" tipo="camillero" id="O-01" nombre="Camillero" ocupado="{{ true }}" etiqueta="izquierda" etiquetas="{{ alt }}" on-hover="{{ hover }}" style="position:absolute;left:57.759%;top:28.123%;width:9.569%" hint-size="9.569%,7.4%"></dc-import>
+    <dc-import name="Personaje" tipo="paciente" estado="piso" id="P-003" nombre="Eder P." nivel="severe" tiempo="0:42" etiqueta="lado" camisa="turquesa" etiquetas="{{ alt }}" on-hover="{{ hover }}" style="position:absolute;left:68.534%;top:29.042%;width:4.138%" hint-size="4.138%,5.5%"></dc-import>
+    <dc-import name="Personaje" tipo="paciente" estado="despierto" id="P-001" nombre="Carmelo P." nivel="moderate" camisa="roja" etiquetas="{{ alt }}" on-hover="{{ hover }}" style="position:absolute;left:44.612%;top:47.51%;width:3.103%" hint-size="3.103%,7.4%"></dc-import>
+    <dc-import name="Personaje" tipo="paciente" estado="despierto" id="P-005" nombre="Wilmer O." nivel="mild" camisa="azul" etiquetas="{{ alt }}" on-hover="{{ hover }}" style="position:absolute;left:11.207%;top:50.575%;width:3.103%" hint-size="3.103%,7.4%"></dc-import>
+
+    <div style="position:absolute;left:39.332%;top:71.648%;transform:translate(-50%,-100%);background:#2f6fd6;border:0.25cqw solid #141414;padding:0.25cqw 0.35cqw;font-size:0.55cqw;line-height:1;color:#ffffff;white-space:nowrap;box-shadow:inset -0.2cqw -0.2cqw 0 #2152a8,0.2cqw 0.3cqw 0 rgba(0,0,0,0.22)">BUS</div>
+    <dc-import name="Personaje" tipo="paciente" estado="caminando" camisa="verde" style="position:absolute;left:51.293%;top:72.031%;width:3.103%" hint-size="3.103%,7.4%"></dc-import>
+    <dc-import name="Personaje" tipo="paciente" estado="caminando" camisa="roja" style="position:absolute;left:44.569%;top:83.525%;width:3.103%" hint-size="3.103%,7.4%"></dc-import>
+    <sc-if value="{{ hasTip }}" hint-placeholder-val="{{ false }}">
+      <div style="position:absolute;left:{{ tipLeft }};top:{{ tipTop }};transform:{{ tipTransform }};z-index:20;pointer-events:none;display:flex;flex-direction:column;gap:0.45cqw;background:#fbf8ef;border:0.25cqw solid #141414;padding:0.55cqw 0.65cqw;font-size:0.6cqw;line-height:1;color:#141414;white-space:nowrap;box-shadow:inset -0.25cqw -0.25cqw 0 #e3ddcc,0.3cqw 0.4cqw 0 rgba(0,0,0,0.25)">
+        <div style="display:flex;gap:0.5cqw;align-items:center"><span style="color:{{ tip.idColor }}">{{ tip.id }}</span><span>{{ tip.nombre }}</span></div>
+        <sc-if value="{{ tip.hasRol }}" hint-placeholder-val="{{ false }}"><div style="color:#5a616b">{{ tip.rol }}</div></sc-if>
+        <sc-if value="{{ tip.hasLevel }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;gap:0.4cqw;align-items:center">
+            <span style="color:#5a616b">LEVEL</span>
+            <span style="display:flex;gap:0.08cqw">
+              <sc-for list="{{ tip.bolts }}" as="b" hint-placeholder-count="0">
+                <svg viewBox="0 0 7 9" shape-rendering="crispEdges" style="width:0.6cqw;height:0.77cqw;display:block"><path fill="#141414" d="{{ b.k }}"></path><path fill="{{ b.c }}" d="{{ b.f }}"></path></svg>
+              </sc-for>
+            </span>
+            <span>{{ tip.nivel }}</span>
+          </div>
+        </sc-if>
+        <div style="display:flex;gap:0.4cqw;align-items:center">
+          <span style="color:#5a616b">STATUS</span>
+          <span style="width:0.65cqw;height:0.65cqw;box-sizing:border-box;background:{{ tip.estadoColor }};border:0.15cqw solid #141414"></span>
+          <span>{{ tip.estado }}</span>
+        </div>
+      </div>
+    </sc-if>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  // Mundo lógico de 464×261 (16:9), dibujado a 2× en el canvas (928×522).
+  // Entorno (muros, pisos, calle): 2 px de canvas por px de mundo.
+  // Escala oficial de sprites y muebles: 1,5× → 3 px de canvas por px de sprite (nítido, sin interpolar).
+  // Franja HUD: y 0–14 · Edificio: (4,14)–(460,182) · Acera: y 182–210 · Calle: y 213–259.
+  // Personajes: escala 1,2 (SVG superpuesto). Etiquetas ID/nombre ocultas: hover = tooltip, mantener Shift = todas.
+  state = { alt: false, tip: null };
+  worldRef = React.createRef();
+  rootRef = React.createRef();
+
+  componentDidMount() {
+    this.draw();
+    this.onDown = (e) => { if (e.key === 'Shift' && !this.state.alt) this.setState({ alt: true }); };
+    this.onUp = (e) => { if (e.key === 'Shift') this.setState({ alt: false }); };
+    this.onBlur = () => this.setState({ alt: false });
+    window.addEventListener('keydown', this.onDown);
+    window.addEventListener('keyup', this.onUp);
+    window.addEventListener('blur', this.onBlur);
+  }
+  componentWillUnmount() {
+    window.removeEventListener('keydown', this.onDown);
+    window.removeEventListener('keyup', this.onUp);
+    window.removeEventListener('blur', this.onBlur);
+  }
+
+  hover = (info, rect) => {
+    if (!info || !rect || !this.rootRef.current) { this.setState({ tip: null }); return; }
+    const R = this.rootRef.current.getBoundingClientRect();
+    const cx = (rect.left + rect.width / 2 - R.left) / R.width * 100;
+    const top = (rect.top - R.top) / R.height * 100;
+    const below = top < 24;
+    const y = below ? (rect.bottom - R.top) / R.height * 100 : top;
+    this.setState({ tip: { ...info, x: Math.min(91, Math.max(9, cx)), y, below } });
+  };
+
+  draw() {
+    const c = this.worldRef.current; if (!c) return;
+    const g = c.getContext('2d');
+    g.imageSmoothingEnabled = false;
+    const S = 2, SP = 3;
+    const K = '#141414', Wt = '#f4f3ee', SH = 'rgba(60,40,10,0.22)';
+    const R = (x, y, w, h, col) => { g.fillStyle = col; g.fillRect(x * S, y * S, w * S, h * S); };
+    const make = (w, h, fn) => {
+      const W = w + 2, H = h + 2, o = document.createElement('canvas');
+      o.width = W; o.height = H;
+      const k = o.getContext('2d');
+      fn((a, b, cw, ch, col) => { k.fillStyle = col; k.fillRect(a + 1, b + 1, cw, ch); });
+      const d = k.getImageData(0, 0, W, H), p = d.data, m = new Uint8Array(W * H);
+      for (let i = 0; i < W * H; i++) m[i] = p[i * 4 + 3] > 0 ? 1 : 0;
+      for (let yy = 0; yy < H; yy++) for (let xx = 0; xx < W; xx++) {
+        const i = yy * W + xx; if (m[i]) continue;
+        if ((xx > 0 && m[i - 1]) || (xx < W - 1 && m[i + 1]) || (yy > 0 && m[i - W]) || (yy < H - 1 && m[i + W])) {
+          p[i * 4] = p[i * 4 + 1] = p[i * 4 + 2] = 20; p[i * 4 + 3] = 255;
+        }
+      }
+      k.putImageData(d, 0, 0);
+      return o;
+    };
+    // coloca un sprite con su px (0,0) en el punto (x,y) del mundo. sc = px de canvas por px de sprite.
+    const put = (o, x, y, sh = true, sc = SP) => {
+      const ox = x * S - sc, oy = y * S - sc, w = o.width * sc, h = o.height * sc;
+      if (sh) {
+        const s = document.createElement('canvas'); s.width = o.width; s.height = o.height;
+        const k = s.getContext('2d'); k.drawImage(o, 0, 0);
+        k.globalCompositeOperation = 'source-in'; k.fillStyle = SH; k.fillRect(0, 0, s.width, s.height);
+        g.drawImage(s, ox + sc, oy + sc * 2, w, h);
+      }
+      g.drawImage(o, ox, oy, w, h);
+    };
+    const tiles = (x, y, w, h, a, b, s) => {
+      for (let j = 0; j < h; j += s) for (let i = 0; i < w; i += s)
+        R(x + i, y + j, Math.min(s, w - i), Math.min(s, h - j), ((i / s + j / s) % 2) ? b : a);
+    };
+    const edge = (x, y, w, h) => { R(x - 1, y - 1, w + 2, 1, K); R(x - 1, y + h, w + 2, 1, K); R(x - 1, y - 1, 1, h + 2, K); R(x + w, y - 1, 1, h + 2, K); };
+    const ellipse = (cx, cy, rx, ry, col) => {
+      for (let dy = -ry; dy <= ry; dy++) { const hw = Math.round(rx * Math.sqrt(1 - (dy / (ry + 0.5)) ** 2)); R(cx - hw, cy + dy, hw * 2, 1, col); }
+    };
+    // hoja de palma: cuchilla de 3 px que se afina en la punta, nervio oscuro y dientes pegados al borde
+    const blade = (r, C0, deg, len, curve, fi, t0, every) => {
+      const pts = [];
+      for (let i = 0, t = t0; t <= len; i++, t += 0.5) {
+        const a = (deg * Math.PI / 180) + curve * (t - t0);
+        const ux = Math.cos(a), uy = Math.sin(a);
+        const x = Math.round(C0 + ux * t), y = Math.round(C0 + uy * t);
+        const half = t <= len - 3 ? 1 : 0;
+        r(x - half, y - half, half * 2 + 1, half * 2 + 1, '#3cb54a');
+        if (i % every === Math.floor(every / 2) && t < len - 1) {
+          const side = (Math.floor(i / every) + fi) % 2 === 0 ? 1 : -1;
+          if (Math.abs(ux) > Math.abs(uy)) r(x, y + side * (half + 1), 1, 1, '#3cb54a');
+          else r(x + side * (half + 1), y, 1, 1, '#3cb54a');
+        }
+        pts.push([x, y]);
+      }
+      pts.slice(2, -2).forEach(([x, y]) => r(x, y, 1, 1, '#23863a'));
+    };
+
+    // ===== exterior =====
+    R(0, 0, 464, 261, '#f3d68e');
+    for (let i = 0; i < 280; i++) R((i * 67 + (i % 7) * 17) % 464, (i * 31) % 261, 2, 1, '#dcb76a');
+
+    // ===== acera (28 px), bordillos y calle de 2 carriles =====
+    tiles(0, 182, 464, 28, '#e3e5e8', '#d6d9de', 7);
+    R(0, 210, 464, 2, Wt); R(0, 212, 464, 1, K);
+    R(0, 213, 464, 46, '#4a4f57');
+    for (let i = 0; i < 280; i++) R((i * 53 + (i % 5) * 19) % 464, 214 + (i * 7) % 44, 1, 1, '#3f444b');
+    for (let x = 0; x < 464; x += 18) if (x + 11 < 197 || x > 231) R(x, 235, 11, 2, '#ffd23f');
+    for (let y = 215; y < 257; y += 6) R(199, y, 30, 3, Wt);
+    R(0, 259, 464, 1, K); R(0, 260, 464, 1, Wt);
+
+    // ===== edificio =====
+    R(7, 18, 456, 168, SH);
+    R(4, 14, 456, 168, '#b9bfc8');
+    R(4, 14, 456, 1, K); R(4, 181, 456, 1, K); R(4, 14, 1, 168, K); R(459, 14, 1, 168, K);
+    const F = {
+      r101: [8, 18, 96, 50], r102: [107, 18, 96, 50], r103: [206, 18, 96, 50], rad: [305, 18, 151, 50],
+      h1: [8, 71, 448, 24], cafe: [8, 98, 120, 80], lobby: [131, 98, 166, 80], h2: [300, 98, 44, 80], staff: [347, 98, 109, 80],
+    };
+    ['r101', 'r102', 'r103'].forEach(k => tiles(...F[k], '#eceae4', '#e1ddd3', 6));
+    tiles(...F.rad, '#dfe6ee', '#cfd8e2', 6);
+    tiles(...F.h1, '#dde1e6', '#d3d8df', 8);
+    tiles(...F.h2, '#dde1e6', '#d3d8df', 8);
+    tiles(...F.cafe, '#c6ece6', '#aedfd7', 6);
+    tiles(...F.lobby, '#f6e7bd', '#ecd59c', 8);
+    R(...F.staff, '#dcae78');
+    for (let y = 98; y < 178; y += 5) { R(347, y + 4, 109, 1, '#c4935c'); for (let x = 347 + ((y / 5) % 2) * 11; x < 456; x += 22) R(x, y, 1, 4, '#c4935c'); }
+    Object.values(F).forEach(r => edge(...r));
+
+    const hDoor = (x, y, w) => { R(x, y, w, 3, '#d7dce2'); R(x - 1, y, 1, 3, K); R(x + w, y, 1, 3, K); };
+    const vDoor = (x, y, h) => { R(x, y, 3, h, '#d7dce2'); R(x, y - 1, 3, 1, K); R(x, y + h, 3, 1, K); };
+    hDoor(76, 68, 14); hDoor(175, 68, 14); hDoor(274, 68, 14); hDoor(320, 68, 16);
+    hDoor(90, 95, 14); hDoor(184, 95, 60); hDoor(300, 95, 44);
+    vDoor(128, 150, 14); vDoor(344, 150, 14);
+    R(199, 178, 30, 4, '#5a616b'); R(198, 178, 1, 4, K); R(229, 178, 1, 4, K);
+    R(200, 179, 13, 2, '#9ddcf7'); R(215, 179, 13, 2, '#9ddcf7'); R(213, 178, 2, 4, K);
+
+    // líneas guía: azul en Hallway 1, verde pegada al borde derecho de Hallway 2
+    R(8, 82, 448, 2, '#2f6fd6');
+    R(339, 84, 2, 94, '#2fb84f');
+
+    const winH = (x, w) => { R(x, 15, w, 2, '#9ddcf7'); R(x, 15, 3, 1, '#ffffff'); R(x - 1, 15, 1, 2, K); R(x + w, 15, 1, 2, K); };
+    const winV = (x, y, h) => { R(x, y, 2, h, '#9ddcf7'); R(x, y, 1, 3, '#ffffff'); R(x, y - 1, 2, 1, K); R(x, y + h, 2, 1, K); };
+    winV(5, 110, 24); winV(5, 146, 24); winV(457, 110, 24); winV(457, 146, 24);
+
+    // ===== habitaciones: cama centrada contra la pared, mesita, suero, ventana con cortinas, tapete y silla =====
+    const bed = (occ) => make(12, 20, (r) => {
+      r(0, 0, 12, 3, '#8a909a'); r(0, 3, 12, 17, '#fbf8ef'); r(10, 3, 2, 17, '#d9d3c5'); r(0, 3, 12, 1, K);
+      r(1, 4, 10, 5, K); r(2, 5, 8, 3, '#ffffff'); r(2, 7, 8, 1, '#cfd6e3');
+      if (occ) { r(0, 9, 12, 1, K); r(1, 10, 10, 10, '#2f6fd6'); r(1, 10, 10, 2, '#9ddcf7'); r(1, 18, 10, 2, '#2152a8'); r(5, 13, 1, 4, '#2152a8'); }
+      else { r(0, 14, 12, 1, K); r(1, 15, 10, 5, '#2f6fd6'); r(1, 15, 10, 1, '#9ddcf7'); }
+    });
+    const stand = make(6, 6, (r) => { r(0, 0, 6, 6, '#b9773f'); r(0, 4, 6, 2, '#8f5a2c'); r(1, 1, 3, 3, K); r(2, 2, 1, 1, '#ffd23f'); });
+    const iv = make(5, 9, (r) => { r(0, 0, 5, 1, '#8a909a'); r(1, 1, 3, 4, '#bff1ea'); r(3, 1, 1, 4, '#7fd0f2'); r(2, 5, 1, 3, '#8a909a'); r(0, 8, 5, 1, '#5a616b'); });
+    const curtain = make(3, 5, (r) => { r(0, 0, 3, 5, '#22b8b0'); r(1, 0, 1, 5, '#1a9c9a'); r(0, 4, 3, 1, '#1a9c9a'); });
+    const rug = make(16, 8, (r) => { r(0, 0, 16, 8, '#f5a623'); r(1, 1, 14, 6, '#ffd23f'); r(3, 3, 10, 2, '#e5484d'); r(1, 1, 1, 1, '#e5484d'); r(14, 6, 1, 1, '#e5484d'); });
+    const visit = make(7, 7, (r) => { r(0, 0, 7, 7, '#e5484d'); r(0, 0, 7, 2, '#b8323a'); r(0, 2, 1, 5, '#b8323a'); r(6, 2, 1, 5, '#b8323a'); });
+    [[8, true], [107, false], [206, true]].forEach(([x0, occ]) => {
+      winH(x0 + 3, 22);
+      put(curtain, x0 + 1, 18); put(curtain, x0 + 21, 18);
+      put(rug, x0 + 6, 38, false);
+      put(stand, x0 + 28, 19);
+      put(bed(occ), x0 + 39, 19);
+      put(iv, x0 + 60, 19);
+      put(visit, x0 + 83, 55);
+    });
+
+    // ===== radiología: escáner de anillo con la camilla pasando por el hueco =====
+    put(make(56, 8, (r) => { r(0, 0, 56, 8, '#c9ced6'); r(0, 6, 56, 2, '#8a909a'); r(2, 1, 52, 4, '#ffffff'); r(2, 4, 52, 1, '#cfd6e3'); r(3, 1, 6, 3, '#9ddcf7'); }), 338, 37);
+    put(make(28, 28, (r) => {
+      for (let y = 0; y < 28; y++) for (let x = 0; x < 28; x++) {
+        const dx = x - 13.5, dy = y - 13.5, d = Math.sqrt(dx * dx + dy * dy);
+        if (d > 13.6 || d < 5.6) continue;
+        let col = '#c9ced6';
+        if (d < 6.8) col = '#9aa1ab';
+        else if (d >= 9 && d < 10.2) col = '#2f6fd6';
+        else if (d >= 11.8 && dx + dy > 4) col = '#8a909a';
+        r(x, y, 1, 1, col);
+      }
+      r(13, 1, 2, 2, '#ffd23f');
+    }), 359, 22);
+    put(make(9, 9, (r) => { r(0, 0, 9, 9, '#ffd23f'); r(4, 4, 1, 1, K); r(3, 1, 3, 2, K); r(1, 5, 2, 3, K); r(6, 5, 2, 3, K); }), 309, 48, false);
+
+    // ===== pasillo 1 =====
+    put(make(7, 7, (r) => { r(0, 0, 7, 7, '#fbf8ef'); r(0, 5, 7, 2, '#d4cdbf'); r(1, 1, 5, 3, '#7fd0f2'); r(2, 1, 1, 1, '#ffffff'); }), 442, 74);
+
+    // ===== cafetería =====
+    put(make(48, 14, (r) => {
+      r(0, 0, 48, 14, '#c9ced6'); r(0, 10, 48, 1, K); r(0, 11, 48, 3, '#c4302b');
+      r(0, 4, 1, 2, '#5a616b'); r(13, 4, 1, 2, '#5a616b');
+      for (let y = 0; y < 11; y++) for (let x = 0; x < 13; x++) {
+        const d = Math.hypot(x - 6, y - 5);
+        if (d <= 5.2) r(x + 1, y, 1, 1, d > 4.3 ? K : d > 3.4 ? '#5a616b' : '#e0a34a');
+      }
+      r(5, 4, 2, 1, '#fbf8ef'); r(8, 6, 2, 1, '#fbf8ef'); r(7, 3, 1, 1, '#ffd23f'); r(5, 7, 1, 1, '#ffd23f');
+      r(9, 4, 1, 1, '#2fb84f'); r(6, 6, 1, 1, '#2fb84f'); r(8, 5, 1, 1, '#8f5a2c');
+      [15, 26].forEach(x => {
+        r(x, 1, 10, 8, K); r(x + 1, 2, 8, 6, '#d8c79a');
+        r(x + 2, 3, 3, 2, '#ffffff'); r(x + 6, 3, 2, 2, '#f5a623'); r(x + 2, 6, 2, 1, '#8f5a2c'); r(x + 5, 6, 2, 1, '#2fb84f'); r(x + 7, 6, 1, 1, '#e5484d');
+      });
+      r(37, 0, 10, 10, K); r(38, 1, 8, 8, '#2f6fd6'); r(38, 7, 8, 2, '#2152a8');
+      r(39, 2, 6, 3, K); r(40, 3, 4, 1, '#2fb84f');
+      [39, 41, 43].forEach(x => { r(x, 6, 1, 1, '#fbf8ef'); r(x, 8, 1, 1, '#fbf8ef'); }); r(45, 6, 1, 1, '#e5484d');
+    }), 12, 101);
+    put(make(9, 5, (r) => {
+      [[1, true], [4, false], [7, true]].forEach(([bx, tall]) => {
+        r(bx, 4, 1, 1, '#ffffff'); r(bx + 1, 3, 1, 1, '#ffffff'); r(bx + 1, 2, 1, 1, '#ffffff'); r(bx, 1, 1, 1, '#ffffff'); if (tall) r(bx, 0, 1, 1, '#ffffff');
+      });
+    }), 16, 93.5, false);
+    const table = make(16, 10, (r) => { r(0, 0, 16, 10, '#f3e7c4'); r(0, 8, 16, 2, '#d8c79a'); r(3, 2, 2, 2, '#e5484d'); r(11, 5, 2, 2, '#2f6fd6'); });
+    const chair = make(5, 5, (r) => { r(0, 0, 5, 5, '#2f6fd6'); r(0, 4, 5, 1, '#2152a8'); });
+    [18, 76].forEach(x => {
+      put(chair, x + 3, 127); put(chair, x + 13.5, 127); put(chair, x + 3, 152.5); put(chair, x + 13.5, 152.5);
+      put(table, x, 136);
+    });
+
+    // ===== lobby =====
+    put(make(30, 6, (r) => { r(0, 0, 30, 6, '#5a616b'); for (let x = 2; x < 30; x += 4) r(x, 1, 2, 4, '#6f7680'); }), 199, 171, false, 2);
+    // recepción paralela a la pared derecha (cerrada), con el frente hacia el lobby
+    put(make(10, 36, (r) => {
+      r(0, 0, 10, 36, '#fbf8ef'); r(0, 0, 3, 36, '#e5484d'); r(0, 0, 1, 36, '#b8323a');
+      r(0, 16, 3, 4, '#ffffff'); r(0, 17, 3, 2, '#2fb84f');
+      r(3, 4, 6, 10, K); r(4, 5, 4, 8, '#7fd0f2'); r(7, 6, 1, 2, '#ffffff');
+      r(4, 20, 4, 5, '#ffffff'); r(6, 21, 1, 3, '#cfd6e3'); r(5, 28, 3, 3, '#ffd23f'); r(5, 28, 1, 3, '#f5a623');
+    }), 267, 111);
+    // silla negra del recepcionista, entre el mostrador y la pared
+    put(make(6, 6, (r) => { r(0, 0, 6, 6, '#3a3f47'); r(4, 0, 2, 6, '#24272d'); r(1, 1, 1, 1, '#5a616b'); }), 286.5, 120);
+    // sillas en columnas, con el espaldar a la izquierda mirando hacia la recepción
+    const seatY = make(6, 6, (r) => { r(0, 0, 6, 6, '#ffd23f'); r(0, 0, 2, 6, '#f5a623'); });
+    const seatB = make(6, 6, (r) => { r(0, 0, 6, 6, '#22b8b0'); r(0, 0, 2, 6, '#1a9c9a'); });
+    [164, 174].forEach(x => [106, 116, 126, 136].forEach(y => put(seatY, x, y)));
+    [228, 238].forEach(x => [106, 116, 126, 136].forEach(y => put(seatB, x, y)));
+    // maceta de esquina (ancho = 2 sillas de espera)
+    put(make(30, 30, (r) => {
+      const C0 = 14.5;
+      for (let y = 0; y < 30; y++) for (let x = 0; x < 30; x++) {
+        const d = Math.hypot(x - C0, y - C0);
+        if (d <= 6.6) r(x, y, 1, 1, d > 5.4 ? '#e08a55' : d > 4.4 ? '#c8693a' : '#6b4320');
+      }
+      [[-50, 12, 0.04], [25, 10, -0.045], [100, 13, 0.035], [175, 11, -0.04], [250, 12, 0.045]].forEach(([deg, len, curve], fi) => blade(r, C0, deg, len, curve, fi, 5, 4));
+      r(13, 13, 3, 3, '#3cb54a'); r(14, 14, 1, 1, '#23863a');
+    }), 132, 99, true, 2);
+
+    // ===== sala del personal =====
+    put(make(35, 12, (r) => {
+      for (let i = 0; i < 5; i++) { r(i * 7, 0, 7, 12, '#2f6fd6'); r(i * 7 + 6, 0, 1, 12, '#2152a8'); r(i * 7, 0, 1, 12, K); r(i * 7 + 2, 2, 3, 1, '#9ddcf7'); r(i * 7 + 2, 4, 3, 1, '#9ddcf7'); r(i * 7 + 4, 7, 1, 2, '#ffd23f'); }
+    }), 351, 100);
+    put(make(14, 40, (r) => {
+      r(0, 0, 14, 40, '#2fb84f'); r(8, 0, 6, 40, '#1f8a3a'); r(0, 0, 8, 3, '#1f8a3a'); r(0, 37, 8, 3, '#1f8a3a');
+      r(0, 13, 8, 1, K); r(0, 26, 8, 1, K); r(8, 0, 1, 40, K);
+    }), 432, 104);
+    put(make(14, 22, (r) => { r(0, 0, 14, 22, '#b9773f'); r(0, 19, 14, 3, '#8f5a2c'); r(3, 4, 6, 8, '#ffffff'); r(4, 6, 4, 1, '#cfd6e3'); r(4, 8, 4, 1, '#cfd6e3'); r(9, 14, 3, 3, '#e5484d'); }), 406, 122);
+    put(make(40, 10, (r) => {
+      r(0, 0, 40, 10, '#c9ced6'); r(0, 8, 40, 2, '#8a909a');
+      r(3, 1, 8, 7, K); r(4, 2, 6, 5, '#3a3f47'); r(5, 3, 2, 2, '#e5484d');
+      r(16, 2, 10, 5, K); r(17, 3, 8, 3, '#9ddcf7');
+      r(30, 1, 8, 7, K); r(31, 2, 6, 5, '#fbf8ef'); r(32, 3, 3, 3, '#3a3f47');
+    }), 351, 161);
+
+    // ===== acera: paradero separado de la pared =====
+    put(make(38, 13, (r) => {
+      r(0, 0, 38, 5, '#e5484d'); r(0, 4, 38, 1, '#b8323a'); r(0, 5, 38, 1, K);
+      r(1, 6, 2, 7, '#8a909a'); r(35, 6, 2, 7, '#8a909a');
+      r(3, 6, 32, 3, '#9ddcf7'); r(5, 6, 4, 1, '#ffffff');
+      r(5, 9, 28, 3, '#ffd23f'); r(5, 11, 28, 1, '#f5a623'); r(7, 12, 1, 1, K); r(30, 12, 1, 1, K);
+    }), 120, 188);
+    put(make(2, 12, (r) => { r(0, 0, 2, 12, '#8a909a'); r(1, 0, 1, 12, '#6f7680'); }), 181, 188);
+
+    // ===== acera: palmeras vistas desde arriba, sombra pequeña justo debajo de la copa =====
+    const crown = make(26, 26, (r) => {
+      const C0 = 12.5;
+      [[-90, 10, 0.02], [-38, 10, -0.02], [14, 9, 0.02], [66, 10, -0.02], [118, 10, 0.02], [170, 9, -0.02], [222, 10, 0.02]]
+        .forEach(([deg, len, curve], fi) => blade(r, C0, deg, len, curve, fi, 1.5, 2));
+      r(11, 11, 3, 3, '#6b4320'); r(11, 11, 1, 1, '#9a6a3a'); r(13, 13, 1, 1, '#9a6a3a');
+    });
+    const pit = make(10, 6, (r) => { r(0, 0, 10, 6, '#6b4320'); r(0, 4, 10, 2, '#4f3017'); });
+    [300, 400].forEach(cx => {
+      put(pit, cx - 7.5, 191.5, false);
+      ellipse(cx + 3, 201, 16, 6, 'rgba(40,25,5,0.38)');
+      put(crown, cx - 19, 177, false);
+    });
+
+    // ===== taxi amarillo (carril inferior, hacia la derecha) =====
+    put(make(30, 14, (r) => {
+      r(5, 0, 5, 1, K); r(20, 0, 5, 1, K); r(5, 13, 5, 1, K); r(20, 13, 5, 1, K);
+      r(0, 1, 30, 12, '#ffd23f'); r(0, 11, 30, 2, '#f5a623');
+      r(5, 2, 1, 10, K); r(6, 2, 3, 10, '#9ddcf7'); r(9, 2, 1, 10, K);
+      r(10, 2, 9, 10, '#ffe27a'); r(13, 5, 3, 4, K); r(14, 6, 1, 2, '#fbf8ef');
+      r(19, 2, 1, 10, K); r(20, 2, 3, 10, '#9ddcf7'); r(23, 2, 1, 10, K);
+      r(29, 2, 1, 2, '#fbf8ef'); r(29, 10, 1, 2, '#fbf8ef'); r(0, 2, 1, 2, '#e5484d'); r(0, 10, 1, 2, '#e5484d');
+    }), 96, 237.5);
+    put(make(9, 6, (r) => { r(2, 0, 7, 1, Wt); r(0, 2, 8, 1, Wt); r(3, 5, 6, 1, Wt); }), 80, 243, false);
+
+    // ===== líneas de movimiento de los dos costeños que van a entrar =====
+    put(make(6, 5, (r) => { r(0, 0, 4, 1, Wt); r(1, 2, 5, 1, Wt); r(0, 4, 4, 1, Wt); }), 254.5, 195, false);
+    put(make(5, 4, (r) => { r(0, 0, 1, 3, Wt); r(2, 0, 1, 4, Wt); r(4, 0, 1, 3, Wt); }), 210.5, 239, false);
+  }
+
+  renderVals() {
+    const t = this.state.tip;
+    return {
+      worldRef: this.worldRef, rootRef: this.rootRef,
+      alt: this.state.alt,
+      hover: this.hover,
+      hasTip: !!t,
+      tip: t || { id: '', nombre: '', idColor: '#141414', hasRol: false, rol: '', hasLevel: false, bolts: [], nivel: '', estado: '', estadoColor: '#2fb84f' },
+      tipLeft: t ? t.x + '%' : '0',
+      tipTop: t ? t.y + '%' : '0',
+      tipTransform: t && t.below ? 'translate(-50%, 0.8cqw)' : 'translate(-50%, calc(-100% - 2cqw))',
+    };
+  }
+}
+</script>
+</body>
+</html>

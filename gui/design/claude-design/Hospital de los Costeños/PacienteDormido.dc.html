@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+/* PacienteDormido — sprite reutilizable. 1 unidad del viewBox = 1 píxel de escena.
+   Grupos: piernas (estático) · torso+cabeza (anim-respirar) · cabeza (anim-cabeceo) · Zzz (anim-zzz-paciente) */
+@keyframes anim-respirar{0%{transform:translateY(0)}25%{transform:translateY(-1px)}50%{transform:translateY(-2px)}75%{transform:translateY(-1px)}100%{transform:translateY(0)}}
+@keyframes anim-cabeceo{0%,70%{transform:translate(0,0)}78%{transform:translate(1px,1px)}86%{transform:translate(1px,2px)}94%{transform:translate(0,1px)}100%{transform:translate(0,0)}}
+@keyframes anim-zzz-paciente{0%{transform:translateY(2px) scale(.6);opacity:0}30%{opacity:1}100%{transform:translateY(-4px) scale(1.25);opacity:0}}
+.anim-respirar{animation:anim-respirar 4s steps(1) infinite}
+.anim-cabeceo{animation:anim-cabeceo 6s steps(1) infinite}
+.anim-zzz-paciente{animation:anim-zzz-paciente 3s steps(6) infinite;transform-box:fill-box;transform-origin:center}
+</style>
+</helmet>
+<svg viewBox="-2 -18 30 47" shape-rendering="crispEdges" style="display:block;width:100%;height:auto;overflow:visible">
+  <g transform="translate(2 0)">
+    <path fill="#141414" d="{{ legs.K }}"></path><path fill="#a86b45" d="{{ legs.S }}"></path><path fill="#7f4d30" d="{{ legs.s }}"></path>
+    <path fill="#f5a623" d="{{ legs.P }}"></path><path fill="#c97f12" d="{{ legs.p }}"></path><path fill="#6b4320" d="{{ legs.n }}"></path>
+  </g>
+  <g class="{{ cResp }}">
+    <g transform="translate(1 0)">
+      <path fill="#141414" d="{{ torso.K }}"></path><path fill="{{ shirt }}" d="{{ torso.F }}"></path><path fill="{{ shirtShade }}" d="{{ torso.f }}"></path>
+      <path fill="#e5484d" d="{{ torso.R }}"></path><path fill="#ffffff" d="{{ torso.W }}"></path><path fill="#ffd23f" d="{{ torso.Y }}"></path>
+      <path fill="#2fb84f" d="{{ torso.G }}"></path><path fill="#a86b45" d="{{ torso.S }}"></path><path fill="#7f4d30" d="{{ torso.s }}"></path>
+    </g>
+    <g class="{{ cCab }}">
+      <path fill="#141414" d="{{ head.K }}"></path><path fill="#f3e7c4" d="{{ head.H }}"></path><path fill="#d8c79a" d="{{ head.h }}"></path>
+      <path fill="#a86b45" d="{{ head.S }}"></path><path fill="#7f4d30" d="{{ head.s }}"></path>
+    </g>
+  </g>
+  <g style="display:{{ zDisplay }}">
+    <g class="{{ cZzz }}" style="animation-delay:0s"><path fill="#141414" d="{{ z1.K }}"></path><path fill="#ffffff" d="{{ z1.W }}"></path></g>
+    <g class="{{ cZzz }}" style="animation-delay:-1s"><path fill="#141414" d="{{ z2.K }}"></path><path fill="#ffffff" d="{{ z2.W }}"></path></g>
+    <g class="{{ cZzz }}" style="animation-delay:-2s"><path fill="#141414" d="{{ z3.K }}"></path><path fill="#ffffff" d="{{ z3.W }}"></path></g>
+  </g>
+</svg>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:240,&quot;height&quot;:376},&quot;animado&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;},&quot;zzz&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;},&quot;camisa&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;azul&quot;,&quot;turquesa&quot;,&quot;verde&quot;],&quot;default&quot;:&quot;azul&quot;,&quot;tsType&quot;:&quot;'azul'|'turquesa'|'verde'&quot;}}">
+class Component extends DCLogic {
+  // Sprite maps: '.' = vacío. El contorno negro se genera solo alrededor de cada grupo.
+  static HEAD = [
+    '......HHHHH.......',
+    '......KHKHK.......',
+    '.....hHHHHHh......',
+    '..HKHKHKHKHKHKH...',
+    '...hhhhhhhhhhh....',
+    '....SSSSSSSSs.....',
+    '....SSSSSSSSs.....',
+    '....SKKSSKKSs.....',
+    '....SSSSSSSSs.....',
+    '....SSSSKKSSs.....',
+    '.....sSSSSSs......',
+    '.......SSS........',
+  ];
+  static TORSO = [
+    '...FFFFFFFFFFf....',
+    '..FFRFFFFFFYFff...',
+    '..FRWRFFGFYWYff...',
+    '..FFRFFGFFFYFff...',
+    '..SFFFYFFFRFFfS...',
+    '..SFFYWYFRWRFfS...',
+    '..SFGFYFFFRFFfS...',
+    '..SFFFFFFGFFFfS...',
+    '..sFFFFFFFFFFfs...',
+  ];
+  static LEGS = [
+    '...PPPPPPPPPPp....',
+    '...PPPPPPPPPPp....',
+    '...PPPPp..PPPp....',
+    '...PPPPp..PPPp....',
+    '....SSs....SSs....',
+    '....SSs....SSs....',
+    '....SSs....SSs....',
+    '....nnnn...nnnn...',
+  ];
+  static Z3 = ['WWW', '.W.', 'WWW'];
+  static Z4 = ['WWWW', '..W.', '.W..', 'WWWW'];
+  static Z5 = ['WWWWW', '...W.', '..W..', '.W...', 'WWWWW'];
+
+  build(map, ox, oy, thick) {
+    const filled = new Set(), runs = {}, add = (c, x, y) => { (runs[c] = runs[c] || []).push([x, y]); };
+    map.forEach((row, y) => [...row].forEach((ch, x) => { if (ch !== '.') filled.add(x + ',' + y); }));
+    const seen = new Set();
+    map.forEach((row, y) => [...row].forEach((ch, x) => {
+      if (ch === '.') return;
+      add(ch, x, y);
+      (thick ? [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, 1], [1, -1], [-1, -1]] : [[1, 0], [-1, 0], [0, 1], [0, -1]]).forEach(([dx, dy]) => {
+        const k = (x + dx) + ',' + (y + dy);
+        if (!filled.has(k) && !seen.has(k)) { seen.add(k); add('K', x + dx, y + dy); }
+      });
+    }));
+    const out = {};
+    Object.keys(runs).forEach(c => {
+      out[c] = runs[c].map(([x, y]) => `M${x + ox} ${y + oy}h1v1h-1z`).join('');
+    });
+    return out;
+  }
+
+  renderVals() {
+    const C = Component;
+    const anim = this.props.animado ?? true;
+    const shirts = { azul: ['#2f6fd6', '#2152a8'], turquesa: ['#22b8b0', '#1a9c9a'], verde: ['#2fb84f', '#1f8a3a'] };
+    const [shirt, shirtShade] = shirts[this.props.camisa ?? 'azul'] || shirts.azul;
+    if (!this._cache) {
+      this._cache = {
+        head: this.build(C.HEAD, 0, 0),
+        torso: this.build(C.TORSO, 0, 12),
+        legs: this.build(C.LEGS, 0, 20),
+        z1: this.build(C.Z3, 16, -4, true),
+        z2: this.build(C.Z4, 19, -10, true),
+        z3: this.build(C.Z5, 22, -17, true),
+      };
+    }
+    return {
+      ...this._cache, shirt, shirtShade,
+      cResp: anim ? 'anim-respirar' : '',
+      cCab: anim ? 'anim-cabeceo' : '',
+      cZzz: anim ? 'anim-zzz-paciente' : '',
+      zDisplay: (this.props.zzz ?? true) ? 'inline' : 'none',
+    };
+  }
+}
+</script>
+</body>
+</html>
