@@ -6,13 +6,19 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
 	"sort"
+	"time"
 
 	"github.com/SamuelGhoop/HospitalCostenosNarcolepsia/hospital"
+	"github.com/SamuelGhoop/HospitalCostenosNarcolepsia/simulation"
 )
+
+// simulationTime es lo que dura la simulación concurrente del bonus.
+const simulationTime = 2 * time.Second
 
 func main() {
 	// ── Paso 1: hospital, 2 doctores, 1 camillero, 3 habitaciones, 5 pacientes ──
@@ -101,6 +107,57 @@ func main() {
 	// El episodio que atendió el camillero no sale en ninguna consulta 5.2.
 	section("Extra — Historial completo (quién atendió cada episodio)")
 	printEpisodes(h.History())
+
+	runConcurrentSimulation()
+}
+
+// runConcurrentSimulation es el bonus: un hospital nuevo, igual al del
+// escenario, donde cada paciente es una goroutine que se duerme a ratos.
+// Se corre limpio con: go run -race .
+func runConcurrentSimulation() {
+	fmt.Println()
+	fmt.Printf("════════════ BONUS — SIMULACIÓN CONCURRENTE (%v, una goroutine por paciente) ════════════\n", simulationTime)
+
+	h := hospital.NewHospital("Hospital de los Costeños con Narcolepsia (simulación)")
+	check(h.HireDoctor(hospital.NewDoctor("D-01", "Dra. Karen Ospina", 45, "Neurología del sueño")))
+	check(h.HireDoctor(hospital.NewDoctor("D-02", "Dr. Efraín Barraza", 52, "Medicina interna")))
+	check(h.HireStaff(hospital.NewOrderly("C-01", "Wilmer Camargo", 29)))
+	for _, number := range []int{101, 102, 103} {
+		check(h.AddRoom(number, 1))
+	}
+	patients := []*hospital.Patient{
+		hospital.NewPatient("P-001", "Yeimy Padilla", 34, hospital.Severe),
+		hospital.NewPatient("P-002", "Kevin Mercado", 27, hospital.Moderate),
+		hospital.NewPatient("P-003", "Ludys Arrieta", 58, hospital.Mild),
+		hospital.NewPatient("P-004", "Wilfrido Berrío", 61, hospital.Severe),
+		hospital.NewPatient("P-005", "Breiner Julio", 22, hospital.Severe),
+	}
+	for _, p := range patients {
+		check(h.AdmitPatient(p))
+	}
+	locations := []string{"cafetería", "fila de radiología", "pista de champeta", "pasillo 2", "parqueadero"}
+
+	// context.WithTimeout cancela la simulación sola cuando pasa el tiempo.
+	ctx, cancel := context.WithTimeout(context.Background(), simulationTime)
+	defer cancel()
+	stats := simulation.Run(ctx, h, patients, locations)
+
+	// Run ya esperó a todas las goroutines (wg.Wait): desde aquí es seguro
+	// leer el hospital y sus pacientes.
+	section("Lo que pasó")
+	fmt.Printf("  %d ataques de sueño, %d despertares\n", stats.Episodes, stats.WakeUps)
+	fmt.Printf("  %d veces alguien se durmió sin cama libre; %d consiguieron cama después\n",
+		stats.LeftInHallway, stats.LateBeds)
+	fmt.Printf("  %d errores inesperados\n", stats.Errors)
+
+	section("Consulta 5.1 al final de la simulación")
+	printHallway(h.PatientsInHallway())
+
+	section("Consulta 5.3 al final de la simulación — habitaciones")
+	printRooms(h.Rooms())
+
+	section("Consulta 5.4 al final de la simulación")
+	printSevereReport(h.SevereReport())
 }
 
 // ─── Ayudantes de impresión ──────────────────────────────────────────────

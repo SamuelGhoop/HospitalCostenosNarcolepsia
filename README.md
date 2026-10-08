@@ -8,22 +8,24 @@ Ejercicio aplicado de **Programación Orientada a Objetos**, Universidad EIA (pr
 |---|---|
 | **Integrante** | Samuel Giraldo Jiménez |
 | **Lenguaje** | Go 1.21 o superior (`go.mod` declara `go 1.21`). El núcleo usa solo la librería estándar |
-| **Estado** | Modelo, consultas y escenario completos. Pendientes: bonus de concurrencia y de interfaz gráfica |
+| **Estado** | Modelo, consultas, escenario y bonus de concurrencia completos. Pendiente: bonus de interfaz gráfica |
 
 ## Cómo correrlo
 
 ```bash
-go run .          # escenario de demostración (Sección 6) y las cuatro consultas
-go test ./...     # pruebas (56 tests del paquete hospital)
+go run .          # escenario de la Sección 6, las cuatro consultas y, al final, la simulación concurrente (2 s)
+go test ./...     # pruebas (56 del paquete hospital + 3 de la simulación)
 go vet ./...      # análisis estático: no reporta nada
 gofmt -l .        # formato: no lista ningún archivo
 ```
 
-**Detector de carreras.** `go test -race` necesita cgo y un gcc de 64 bits. En Windows sin ese compilador, se corre en Docker:
+**Detector de carreras.** `-race` necesita cgo y un gcc de 64 bits. En Windows sin ese compilador, se corre en Docker con la versión mínima de Go:
 
 ```bash
-docker run --rm -v "<ruta-del-repo>:/src" -w /src golang:1.21 go test -race ./...
+docker run --rm -v "<ruta-del-repo>:/src" -w /src golang:1.21 sh -c "go test -race ./... && go run -race ."
 ```
+
+Resultado verificado con Go 1.21.13: tests en verde y `go run -race .` termina sin ningún `DATA RACE`.
 
 ## Estructura
 
@@ -40,7 +42,7 @@ hospital/        el modelo: structs, métodos, interfaz, consultas y sus tests
   hospital.go      Hospital: despacho, candado y las cuatro consultas
   errors.go        errores centinela
   *_test.go        tests (los 3 obligatorios están al inicio de hospital_test.go)
-simulation/      (bonus, pendiente) simulación concurrente con goroutines
+simulation/      (bonus) simulación concurrente: una goroutine por paciente
 gui/             (bonus, pendiente) juego en Ebitengine, módulo Go aparte
 ```
 
@@ -58,6 +60,7 @@ gui/             (bonus, pendiente) juego en Ebitengine, módulo Go aparte
 | 5.4 Reporte de severidad | `func (h *Hospital) SevereReport() map[*Patient]int` |
 | "Sin cama" devuelve error, sin `panic` | `AssignRoom` envuelve `ErrNoRoomAvailable`; `main` lo imprime y sigue |
 | 3 tests obligatorios | `hospital_test.go`, marcados `[Obligatorio 1/2/3]` |
+| Bonus: goroutines + `sync.Mutex`, limpio con `-race` | `simulation/simulation.go` + el candado de `Hospital`; sección final de `go run .` |
 
 ## Decisiones de diseño
 
@@ -80,6 +83,8 @@ gui/             (bonus, pendiente) juego en Ebitengine, módulo Go aparte
 **Errores.** Los métodos que pueden fallar devuelven `error` como último valor. Se usan errores centinela (`ErrNoRoomAvailable`, `ErrNotAsleep`…) envueltos con `%w` para dar contexto, y se comparan con `errors.Is`. Ninguna situación prevista usa `panic`.
 
 **Concurrencia a nivel de `Hospital`.** Un solo `sync.Mutex` protege todo el estado del hospital, y con él el de sus pacientes, habitaciones y doctores. `Patient`, `Room` y `Doctor` por sí solos **no** son seguros para uso concurrente: el código con goroutines debe entrar siempre por los métodos de `Hospital`, y los getters de las entidades se leen **después de `wg.Wait()`**, cuando ya no hay goroutines escribiendo. El `Mutex` de Go no es reentrante. Por eso los métodos públicos toman el candado y delegan en helpers `...Locked` (por ejemplo `assignRoomLocked`): si `RegisterEpisode` llamara a `AssignRoom`, se bloquearía esperándose a sí mismo. Un test lanza 10 goroutines por 3 camas y pasa con `-race`.
+
+**Bonus: simulación concurrente.** `simulation.Run` lanza una goroutine por paciente. Cada una repite un ciclo: despierto un rato al azar, ataque de sueño (`RegisterEpisode`), dormido un rato (si quedó en el pasillo, reintenta `AssignRoom` y compite con las demás por las camas que se liberan) y despertar (`WakePatient`). Las goroutines **solo** llaman métodos de `Hospital`. Para saber si el paciente quedó en cama le preguntan al hospital (`AssignRoom` responde `ErrAlreadyInBed`), no al paciente. Los contadores son `atomic.Int64`. La simulación se detiene con `context.WithTimeout`, y `Run` espera a todas las goroutines (`sync.WaitGroup`) antes de devolver, así que `main` lee los resultados cuando ya nadie escribe.
 
 **Go 1.21.** `go.mod` declara la versión mínima que acepta el enunciado. En esa versión la variable de un `for` es la misma en cada vuelta, así que antes de lanzar una goroutine se copia explícitamente (`p := p`).
 
@@ -114,6 +119,6 @@ gui/             (bonus, pendiente) juego en Ebitengine, módulo Go aparte
 - [x] Fase 3: `Attender`, `Doctor`, `Orderly` y `EpisodeRecord`
 - [x] Fase 4: `Hospital` y las cuatro consultas
 - [x] Fase 5: escenario de demostración en `main.go`
-- [ ] Fase 6: bonus de simulación concurrente
+- [x] Fase 6: bonus de simulación concurrente
 - [ ] Fase 7: bonus de interfaz gráfica
 - [ ] Fase 8: revisión final y `AI_USAGE.md`
