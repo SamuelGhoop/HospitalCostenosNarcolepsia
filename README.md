@@ -7,17 +7,40 @@ Ejercicio aplicado de **Programación Orientada a Objetos**, Universidad EIA (pr
 | | |
 |---|---|
 | **Integrante** | Samuel Giraldo Jiménez |
-| **Lenguaje** | Go 1.21 o superior (`go.mod` declara `go 1.21`). El núcleo usa solo la librería estándar |
-| **Estado** | Modelo, consultas, escenario y bonus de concurrencia completos. Pendiente: bonus de interfaz gráfica |
+| **Lenguaje** | Núcleo: Go 1.21 o superior (`go.mod` declara `go 1.21`), solo librería estándar. Interfaz gráfica: **Go 1.26** o superior (ver abajo) |
+| **Estado** | Modelo, consultas, escenario y bonus de concurrencia completos. Interfaz gráfica: la demostración de la Sección 6 funciona; el modo juego está en construcción |
 
 ## Cómo correrlo
 
 ```bash
 go run .          # escenario de la Sección 6, las cuatro consultas y, al final, la simulación concurrente (2 s)
-go test ./...     # pruebas (56 del paquete hospital + 3 de la simulación)
+go test ./...     # pruebas de la raíz: hospital, simulation y game
 go vet ./...      # análisis estático: no reporta nada
 gofmt -l .        # formato: no lista ningún archivo
 ```
+
+### Interfaz gráfica (bonus)
+
+```bash
+cd gui
+go run .          # abre la ventana con la demostración de la Sección 6
+go test ./...     # pruebas de la interfaz
+```
+
+> **La interfaz gráfica necesita Go 1.26 o superior.** Está en un módulo aparte (`gui/go.mod`) porque Ebitengine v2.10 y `golang.org/x/image` exigen esa versión; el núcleo sigue en Go 1.21. Si tu Go es más viejo, `go` descarga solo el toolchain 1.26 (`GOTOOLCHAIN=auto`, el valor por defecto), así que **la primera vez se necesita internet**, también para descargar Ebitengine. Después funciona sin conexión.
+>
+> En Windows y macOS no hace falta nada más. En Linux, Ebitengine necesita cgo y las librerías de desarrollo de X11 y OpenGL (ver la guía de instalación de Ebitengine).
+
+Controles de la demostración:
+
+| Tecla | Acción |
+|---|---|
+| Espacio o clic | Siguiente paso |
+| A | Avance automático (un paso cada 3 s) |
+| S | Saltar al final |
+| C | Mostrar u ocultar los subtítulos |
+
+Cada paso muestra el subtítulo, la **llamada real** al modelo (por ejemplo `h.AssignRoom(P-004)`) y lo que respondió. El paso 8 muestra en rojo el error real de "no hay habitación disponible". Al final aparece el Shift Report con las cuatro consultas.
 
 **Detector de carreras.** `-race` necesita cgo y un gcc de 64 bits. En Windows sin ese compilador, se corre en Docker con la versión mínima de Go:
 
@@ -43,7 +66,14 @@ hospital/        el modelo: structs, métodos, interfaz, consultas y sus tests
   errors.go        errores centinela
   *_test.go        tests (los 3 obligatorios están al inicio de hospital_test.go)
 simulation/      (bonus) simulación concurrente: una goroutine por paciente
-gui/             (bonus, pendiente) juego en Ebitengine, módulo Go aparte
+game/            reglas de la demostración y del juego, encima de hospital (solo stdlib)
+  demo.go          los 12 pasos de la Sección 6 sobre su propio hospital
+  report.go        las cuatro consultas copiadas a vistas (solo valores)
+gui/             (bonus) interfaz en Ebitengine: módulo Go aparte (go 1.26)
+  main.go          abre la ventana
+  ui/              escenas (demostración, Shift Report), mapa y dibujo
+  design/          maquetas de Claude Design (solo referencia visual, no se compilan)
+GAME_DESIGN.md   especificación del modo demostración y del juego
 ```
 
 ## Cómo se cumple el enunciado
@@ -61,10 +91,11 @@ gui/             (bonus, pendiente) juego en Ebitengine, módulo Go aparte
 | "Sin cama" devuelve error, sin `panic` | `AssignRoom` envuelve `ErrNoRoomAvailable`; `main` lo imprime y sigue |
 | 3 tests obligatorios | `hospital_test.go`, marcados `[Obligatorio 1/2/3]` |
 | Bonus: goroutines + `sync.Mutex`, limpio con `-race` | `simulation/simulation.go` + el candado de `Hospital`; sección final de `go run .` |
+| Bonus: interfaz gráfica separada de la lógica | `gui/` (Ebitengine, módulo aparte). `hospital/` no cambió al agregarla: `git diff --stat modelo-cerrado -- hospital/` sale vacío |
 
 ## Decisiones de diseño
 
-**División en paquetes.** `hospital` tiene todo el modelo y no imprime nada. `main` solo arma el escenario y formatea la salida. La interfaz gráfica irá en `gui/`, un **módulo Go aparte** (con su propio `go.mod`): `go test ./...` desde la raíz no entra a módulos anidados, así que los tests del núcleo no dependen de Ebitengine ni de las librerías gráficas del sistema.
+**División en paquetes.** `hospital` tiene todo el modelo y no imprime nada. `main` solo arma el escenario y formatea la salida. `game` tiene las reglas de la demostración y del juego, y solo cambia el modelo a través de los métodos de `Hospital`. La interfaz gráfica está en `gui/`, un **módulo Go aparte** (con su propio `go.mod`): `go test ./...` desde la raíz no entra a módulos anidados, así que los tests del núcleo no dependen de Ebitengine ni de las librerías gráficas del sistema. La interfaz no decide nada: solo dibuja las vistas que le entrega `game` (copias con valores, nunca punteros del modelo) y llama sus métodos. El tag `modelo-cerrado` marca el modelo antes de la interfaz.
 
 **Composición en vez de herencia.** `Person` (id, nombre, edad) se embebe **por valor** en `Patient`, `Doctor` y `Orderly`. Sus métodos se promueven (`paciente.Name()`) y le dan a `Doctor` y `Orderly` dos de los cuatro métodos de `Attender`. Se embebe por valor y no como `*Person` porque cada persona tiene su propia identidad y el valor cero es seguro. Con `*Person`, dos copias compartirían los datos y un `Patient{}` sin inicializar tendría `Person == nil`.
 
@@ -120,5 +151,7 @@ gui/             (bonus, pendiente) juego en Ebitengine, módulo Go aparte
 - [x] Fase 4: `Hospital` y las cuatro consultas
 - [x] Fase 5: escenario de demostración en `main.go`
 - [x] Fase 6: bonus de simulación concurrente
-- [ ] Fase 7: bonus de interfaz gráfica
+- [ ] Fase 7: bonus de interfaz gráfica (ver `GAME_DESIGN.md`)
+  - [x] Demostración de la Sección 6 paso a paso, con subtítulos y Shift Report
+  - [ ] Modo juego
 - [ ] Fase 8: revisión final y `AI_USAGE.md`
