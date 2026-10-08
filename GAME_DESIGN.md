@@ -1,0 +1,420 @@
+# GAME_DESIGN.md — Hospital de los Costeños con Narcolepsia (modo juego)
+
+> Especificación del juego que se construye **encima** del modelo de `hospital/`.
+> Es el bono de interfaz gráfica (+10 %) del trabajo de POO en Go (Universidad EIA). El bono de concurrencia (+5 %) ya está cubierto por `simulation/`.
+> La interfaz se hace con **Ebitengine** (motor 2D en Go, juego de escritorio). El profesor autorizó usarlo para el bono.
+> Todos los números de este documento son valores iniciales para balancear; viven en un solo archivo (`game/config.go`) para ajustarlos sin tocar la lógica.
+
+---
+
+## 1. Visión
+
+El jugador administra un hospital en la costa caribe colombiana. Llegan costeños con narcolepsia que se quedan dormidos de repente en cualquier parte. El jugador despacha médicos y camilleros para atenderlos y subirlos a una cama antes de que bloqueen los pasillos, mientras cuida la plata y la reputación del hospital.
+
+Estética: pixel art "chunky" retro pero legible (maquetas de Claude Design en `gui/design/claude-design/`).
+
+### 1.1 Flujo general
+
+1. **Modo demostración** (sección 4): la ventana reproduce, animado y paso a paso, el escenario obligatorio de la Sección 6 del enunciado, con el **despacho automático** del modelo. Termina mostrando las 4 consultas.
+2. **Modo juego** (secciones 5 a 9): al terminar la demo aparece **"¡AHORA TE TOCA!"** y empieza una partida donde el jugador toma el control como jefe de turno.
+
+La narrativa: primero se ve el sistema del hospital funcionando solo; después el jugador lo administra.
+
+---
+
+## 2. Restricciones del trabajo (no negociables)
+
+1. **El paquete `hospital/` no se modifica.** La sección 7 del enunciado exige que la lógica no cambie al agregar la interfaz y que `hospital/` no tenga código de presentación.
+2. **El `main.go` de la raíz no se toca.** `go run .` sigue ejecutando el escenario de la Sección 6 en consola y la simulación concurrente.
+3. `simulation/` no se modifica (es el bono de concurrencia ya entregado).
+4. `hospital/`, `simulation/` y `game/` usan solo la librería estándar. **Ebitengine** (`github.com/hajimehoshi/ebiten/v2`) solo se importa dentro de `gui/`, que es un **módulo Go aparte**.
+5. Métodos que pueden fallar devuelven `error`; nada de `panic` para situaciones previsibles.
+6. `gofmt` y `go vet` limpios; `go test ./...` en verde en la raíz y en `gui/`; `go test -race ./...` limpio en la raíz (vía Docker si no hay gcc de 64 bits, como indica el README).
+7. Samuel debe poder explicar y modificar cada línea en la sustentación.
+
+> Si el juego necesita algo que la API de `hospital/` no expone, **no se improvisa**: se le avisa a Samuel antes de tocar nada.
+
+---
+
+## 3. Arquitectura
+
+```
+HospitalCostenosNarcolepsia/          ← módulo raíz (go 1.21, solo stdlib)
+  go.mod
+  main.go                → escenario de la Sección 6 en consola (intacto)
+  hospital/              → modelo del enunciado (intacto)
+  simulation/            → bono de concurrencia (intacto)
+  game/                  → NUEVO: reglas del juego, solo stdlib, con sus tests
+    config.go            → constantes de balance
+    errors.go            → errores centinela del juego
+    game.go              → struct Game, mutex, ciclo de vida, Tick()
+    engine.go            → goroutine motor: llama Tick cada 100 ms (sección 11)
+    clock.go             → turno (08:00–20:00) y hora del juego
+    staff.go             → StaffMember: decorador que cumple hospital.Attender
+    dispatch.go          → despacho elegido por el jugador ("de guardia")
+    patients.go          → estado de cada paciente en el juego, avanzado por ticks
+    beds.go              → triaje de camas, despertar y alta
+    spawner.go           → llegada de pacientes
+    economy.go, reputation.go, hiring.go, events.go, names.go
+    snapshot.go          → Snapshot(): copia de solo lectura para la interfaz
+    report.go            → Report: las 4 consultas y las vistas (solo valores)
+    demo.go              → tipo Demo: guion del modo demostración (Sección 6)
+    *_test.go
+  gui/                   ← módulo aparte (Ebitengine)
+    go.mod               → require ebiten/v2; replace del módulo raíz => ../
+    main.go              → crea la App y llama ebiten.RunGame
+    ui/                  → escenas, dibujo, animación, entrada
+    assets/              → PNG, fuente pixel y sonidos (//go:embed)
+    design/claude-design/ → maquetas de Claude Design (solo referencia, no se compila)
+```
+
+- `game/` vive en el módulo raíz para que sus tests corran con `go test ./...` desde la raíz y no dependan de Ebitengine.
+- `gui/` tiene su propio `go.mod`. Puede declarar la versión de Go que pida Ebitengine sin cambiar el `go 1.21` de la raíz. Para usar el código local se agrega `replace github.com/SamuelGhoop/HospitalCostenosNarcolepsia => ../`.
+- El juego se corre con `cd gui && go run .`.
+
+| Capa | Hace | No hace |
+|---|---|---|
+| `hospital/` | Reglas del dominio: admitir, despachar, asignar cama, registrar episodios, consultas | Nada de juego ni de interfaz |
+| `game/` | Tiempo, azar, economía, decisiones del jugador; todo cambio al hospital pasa por la API de `hospital/` | No reimplementa reglas del modelo; no importa Ebitengine |
+| `gui/ui/` | Dibuja, anima y traduce clics y teclas en llamadas a `game.Game` | No decide reglas; solo lee `Snapshot()` y llama métodos de `Game` |
+
+### 3.1 El decorador `StaffMember`
+
+`RegisterEpisode` elige por turnos (round-robin) entre el personal cuyo `IsAvailable()` es `true`. `HireStaff` acepta **cualquier** `hospital.Attender`. El juego aprovecha eso: contrata a su personal envuelto en un tipo propio que cumple la interfaz.
+
+```go
+// StaffMember cumple hospital.Attender envolviendo al Doctor u Orderly real.
+type StaffMember struct {
+    inner    hospital.Attender // *hospital.Doctor o *hospital.Orderly
+    doctor   *hospital.Doctor  // no nil si es médico (para MyEpisodes)
+    speed    int               // 1-5
+    skill    int               // 1-5, solo médicos
+    salary   int
+    look     Appearance
+    busy     bool              // caminando o cargando a un paciente
+    onCall   bool              // "de guardia": único disponible durante un despacho
+}
+
+func (s *StaffMember) ID() string   { return s.inner.ID() }
+func (s *StaffMember) Name() string { return s.inner.Name() }
+func (s *StaffMember) Attend(p *hospital.Patient, loc string) (hospital.EpisodeRecord, error) {
+    return s.inner.Attend(p, loc) // el registro lo crea el Doctor/Orderly real
+}
+func (s *StaffMember) IsAvailable() bool { return s.onCall }
+```
+
+- Todo el personal del modo juego se contrata con `HireStaff(staffMember)`. **Invariante: en el hospital del juego no hay ningún Attender sin envolver.** Un `Orderly` suelto devuelve siempre `IsAvailable() == true` y se robaría los despachos. Un test lo verifica.
+- Como `HireStaff` solo registra como médico a un `*hospital.Doctor` real, **los médicos envueltos no aparecen en `Doctors()`**. `Game` guarda su propia lista de `StaffMember` y usa `doctor.MyEpisodes()` para la consulta 5.2.
+- Los registros del historial muestran al Doctor/Orderly real como quien atendió, porque `Attend` se delega.
+- El `IsAvailable` del decorador **ya ignora** el cupo de 4 pacientes del médico: el `IsAvailable` del Doctor interno nunca se consulta. El juego no llama `DiagnosePatient` porque no hay diagnóstico en el modo juego, y por eso en sus registros `TreatingDoctor()` queda vacío ("sin tratante").
+- ⚠️ `IsAvailable`, `Attend`, `ID` y `Name` se llaman desde adentro de los métodos del hospital, con su candado tomado y mientras `Game` ya tiene el suyo. **Nunca deben tomar el mutex de `Game`** (sería un deadlock). El orden de candados siempre es `g.mu` → `h.mu`.
+
+### 3.2 Despacho elegido por el jugador ("de guardia")
+
+```go
+// Dentro de Game, con g.mu tomado:
+s.onCall = true
+defer func() { s.onCall = false }() // se apaga aunque RegisterEpisode falle
+err := g.h.RegisterEpisode(p, zone) // el round-robin solo encuentra a s
+```
+
+El hospital sigue decidiendo "entre los disponibles"; el juego decide quién está disponible. El modelo no se modifica y su lógica (dormir al paciente, buscar la primera cama, crear y guardar el registro) se usa tal cual.
+
+Cuando el despacho crea un episodio, `game/` guarda la **hora del juego** en un `map[string]string` (ID del episodio → `"14:15"`). Es solo para mostrarla en la bitácora y en el Shift Report. El modelo sigue guardando la hora real en `At()`.
+
+### 3.3 Qué método del modelo usa cada acción del juego
+
+| Acción del juego | API de `hospital/` |
+|---|---|
+| Crear el hospital y las habitaciones | `NewHospital`, `AddRoom(n, 1)` |
+| Contratar personal | `NewDoctor` / `NewOrderly` + `HireStaff(&StaffMember{...})` |
+| Llega un costeño | `NewPatient` + `AdmitPatient` |
+| El personal llega donde el paciente dormido | `RegisterEpisode(p, zona)` con el mecanismo "de guardia" |
+| Saber si consiguió cama | `p.Room()` después de `RegisterEpisode` (nil = se queda en el pasillo) |
+| Triaje: darle una cama libre a alguien del pasillo | `AssignRoom(p)`; su error se muestra como aviso |
+| Termina el sueño o el jugador lo despierta | `WakePatient(p)` (libera la cama) |
+| Alerta de pasillo / consulta 5.1 | `PatientsInHallway()` |
+| Consulta 5.2 | `doctor.MyEpisodes()` de cada médico |
+| Consulta 5.3 | `Rooms()` + el último error de `AssignRoom` |
+| Consulta 5.4 | `SevereReport()` tal cual, rotulado **"episodios en esta partida"**: el modelo cuenta por día real del calendario y un día de juego dura 5 minutos reales |
+
+`Patient.SufferSleepAttack`, `Patient.WakeUp`, `Room.Occupy`, `Room.Release` y `Attender.Attend` **no** se llaman directamente desde el juego: solo el hospital los usa, con su candado.
+
+### 3.4 Dos capas de estado del paciente
+
+| Momento | Estado en `game/` | Estado en el modelo |
+|---|---|---|
+| Despierto, deambulando | `Walking` / `Idle` | `Awake` |
+| Le dio el ataque y nadie lo ha atendido | `Collapsed` (en el piso, con cronómetro) | `Awake` (el hospital aún no se ha enterado) |
+| Atendido y con cama | `InBed` | `AsleepInBed` |
+| Atendido pero sin cama | `InHallway` | `AsleepInHallway` |
+| Se fue de alta | `Discharged` (sale del mapa) | `Awake` (sigue en la lista; el modelo no tiene alta) |
+
+- El episodio entra al historial cuando alguien lo atiende: "un episodio existe en el sistema cuando el personal lo reporta".
+- Para el colapso y la reputación cuentan los `Collapsed` **y** los `InHallway`.
+- **Los `Collapsed` y los `InHallway` no se despiertan solos.** El `Collapsed` espera a que alguien lo atienda y el `InHallway`, a que le den cama. Solo un evento que lo diga explícitamente puede despertarlos. Mientras esperan corren las penalizaciones de reputación de 5.9. Si el juego queda muy difícil, se balancea con `config.go` (intervalo de llegadas, duración del sueño en cama), sin cambiar esta regla.
+- Los dados de alta siguen en el modelo como `Awake`, así que `SevereReport()` los incluye; el Shift Report los marca "(alta)".
+
+---
+
+## 4. Modo demostración (Sección 6)
+
+Reproduce en la ventana el mismo escenario de `main.go`, sobre **un hospital propio**, con el personal sin envolver (`HireDoctor` / `HireStaff` reales) para que el despacho sea el round-robin original del modelo.
+
+La demo es un **tipo aparte**, `game.Demo`, con métodos `Next()`, `Skip()`, `Snapshot()` y `Report()`. No vive dentro de `Game` porque tiene su propio hospital y no usa la goroutine motor: solo la usa la goroutine de la interfaz, así que no necesita candado. Las horas de los episodios salen de `At()` (hora real), igual que en la consola de `main.go`.
+
+### 4.1 Guion
+
+| Paso | Qué se ve | Llamada al modelo |
+|---|---|---|
+| 1 | Se contratan Dra. Karen Ospina (D-01), Dr. Efraín Barraza (D-02) y el camillero Wilmer Camargo (C-01); aparecen en la sala del personal | `HireDoctor`, `HireDoctor`, `HireStaff` |
+| 2 | Se habilitan las habitaciones 101, 102 y 103 | `AddRoom` ×3 |
+| 3 | Entran por la calle P-001 Yeimy Padilla (Severe), P-002 Kevin Mercado (Moderate), P-003 Ludys Arrieta (Mild), P-004 Wilfrido Berrío (Severe), P-005 Breiner Julio (Severe) | `AdmitPatient` ×5 |
+| 4 | Cada uno queda a cargo de su médico tratante | `DiagnosePatient` (como en `main.go`) |
+| 5 | Yeimy se duerme en la cafetería; el sistema despacha y la suben a la 101 | `RegisterEpisode` |
+| 6 | Kevin, en la fila de radiología → 102 | `RegisterEpisode` |
+| 7 | Ludys, en la pista de champeta → 103 | `RegisterEpisode` |
+| 8 | Wilfrido, en el pasillo 2 → **no hay cama**; aviso rojo con el error real | `RegisterEpisode` + `AssignRoom` (error) |
+| 9 | Panel de la consulta 5.1 con Wilfrido en el pasillo | `PatientsInHallway` |
+| 10 | Yeimy se despierta y libera la 101 | `WakePatient` |
+| 11 | El camillero lleva a Wilfrido a la 101 | `AssignRoom` |
+| 12 | Shift Report con las 4 consultas finales | `PatientsInHallway`, `MyEpisodes`, `Rooms`, `SevereReport` |
+
+- Las ubicaciones de `main.go` se ubican en el mapa así: "cafetería" → Cafetería, "fila de radiología" → Radiología, "pasillo 2" → Hallway 2. **"Pista de champeta del patio" no existe en el mapa**: se ubica en el Lobby, salvo que Samuel decida agregar un patio (⏳ pendiente para F2).
+- El resultado de cada paso sale del modelo real, no de texto fijo.
+- Paso 11: `AssignRoom` no involucra a ningún Attender. El camillero se anima llevando a Wilfrido, pero el subtítulo muestra solo la llamada real (`h.AssignRoom(P-004) → habitación 101`).
+
+### 4.2 Controles y subtítulos
+- **Espacio / clic**: siguiente paso. **A**: avance automático (un paso cada 3 s). **S**: saltar al final.
+- Barra inferior con el subtítulo del paso y la llamada real que se hizo, por ejemplo: `h.AssignRoom(P-004) → error: no hay habitación disponible`. Se oculta y se muestra con **C**. Pensado para la sustentación.
+- Al terminar: Shift Report → botón **"¡AHORA TE TOCA!"** → empieza el modo juego. También hay una opción **DEMO SECCIÓN 6** en el menú del portapapeles.
+
+---
+
+## 5. Modo juego: ciclo
+
+### 5.1 Tiempo
+- Turno de **08:00 a 20:00** en tiempo de juego, que dura **300 s reales** (1 s real = 2,4 min de juego).
+- Tick de simulación: 100 ms. La pausa congela reloj, cronómetros y llegadas.
+
+### 5.2 Inicio de partida
+- Plata inicial **$2.000**; reputación **3 estrellas** (escala 0–5).
+- Personal: **1 doctor** (rapidez 3, pericia 3) y **1 camillero** (rapidez 3), aleatorios y envueltos en `StaffMember`.
+- Habitaciones **101, 102, 103**, capacidad 1.
+
+### 5.3 Llegada de pacientes
+- Intervalo día 1: aleatorio entre **18 y 25 s**; cada día ×0,9 (mínimo **8 s**). Máximo **10** pacientes simultáneos en el mapa.
+- Nivel: **Mild 40 %**, **Moderate 35 %**, **Severe 25 %**. IDs consecutivos (P-001, P-002…) porque `AdmitPatient` rechaza IDs repetidos.
+- Aparecen en la **calle**, caminan unos **4 s** por la acera y `AdmitPatient` se llama al cruzar la puerta del lobby. Hay peatones y carros decorativos.
+
+### 5.4 Comportamiento del paciente
+- Despierto, deambula cada **10–20 s** entre Lobby, Cafetería, Hallway 1, Hallway 2 y Radiología.
+- Tiempo despierto antes del ataque: **Mild 60–90 s**, **Moderate 35–55 s**, **Severe 15–30 s**.
+- ~2 s antes del ataque hace la animación de aviso (cabeceo) y luego se desploma: estado `Collapsed`, arranca su **cronómetro de pasillo**.
+- Duración del sueño en cama: **Mild 15 s**, **Moderate 22 s**, **Severe 30 s**; si lo atendió un médico, −8 % por punto de pericia. Al cumplirse, el juego llama `WakePatient`. El cronómetro de sueño arranca **cuando consigue cama**: el que está en el pasillo sigue dormido hasta que se la den (sección 3.4).
+- **Alta**: al despertar después de **1 / 2 / 3** episodios atendidos (Mild / Moderate / Severe), sale caminando por la puerta.
+
+### 5.5 Despacho (decisión del jugador)
+1. Clic en un paciente `Collapsed` y luego en un miembro del personal libre.
+2. El personal camina **(8 − rapidez) s** hasta el paciente (de 3 a 7 s); queda `busy`.
+3. Al llegar, el juego hace el despacho "de guardia" (sección 3.2):
+   - **Con cama**: lo lleva a la habitación (animación de 2 s) y luego queda libre.
+   - **Sin cama**: el paciente queda `InHallway`, aviso rojo "sin cama disponible" y el personal queda libre.
+4. Pago: atendido por médico **$300**, por camillero **$150**.
+5. Si el paciente se despertó antes de que llegara el personal (eventos), el despacho se cancela sin llamar al modelo. Como solo un evento puede despertar a un `Collapsed` (sección 3.4), esta cancelación se implementa en F5, junto con los eventos.
+
+### 5.6 Triaje de camas
+- Cuando una cama se libera, el letrero de la habitación parpadea en verde.
+- Clic en un paciente `InHallway` → el juego llama `AssignRoom(p)`. Si no hay cama, el error del modelo se muestra como aviso.
+- Si nadie decide en **10 s**, la cama se le da automáticamente a quien lleve más tiempo en el pasillo.
+
+### 5.7 Despertar antes de tiempo
+- Clic derecho sobre un paciente en cama → **DESPERTAR**: `WakePatient(p)` libera la cama al instante. Cuesta **−0,25 estrellas** y ese paciente vuelve a dormirse en la mitad del tiempo normal.
+
+### 5.8 Economía
+- Ingresos: $300 (médico) / $150 (camillero) por atención; alta **+$200**.
+- Nómina a las 20:00. Médico: `250 + 50 × (rapidez + pericia)`; camillero: `120 + 60 × rapidez`.
+- Contratar cuesta un día de salario por adelantado.
+- (Opcional, fase final) **Ampliar**: comprar la habitación 104 por $2.500 con `AddRoom`.
+
+### 5.9 Reputación (0–5)
+- Más de **20 s** `Collapsed` o `InHallway`: **−0,5**, y luego **−0,25** cada 10 s más. Corre para los dos estados mientras esperan.
+- Atendido en menos de **10 s** desde el ataque: **+0,1**. Alta: **+0,1**. Tope 5.
+- En el código la reputación se guarda como **entero en centésimas de estrella** (300 = 3 ★). Así sumar 0,1 y restar 0,25 no acumula errores de redondeo.
+
+### 5.10 Derrota y puntaje
+- Pierde con: reputación en 0 ("¡PERDIÓ LA LICENCIA!"), quiebra al pagar la nómina ("¡QUIEBRA!") o **5 o más** pacientes `Collapsed` + `InHallway` a la vez ("¡HOSPITAL COLAPSADO!").
+- Puntaje: +100 por atención, +250 por alta, +500 por día completado; al final, + plata ÷ 10 + estrellas × 200.
+
+---
+
+## 6. Contratación (Bolsa de empleo)
+
+- Botón **CONTRATAR** → portapapeles con **3 candidatos** que cambian cada día (≈ 66 % médicos, 34 % camilleros).
+- Estadísticas de 1 a 5, con más probabilidad de 2–3. Cada ficha: retrato, nombre, rol, barras de **Rapidez** y **Pericia** (solo médicos) y salario diario.
+- Botón deshabilitado si no alcanza la plata. Máximo **6** miembros del personal.
+- Contratar crea el `*hospital.Doctor` o `*hospital.Orderly`, lo envuelve en `StaffMember` y llama `HireStaff`.
+
+---
+
+## 7. Generación aleatoria
+
+- **Nombres** costeños. Nombres: Wilfrido, Yeimy, Dairo, Yuleidis, Éder, Keyner, Nayibe, Yeferson, Ledys, Aníbal, Rosiris, Hernando, Yorledis, Dagoberto, Marelvis, Ronaldo. Apellidos: Berrío, Padilla, Barrios, Arrieta, Mendoza, Julio, Polo, Pertuz, Cassiani, Ospina, Castro, Herrera, Altamar, Cantillo. Médicos con "Dr." o "Dra.".
+- **Edad**: pacientes 18–80; personal 25–60.
+- **Apariencia** (`Appearance`): `skinTone` (4), `shirtColor`, `shirtPattern` (liso, floreada, rayas), `hat` (vueltiao, gorra, ninguno; solo pacientes), `hair` (corto, afro, trenzas, calvo). El personal usa uniforme por rol.
+- El azar se inyecta en `Game` como `*rand.Rand` para que los tests usen semilla fija.
+
+---
+
+## 8. Eventos aleatorios
+
+- Día 1 sin eventos; días 2–3, **1** por día; desde el día 4, **2** por día, a una hora aleatoria entre 10:00 y 18:00.
+- Se anuncian con un **banner** de 3 s (nombre, descripción breve y decoración temática) y un icono en el HUD mientras están activos. Varios cambian el mapa (bafles, el bus en la calle…).
+- ⚠️ Pendiente: Samuel quiere definir en detalle cada banner y decoración antes de pedirlos en Claude Design.
+
+| # | Evento | Efecto | Duración |
+|---|---|---|---|
+| 1 | 🎉 Carnaval | Intervalo de llegadas ÷ 2 | 60 s |
+| 2 | 🍲 Día de sancocho | Los que están en la Cafetería se duermen el doble de rápido | 60 s |
+| 3 | ⚾ Final de béisbol | Nadie se duerme; al terminar, cada despierto se duerme en 3–8 s | 30 s |
+| 4 | 📋 Visita del Ministerio | Si al irse el inspector no hay nadie `Collapsed`/`InHallway`: +$800 y +0,5 ★. Si hay 2 o más: −0,5 ★ | 30 s |
+| 5 | 👑 Paciente VIP: el alcalde | Llega un Severe con banda tricolor. Atendido en menos de 10 s: +$1.000 y +1 ★. Más de 20 s sin cama: −1 ★ | Hasta que se va |
+| 6 | 🤢 Doctor enguayabado | Un médico al azar pierde 2 de rapidez (mínimo 1) | Resto del día |
+| 7 | 🚌 Bus de excursión de Cartagena | Llegan 4 pacientes de una (respetando el máximo) | Instantáneo |
+| 8 | 🔊 Picó de champeta | Todo el personal +2 de rapidez (máximo 5); nadie recibe el alta mientras suene | 45 s |
+
+---
+
+## 9. Pantallas
+
+| Pantalla | Maqueta (Claude Design) | Contenido |
+|---|---|---|
+| Inicio | `index.html` | Logo, hospital en la playa, menú en portapapeles: CONTINUE, NEW ROUND, DEMO SECCIÓN 6, SETTINGS, CREDITS, EXIT |
+| Hospital | `hospital.html` | Mapa top-down (habitaciones, lobby, pasillos, cafetería, radiología, sala del personal) y calle con paradero |
+| Catálogo de sprites | `sprites.html` | Exportador de spritesheets PNG |
+| Bolsa de empleo | por diseñar | Portapapeles con 3 fichas |
+| Pausa / Settings | por diseñar | REANUDAR, SETTINGS, SALIR AL MENÚ |
+| Shift Report | por diseñar | Las 4 consultas + balance del día; en la demo, botón "¡AHORA TE TOCA!". La 5.4 va rotulada "episodios en esta partida" y los episodios muestran la hora del juego (en la demo, la hora real) |
+| Game Over | por diseñar | Motivo, puntaje, días sobrevividos, NUEVA PARTIDA |
+
+### 9.1 HUD
+- **Arriba**: plata, estrellas, "DÍA N", reloj con barra de progreso, icono del evento activo. En la demo: "MODO DEMOSTRACIÓN — PASO N/12".
+- **Abajo a la derecha**: CONTRATAR, REPORTE, PAUSA (ocultos en la demo).
+- **Siempre visible**: burbuja roja "Zzz!" con cronómetro (`Collapsed` e `InHallway`; intermitente tras 15 s), burbuja azul "Zzz" en cama, rayitos de nivel solo en dormidos (1 amarillo Mild, 2 naranja Moderate, 3 rojos Severe), punto verde/rojo sobre el personal (libre/ocupado), letreros OCCUPIED/AVAILABLE y nombres de zonas.
+- **Etiquetas ocultas**: tooltip al pasar el cursor (ID, nombre, nivel, estado). **Shift** las muestra todas.
+- **Avisos** en la esquina superior: errores del modelo, altas y eventos.
+
+### 9.2 Transiciones
+- Inicio → Hospital: el portapapeles se voltea + pixel dissolve.
+- Fin del día → Shift Report: las fichas caen y se clavan en un tablero de corcho.
+
+---
+
+## 10. Interfaz con Ebitengine (`gui/ui/`)
+
+### 10.1 Pantalla
+- Resolución lógica **640 × 360**; ventana 1280 × 720 (×2), pantalla completa ×3. Escalado entero, filtro *nearest*.
+- Tiles de **16 × 16 px**; personajes en cuadros de **16 × 24 px**.
+
+### 10.2 Escenas (otra interfaz)
+```go
+type Scene interface {
+    Update() error
+    Draw(screen *ebiten.Image)
+}
+```
+`ui.App` implementa `ebiten.Game` y delega en la escena actual: Title, Demo, Hospital, Hiring, Report, GameOver. Pausa y Settings son capas encima.
+
+### 10.3 Sprites y animaciones
+- Personajes por capas: cuerpo (tono de piel), pelo, camisa y sombrero. La camisa va en escala de grises y se tiñe con `ColorScale`.
+- Spritesheet PNG: **una fila por animación, una columna por cuadro**, cuadros de 16 × 24 px. La animación hacia la derecha es la de la izquierda volteada con `GeoM.Scale(-1, 1)`.
+
+| Animación | Cuadros | Duración por cuadro |
+|---|---|---|
+| Quieto respirando | 2 | 500 ms |
+| Caminar abajo / arriba / izquierda | 4 | 150 ms |
+| Aviso de sueño (cabeceo) | 4 | 250 ms |
+| Desplomarse | 4 | 120 ms (no se repite) |
+| Dormido en el piso | 2 | 600 ms |
+| Dormido en cama | 2 | 600 ms |
+| Despertarse | 4 | 150 ms (no se repite) |
+| Alta (saluda) | 4 | 150 ms |
+
+- El personal y los personajes de eventos usan el mismo formato con sus animaciones (atender, empujar camilla…).
+- Las animaciones avanzan por ticks de `Update` (60/s), nunca con `time.Sleep`.
+
+### 10.4 Entrada
+- Clic en paciente `Collapsed` + clic en personal libre → `Game.Dispatch(patientID, staffID)`.
+- Clic en paciente `InHallway` → `Game.AssignBed(patientID)`. Clic derecho en paciente en cama → `Game.WakeEarly(patientID)`.
+- Hover → tooltip; **Shift** → todas las etiquetas; **Esc** → pausa; flechas + Enter en los portapapeles.
+
+### 10.5 Texto
+- Fuente **Press Start 2P** (OFL) en `assets/fonts/`, con `text/v2`.
+
+### 10.6 Comunicación con `game/`
+- Cada `Draw` usa `game.Snapshot()`: una copia de solo lectura construida con el mutex de `Game` tomado. `Snapshot()` y `Report()` contienen **solo valores** (textos, números y estados), nunca punteros del modelo como `*hospital.Patient`: la interfaz no puede leer el hospital sin pasar por `Game`.
+- Las acciones son métodos de `Game` (`Dispatch`, `AssignBed`, `WakeEarly`, `Hire`, `Pause`, `Resume`, `Report`). Una partida nueva es un `game.New(rng)` nuevo con su propio `context`, que cancela la anterior. La demo usa el tipo `game.Demo` (`Next`, `Skip`, `Snapshot`, `Report`). Los errores se muestran como avisos.
+- Los estados se muestran con el `String()` de las constantes tipadas del modelo.
+
+---
+
+## 11. Concurrencia
+
+> Decisión del 2026-10-08: **un solo reloj (`Tick`) y una sola goroutine motor**, en lugar de una goroutine por paciente.
+
+- El bono de concurrencia ya está cubierto por `simulation/`. En el juego hay **una única fuente de tiempo**: `Game.Tick(dt)`, que avanza en un solo paso el reloj, los cronómetros de cada paciente (máquina de estados en `patients.go`), las llegadas, el triaje automático, la reputación y la derrota.
+- **Dos goroutines tocan `Game`:**
+  - la **goroutine motor** (`Start(ctx)`, en `engine.go`): un `time.Ticker` que llama `Tick` cada 100 ms hasta que se cancela el `context` de la partida;
+  - la **goroutine de Ebitengine**: llama `Snapshot()` en cada `Draw` y las acciones del jugador (`Dispatch`, `AssignBed`…).
+  
+  Por eso el mutex de `Game` es necesario, y `-race` lo verifica.
+- Los tests no lanzan el motor: llaman `Tick` a mano con un `*rand.Rand` de semilla fija, así que son deterministas. Un test aparte arranca el motor y lee `Snapshot()` en paralelo para que `-race` revise la concurrencia real.
+- La pausa es una bandera bajo `g.mu`: `Tick` no hace nada mientras está activa. Así quedan congelados el reloj, los cronómetros y las llegadas, sin coordinar varias goroutines.
+- `*rand.Rand` no es seguro entre goroutines: solo se usa con `g.mu` tomado, y como todo pasa dentro de `Tick` o de las acciones, se cumple solo.
+- `Hospital` tiene su propio candado, pero los getters de `Patient`, `Room` y `Doctor` **no son seguros con goroutines** (lo dice el README). Por eso **todo** acceso al hospital (escrituras y lecturas, incluido `Snapshot()`) pasa por métodos de `Game` que toman `g.mu`.
+- Orden de candados siempre: primero `g.mu` (Game), después `h.mu` (Hospital, adentro de sus métodos). Los métodos de `StaffMember` nunca toman `g.mu` (sección 3.1).
+- El `sync.Mutex` no es reentrante: los métodos públicos de `Game` no se llaman entre sí, sino que delegan en helpers `...Locked`. Es la misma convención que usa `hospital/`.
+- Nunca se usa `time.Sleep` mientras se tiene `g.mu`: el motor espera al `Ticker` sin candado y solo lo toma dentro de `Tick`.
+- Verificación: `go test -race ./...` limpio en la raíz (incluye `game/`).
+
+---
+
+## 12. Fases de implementación
+
+Cada fase termina con `gofmt`, `go vet`, tests en verde, un commit y una explicación en español para Samuel.
+
+| Fase | Entregable | Criterio de aceptación |
+|---|---|---|
+| F0 | Modelo cerrado (ya hecho) | Tag `modelo-cerrado` sobre el commit actual. Desde aquí `hospital/` y `simulation/` no cambian |
+| F1 | `game/` núcleo | `StaffMember`, despacho "de guardia", triaje, despertar, guion de la demo, reloj, llegadas, plata (ingresos), reputación y derrota por licencia o colapso, con tick manual y tests con semilla fija. La quiebra llega con la nómina en F4 |
+| F2 | `gui/` + **modo demostración** | La ventana reproduce los 12 pasos de la Sección 6 con subtítulos y termina en el Shift Report. **Con esto ya está el bono de interfaz** |
+| F3 | Modo juego jugable | Despachar, triaje y despertar con clics; HUD; goroutine motor + interfaz con `-race` limpio |
+| F4 | Contratación + nómina + Shift Report diario | Bolsa de empleo funcional |
+| F5 | Eventos aleatorios | Los 8 eventos con banner y su test |
+| F6 | Pulido | README actualizado (cómo correr la demo y el juego), Game Over, sonido opcional, `AI_USAGE.md` |
+
+Prioridad si el tiempo no alcanza: F1 → F2 → F3 → F4 → F5 → F6. **F2 es la meta mínima.**
+
+**Orden real (2026-10-08), para asegurar primero el bono de interfaz:**
+1. F1.5: `game.Demo` + `Report`, que no dependen del resto de F1.
+2. F2 mínima: la demo de los 12 pasos en Ebitengine, con rectángulos de colores en lugar de sprites, subtítulos y Shift Report.
+3. F1.1–F1.4: reloj y motor, `StaffMember` + despacho, pacientes, llegadas y camas, y economía, reputación y derrota.
+4. F3 → F6.
+
+### 12.1 Decisiones pendientes
+- ⏳ **Idioma de la interfaz**: las maquetas mezclan inglés (CONTINUE, NEW ROUND, OCCUPIED, Shift Report, Hallway) y español. Se decide antes de F2.
+- ⏳ **"Pista de champeta del patio"**: va al Lobby o se agrega un patio al mapa. Se decide antes de F2.
+- Velocidad del tiempo (×2, ×3): fuera de alcance por ahora; si se quiere, va como constante en `config.go`.
+
+---
+
+## 13. Notas para la sustentación
+
+Por cada fase, Claude Code debe explicarle a Samuel:
+- Por qué `StaffMember` es un **decorador**: cumple `hospital.Attender`, envuelve al Doctor/Orderly real y cambia la disponibilidad sin modificar el hospital.
+- Cómo el mecanismo "de guardia" deja que el jugador elija mientras el round-robin del modelo sigue funcionando.
+- Por qué los médicos envueltos no salen en `Doctors()` (la aserción de tipo de `HireStaff`) y cómo se resuelve la consulta 5.2.
+- Por qué el mutex de `Game` es necesario aunque `Hospital` ya tenga el suyo, y por qué `StaffMember` no puede tomarlo (deadlock).
+- Cómo agregar una `Nurse` en vivo: un tipo nuevo que cumpla `Attender`, envuelto en `StaffMember` y contratado con `HireStaff`.
+- Cómo `ui.App` cumple `ebiten.Game` y cómo la interfaz `Scene` cambia de pantalla sin `switch` gigantes.
+- Por qué `game/` está en el módulo raíz y `gui/` en un módulo aparte.
