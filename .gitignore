@@ -11,3 +11,6 @@ coverage.*
 # Configuración local de editores
 .idea/
 .vscode/
+
+# Instrucciones locales para Claude Code (no se suben al repo)
+CLAUDE.md
