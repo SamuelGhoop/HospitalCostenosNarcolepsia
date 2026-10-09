@@ -343,7 +343,15 @@ type Scene interface {
 | Despertarse | 4 | 150 ms (no se repite) |
 | Alta (saluda) | 4 | 150 ms |
 
-- **Cuadros de personaje acostado**: los cuadros 3 y 4 de *Desplomarse*, todos los de *Dormido en el piso* y *Dormido en cama*, y el cuadro 1 de *Despertarse* ya vienen dibujados **en horizontal dentro del mismo cuadro de 16 × 24 px**. Se dibujan tal cual, **sin rotarlos** (nada de `GeoM.Rotate`). Así todos los cuadros miden lo mismo y se recortan de la hoja igual que los demás.
+- **Cuadros de personaje acostado**: los cuadros 3 y 4 de *Desplomarse*, todos los de *Dormido en el piso* y *Dormido en cama*, y el cuadro 1 de *Despertarse* ya vienen dibujados **en horizontal dentro del mismo cuadro de 16 × 24 px**, con la cabeza a la izquierda. Así todos los cuadros miden lo mismo y se recortan de la hoja igual que los demás.
+  - **En el piso** se dibujan tal cual, sin rotar.
+  - **En la cama** la cama sigue vertical, como en la maqueta, y solo se rotan 90° en sentido horario (`GeoM.Rotate`) los cuadros de *Dormido en cama* y el cuadro 1 de *Despertarse* si arranca en la cama. Así la cabeza queda hacia la cabecera. Un test verifica que la rotación solo se aplica en la cama.
+  - Mientras lo cargan hacia la cama, el paciente se dibuja con *Dormido en el piso*, sin rotar.
+  - Las capas de camisa, pelo y sombrero se dibujan con **la misma GeoM** que el cuerpo, así rotan y se voltean juntas.
+- **Despertarse**: el cuadro 1 va dentro de la cama, rotado como *Dormido en cama*. Desde el cuadro 2 (sentado) el paciente aparece de pie al lado de la cama, sin rotar, y ahí termina la animación. Un test verifica las dos posiciones.
+  - **En la demo**: después de despertarse hace *Alta* (saluda) una sola vez y queda en *Quieto* al lado de la cama. En la demo nadie se va del hospital, porque el modelo no tiene alta.
+  - **En el modo juego**: cuando recibe el alta, hace despertarse → alta → camina hasta la puerta del lobby y sale del mapa.
+- La burbuja "Zzz" aparece solo cuando el paciente ya está acostado (en el piso o en la cama). El modelo lo marca dormido desde el ataque, pero en pantalla primero camina al sitio y se desploma.
 - El personal y los personajes de eventos usan el mismo formato con sus animaciones (atender, empujar camilla…).
 - Las animaciones avanzan por ticks de `Update` (60/s), nunca con `time.Sleep`.
 

@@ -23,14 +23,15 @@ type DemoScene struct {
 	demo     *game.Demo
 	snap     game.DemoSnapshot
 	figures  []figure
-	pos      map[string]vec // posición dibujada de cada personaje, por ID
+	pos      map[string]vec          // posición dibujada de cada personaje, por ID
+	anims    map[string]*patientAnim // animación de cada paciente, por ID
 	auto     autoAdvance
 	showSubs bool
 }
 
 // NewDemoScene prepara la escena para una demo recién creada.
 func NewDemoScene(d *game.Demo) *DemoScene {
-	s := &DemoScene{demo: d, pos: map[string]vec{}, showSubs: true}
+	s := &DemoScene{demo: d, pos: map[string]vec{}, anims: map[string]*patientAnim{}, showSubs: true}
 	s.refresh()
 	return s
 }
@@ -67,32 +68,51 @@ func (s *DemoScene) Update() (Scene, error) {
 		s.refresh()
 	}
 
-	// Cada personaje se desliza un poco hacia su puesto en cada tick.
+	// Cada personaje se desliza un poco hacia su puesto en cada tick, y la
+	// animación de cada paciente avanza según cuánto se movió.
 	for _, f := range s.figures {
-		s.pos[f.id] = moveToward(s.pos[f.id], f.target, walkSpeed)
+		old := s.pos[f.id]
+		now := moveToward(old, f.target, walkSpeed)
+		s.pos[f.id] = now
+		if a, ok := s.anims[f.id]; ok {
+			a.step(now.x-old.x, now.y-old.y, f.room != 0)
+		}
 	}
 	return s, nil
 }
 
 // refresh pide una foto nueva a la demo y recalcula el puesto de cada
-// personaje: en su cama si tiene habitación; si no, en la zona de su
-// ubicación (zoneFor), uno al lado del otro.
+// personaje: en su cama si tiene habitación; de pie al lado de la cama si
+// está despierto en una habitación; si no, en la zona de su ubicación
+// (zoneFor), uno al lado del otro.
 func (s *DemoScene) refresh() {
 	s.snap = s.demo.Snapshot()
 	s.figures = s.figures[:0]
 	used := map[zone]int{} // cuántos puestos van ocupados en cada zona
 
-	for i, p := range s.snap.Patients {
-		f := figure{id: p.ID, patient: true, state: p.State, level: p.Level, shirt: shirts[i%len(shirts)]}
-		if p.Room != 0 {
+	for _, p := range s.snap.Patients {
+		f := figure{id: p.ID, patient: true, state: p.State, level: p.Level, room: p.Room}
+		z := zoneFor(p.Location)
+		_, inRoomZone := roomMockupX[z] // ¿la zona es una habitación?
+		switch {
+		case p.Room != 0:
 			f.target = bedCell(roomZone(p.Room))
-		} else {
-			z := zoneFor(p.Location)
+		case inRoomZone && used[z] == 0:
+			f.target = toVec(besideBed(z)) // se despertó en su habitación: de pie al lado de la cama
+			used[z]++
+		default:
 			f.target = toVec(slot(z, used[z]))
 			used[z]++
 		}
-		if _, seen := s.pos[p.ID]; !seen {
+
+		a, seen := s.anims[p.ID]
+		if !seen {
+			a = &patientAnim{state: p.State, room: p.Room}
+			s.anims[p.ID] = a
 			s.pos[p.ID] = toVec(entrance) // los pacientes nuevos entran desde la acera
+		}
+		if leftBed := a.observe(p.State, p.Room); leftBed {
+			s.pos[p.ID] = f.target // se levanta y queda de una al lado de la cama, sin deslizarse
 		}
 		s.figures = append(s.figures, f)
 	}
@@ -111,7 +131,7 @@ func (s *DemoScene) Draw(screen *ebiten.Image) {
 	drawMap(screen)
 	drawRooms(screen, s.snap.Rooms)
 	for _, f := range s.figures {
-		drawFigure(screen, f, s.pos[f.id])
+		drawFigure(screen, f, s.pos[f.id], s.anims[f.id]) // anims[id] es nil para el personal
 	}
 	s.drawHUD(screen)
 	if s.showSubs {

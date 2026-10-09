@@ -15,9 +15,13 @@ type App struct {
 // Chequeo en compilación: si App dejara de cumplir ebiten.Game, no compila.
 var _ ebiten.Game = (*App)(nil)
 
-// NewApp carga las fuentes y arranca en la demostración de la Sección 6.
+// NewApp carga las fuentes y los sprites y arranca en la demostración de
+// la Sección 6.
 func NewApp() (*App, error) {
 	if err := loadFonts(); err != nil {
+		return nil, err
+	}
+	if err := loadSprites(); err != nil {
 		return nil, err
 	}
 	return &App{scene: NewDemoScene(game.NewDemo())}, nil

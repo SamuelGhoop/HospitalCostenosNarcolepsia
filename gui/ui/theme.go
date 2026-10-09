@@ -63,10 +63,6 @@ var (
 	colBubbleBed      = colBlue      // #2f6fd6 "Zzz" dormido en cama
 )
 
-// shirts son los colores de camisa de la maqueta (azul, turquesa, verde y
-// roja). Mientras no haya sprites, cada paciente usa uno según su orden.
-var shirts = []color.RGBA{colBlue, colTeal, colGreen, colRed}
-
 // Fuentes. Go Mono viene dentro de golang.org/x/image, así que no hay
 // archivos que buscar, y trae tildes, ñ y símbolos como → · …
 // Se cambiará por Press Start 2P cuando llegue a gui/assets/fonts/.

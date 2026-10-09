@@ -17,23 +17,18 @@ type figure struct {
 	doctor  bool // solo personal: médico (true) o camillero (false)
 	state   hospital.PatientState
 	level   hospital.NarcolepsyLevel
-	shirt   color.RGBA
+	room    int // habitación con cama asignada en el modelo; 0 = ninguna
 	target  vec // puesto al que tiene que llegar
 }
 
 // drawFigure dibuja un personaje en su cuadro de 16×24 con esquina en at.
-//
-// Rectángulos provisionales mientras llegan los sprites. Igual que los
-// sprites (GAME_DESIGN §10.3), el paciente dormido se dibuja HORIZONTAL
-// dentro del mismo cuadro de 16×24, sin rotar nada.
-func drawFigure(dst *ebiten.Image, f figure, at vec) {
+// anim es la animación del paciente (nil para el personal).
+func drawFigure(dst *ebiten.Image, f figure, at vec, anim *patientAnim) {
 	x, y := int(math.Round(at.x)), int(math.Round(at.y))
 
 	switch {
-	case f.patient && f.state != hospital.Awake:
-		drawLying(dst, x, y, f.shirt)
 	case f.patient:
-		drawStanding(dst, x, y, f.shirt, colPants)
+		drawPatientSprite(dst, f, at, anim)
 	case f.doctor:
 		drawStanding(dst, x, y, colPaper, colTeal) // bata blanca y pantalón turquesa
 	default:
@@ -41,9 +36,9 @@ func drawFigure(dst *ebiten.Image, f figure, at vec) {
 	}
 
 	if f.patient {
-		// Dormido: burbuja Zzz y "rayitos" de nivel (solo en dormidos).
-		if txt, bg, ok := bubbleFor(f.state); ok {
-			bubble := label(dst, txt, x+cellWidth/2, y, smallFace, colWhite, bg)
+		// Dormido y ya acostado: burbuja Zzz encima del cuadro y "rayitos" de nivel.
+		if txt, bg, ok := bubbleFor(f.state); ok && anim.showsBubble() {
+			bubble := label(dst, txt, x+cellWidth/2, y-10, smallFace, colWhite, bg)
 			c, n := levelStyle(f.level)
 			for i := 0; i < n; i++ {
 				bolt := image.Rect(bubble.Max.X+2+i*4, bubble.Min.Y+2, bubble.Max.X+5+i*4, bubble.Max.Y-2)
@@ -59,19 +54,35 @@ func drawFigure(dst *ebiten.Image, f figure, at vec) {
 	label(dst, f.id, x+cellWidth/2, y+cellHeight+1, smallFace, colInk, colPaper)
 }
 
+// drawPatientSprite dibuja el cuadro actual de la animación del paciente
+// (hoja patient_body_skin1.png). spritePlacement decide si va rotado
+// dentro de la cama o tal cual en su puesto.
+func drawPatientSprite(dst *ebiten.Image, f figure, at vec, a *patientAnim) {
+	frame := frameAt(a.anim, a.ticks)
+
+	// ¿En qué cama se dibuja, si toca dibujarlo en una? En la que le asignó
+	// el modelo o, en el primer cuadro de despertarse, en la que acaba de dejar.
+	bed, hasBed := image.Rectangle{}, false
+	switch {
+	case f.room != 0:
+		bed, hasBed = bedRect(roomZone(f.room)), true
+	case a.anim == animWakeUp && a.room != 0:
+		bed, hasBed = bedRect(roomZone(a.room)), true
+	}
+
+	g, _ := spritePlacement(a.anim, frame, bed, hasBed, at, a.flip)
+	op := &ebiten.DrawImageOptions{GeoM: g}
+	// SubImage recorta el cuadro de la hoja sin copiar píxeles.
+	dst.DrawImage(patientSheet.SubImage(frameRect(a.anim, frame)).(*ebiten.Image), op)
+}
+
 // drawStanding: personaje de pie (cabeza, tronco y piernas) con contorno.
+// Lo usa el personal mientras llegan sus sprites.
 func drawStanding(dst *ebiten.Image, x, y int, body, legs color.RGBA) {
 	fillRect(dst, image.Rect(x+3, y+2, x+13, y+23), colInk) // contorno
 	fillRect(dst, image.Rect(x+4, y+3, x+12, y+9), colSkin) // cabeza
 	fillRect(dst, image.Rect(x+4, y+10, x+12, y+17), body)  // tronco
 	fillRect(dst, image.Rect(x+4, y+18, x+12, y+22), legs)  // piernas
-}
-
-// drawLying: personaje acostado, horizontal en la parte de abajo del cuadro.
-func drawLying(dst *ebiten.Image, x, y int, shirt color.RGBA) {
-	fillRect(dst, image.Rect(x, y+13, x+16, y+23), colInk)   // contorno
-	fillRect(dst, image.Rect(x+1, y+14, x+6, y+22), colSkin) // cabeza
-	fillRect(dst, image.Rect(x+7, y+14, x+15, y+22), shirt)  // cuerpo
 }
 
 // bedCell es el cuadro de 16×24 del paciente acostado en la cama de una
