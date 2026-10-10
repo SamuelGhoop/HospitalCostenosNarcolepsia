@@ -67,9 +67,9 @@ var (
 // archivos que buscar, y trae tildes, ñ y símbolos como → · …
 // Se cambiará por Press Start 2P cuando llegue a gui/assets/fonts/.
 var (
-	textFace  *text.GoTextFace // texto normal (8 px)
-	smallFace *text.GoTextFace // rótulos pequeños (7 px)
-	boldFace  *text.GoTextFace // títulos (10 px)
+	textFace  *text.GoTextFace // texto normal (16 px)
+	smallFace *text.GoTextFace // rótulos pequeños (14 px)
+	boldFace  *text.GoTextFace // títulos (20 px)
 )
 
 // loadFonts prepara las fuentes. Devuelve error en vez de hacer panic: así
@@ -83,9 +83,9 @@ func loadFonts() error {
 	if err != nil {
 		return fmt.Errorf("cargando Go Mono Bold: %w", err)
 	}
-	textFace = &text.GoTextFace{Source: regular, Size: 8}
-	smallFace = &text.GoTextFace{Source: regular, Size: 7}
-	boldFace = &text.GoTextFace{Source: bold, Size: 10}
+	textFace = &text.GoTextFace{Source: regular, Size: 16}
+	smallFace = &text.GoTextFace{Source: regular, Size: 14}
+	boldFace = &text.GoTextFace{Source: bold, Size: 20}
 	return nil
 }
 
@@ -123,13 +123,17 @@ func fillRect(dst *ebiten.Image, r image.Rectangle, c color.Color) {
 	vector.FillRect(dst, float32(r.Min.X), float32(r.Min.Y), float32(r.Dx()), float32(r.Dy()), c, false)
 }
 
-// outline dibuja un borde de 1 px POR FUERA del rectángulo, como la
-// función edge() de la maqueta.
+// outlineWidth: el borde de los rótulos mide 2 px, el doble que a 640×360.
+const outlineWidth = 2
+
+// outline dibuja un borde POR FUERA del rectángulo, como la función edge()
+// de la maqueta.
 func outline(dst *ebiten.Image, r image.Rectangle, c color.Color) {
-	fillRect(dst, image.Rect(r.Min.X-1, r.Min.Y-1, r.Max.X+1, r.Min.Y), c) // arriba
-	fillRect(dst, image.Rect(r.Min.X-1, r.Max.Y, r.Max.X+1, r.Max.Y+1), c) // abajo
-	fillRect(dst, image.Rect(r.Min.X-1, r.Min.Y, r.Min.X, r.Max.Y), c)     // izquierda
-	fillRect(dst, image.Rect(r.Max.X, r.Min.Y, r.Max.X+1, r.Max.Y), c)     // derecha
+	const w = outlineWidth
+	fillRect(dst, image.Rect(r.Min.X-w, r.Min.Y-w, r.Max.X+w, r.Min.Y), c) // arriba
+	fillRect(dst, image.Rect(r.Min.X-w, r.Max.Y, r.Max.X+w, r.Max.Y+w), c) // abajo
+	fillRect(dst, image.Rect(r.Min.X-w, r.Min.Y, r.Min.X, r.Max.Y), c)     // izquierda
+	fillRect(dst, image.Rect(r.Max.X, r.Min.Y, r.Max.X+w, r.Max.Y), c)     // derecha
 }
 
 // panel es un rectángulo con fondo y borde negro.

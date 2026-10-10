@@ -12,8 +12,9 @@ import (
 )
 
 // walkSpeed: cuántos píxeles avanza por tick un personaje que cambia de
-// puesto (a 60 ticks por segundo, unos 180 px por segundo).
-const walkSpeed = 3.0
+// puesto (a 60 ticks por segundo, unos 360 px por segundo en la pantalla
+// de 1280×720: la misma rapidez que se veía a 640×360).
+const walkSpeed = 6.0
 
 // DemoScene muestra la demostración de la Sección 6 paso a paso.
 //
@@ -31,6 +32,7 @@ type DemoScene struct {
 	carried  string                  // paciente que el último paso pasó del pasillo a una cama
 	auto     autoAdvance
 	showSubs bool
+	scenery  scenery // el taxi y el humo de la olla
 }
 
 // NewDemoScene prepara la escena para una demo recién creada.
@@ -45,6 +47,7 @@ func NewDemoScene(d *game.Demo) *DemoScene {
 //	Espacio o clic: siguiente paso (o adelantar la coreografía en curso)
 //	A: avance automático cada 3 s · S: saltar al final · C: subtítulos
 func (s *DemoScene) Update() (Scene, error) {
+	s.scenery.update()
 	if inpututil.IsKeyJustPressed(ebiten.KeyC) {
 		s.showSubs = !s.showSubs
 	}
@@ -246,11 +249,12 @@ func (s *DemoScene) refresh() {
 	}
 }
 
-// Draw dibuja por capas: mapa → colchones → personajes → cobijas →
-// rótulos (letreros, burbujas, etiquetas) → HUD y subtítulos.
+// Draw dibuja por capas: mapa (con las camas libres) → taxi y humo →
+// personajes → cobijas → rótulos (letreros, burbujas, etiquetas) → HUD y
+// subtítulos.
 func (s *DemoScene) Draw(screen *ebiten.Image) {
 	drawMap(screen)
-	drawBeds(screen, s.snap.Rooms)
+	s.scenery.draw(screen)
 
 	lyingIn := map[int]bool{} // habitaciones con alguien ya acostado en la cama
 	for _, f := range s.figures {
@@ -285,41 +289,41 @@ func (s *DemoScene) drawHUD(dst *ebiten.Image) {
 	fillRect(dst, image.Rect(0, 0, ScreenWidth, buildingRect.Min.Y-1), colInk)
 
 	title := fmt.Sprintf("MODO DEMOSTRACIÓN — PASO %d/%d", s.snap.Step, s.snap.TotalSteps)
-	drawText(dst, title, 6, 3, boldFace, colYellow)
+	drawText(dst, title, 12, 6, boldFace, colYellow)
 	if s.auto.on {
-		drawText(dst, "[AUTOMÁTICO]", 12+textWidth(title, boldFace), 5, smallFace, colGreen)
+		drawText(dst, "[AUTOMÁTICO]", 24+textWidth(title, boldFace), 10, smallFace, colGreen)
 	}
 
 	hint := "ESPACIO siguiente · A automático · S saltar · C subtítulos"
-	drawText(dst, hint, ScreenWidth-6-textWidth(hint, smallFace), 5, smallFace, colLightGray)
+	drawText(dst, hint, ScreenWidth-12-textWidth(hint, smallFace), 10, smallFace, colLightGray)
 }
 
 // drawSubtitles: la barra de abajo con lo que pasó en el último paso, la
 // llamada real al modelo y lo que respondió (en rojo si fue un error).
 func (s *DemoScene) drawSubtitles(dst *ebiten.Image) {
-	box := image.Rect(6, 297, ScreenWidth-6, ScreenHeight-5)
+	box := image.Rect(12, 594, ScreenWidth-12, ScreenHeight-10)
 	panel(dst, box, colPaper)
-	x := float64(box.Min.X + 6)
+	x := float64(box.Min.X + 12)
 	top := float64(box.Min.Y)
 
 	step := s.snap.Last
 	if step.Number == 0 {
-		drawText(dst, "Demostración del escenario obligatorio de la Sección 6 del enunciado.", x, top+5, boldFace, colInk)
-		drawText(dst, "Cada paso hace la llamada REAL al modelo (paquete hospital) y muestra lo que respondió.", x, top+22, textFace, colMuted)
-		drawText(dst, "Presiona ESPACIO o haz clic para dar el primer paso.", x, top+36, textFace, colBlueDark)
+		drawText(dst, "Demostración del escenario obligatorio de la Sección 6 del enunciado.", x, top+10, boldFace, colInk)
+		drawText(dst, "Cada paso hace la llamada REAL al modelo (paquete hospital) y muestra lo que respondió.", x, top+44, textFace, colMuted)
+		drawText(dst, "Presiona ESPACIO o haz clic para dar el primer paso.", x, top+72, textFace, colBlueDark)
 		return
 	}
 
-	drawText(dst, fmt.Sprintf("%d. %s", step.Number, step.Subtitle), x, top+4, boldFace, colInk)
-	drawText(dst, step.Call, x, top+21, textFace, colBlueDark)
+	drawText(dst, fmt.Sprintf("%d. %s", step.Number, step.Subtitle), x, top+8, boldFace, colInk)
+	drawText(dst, step.Call, x, top+42, textFace, colBlueDark)
 	result := colGreenDark
 	if step.Err != nil {
 		result = colRedDark // el error previsto del paso 8
 	}
-	drawText(dst, "→ "+step.Result, x, top+36, textFace, result)
+	drawText(dst, "→ "+step.Result, x, top+72, textFace, result)
 
 	if s.demo.Done() {
 		hint := "ESPACIO: ver el Shift Report"
-		drawText(dst, hint, float64(box.Max.X-6)-textWidth(hint, smallFace), top+6, smallFace, colMuted)
+		drawText(dst, hint, float64(box.Max.X-12)-textWidth(hint, smallFace), top+12, smallFace, colMuted)
 	}
 }

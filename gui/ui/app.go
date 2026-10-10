@@ -15,13 +15,16 @@ type App struct {
 // Chequeo en compilación: si App dejara de cumplir ebiten.Game, no compila.
 var _ ebiten.Game = (*App)(nil)
 
-// NewApp carga las fuentes y los sprites y arranca en la demostración de
-// la Sección 6.
+// NewApp carga las fuentes, los sprites y el mapa, y arranca en la
+// demostración de la Sección 6.
 func NewApp() (*App, error) {
 	if err := loadFonts(); err != nil {
 		return nil, err
 	}
 	if err := loadSprites(); err != nil {
+		return nil, err
+	}
+	if err := loadMap(); err != nil {
 		return nil, err
 	}
 	return &App{scene: NewDemoScene(game.NewDemo())}, nil
@@ -43,8 +46,8 @@ func (a *App) Draw(screen *ebiten.Image) {
 	a.scene.Draw(screen)
 }
 
-// Layout fija la resolución lógica. Ebitengine la escala a la ventana; con
-// escala entera (×2) usa el filtro nearest, así el pixel art se ve nítido.
+// Layout fija la resolución lógica: 1280×720, la del mapa de fondo. Si la
+// ventana es más grande (pantalla completa), Ebitengine la escala.
 func (a *App) Layout(outsideWidth, outsideHeight int) (int, int) {
 	return ScreenWidth, ScreenHeight
 }

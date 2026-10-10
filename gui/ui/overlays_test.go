@@ -79,21 +79,21 @@ func TestOverlays_DoNotOverlapInAnyStepOfTheDemo(t *testing.T) {
 }
 
 // figureBody es lo que ocupa el cuerpo de un personaje en at: su cuadro de
-// 16×24, o el de 24×16 si está rotado en su cama.
+// 32×48 en la pantalla, o el de 48×32 si está rotado en su cama.
 func figureBody(f figure, at vec) image.Rectangle {
 	if f.patient && f.room != 0 && at == bedCell(roomZone(f.room)) {
-		bed := bedRect(roomZone(f.room))
-		x, y := bed.Min.X+(bed.Dx()-cellHeight)/2, bed.Min.Y+4
-		return image.Rect(x, y, x+cellHeight, y+cellWidth)
+		cell := bedCell(roomZone(f.room))
+		x, y := int(cell.x), int(cell.y)
+		return image.Rect(x, y, x+figHeight, y+figWidth) // acostado (rotado): 48×32
 	}
 	x, y := int(at.x), int(at.y)
-	return image.Rect(x, y, x+cellWidth, y+cellHeight)
+	return image.Rect(x, y, x+figWidth, y+figHeight)
 }
 
 // figureBox es todo lo que ocupa un personaje: su cuadro y sus rótulos.
 func figureBox(f figure, at vec) image.Rectangle {
 	x, y := int(at.x), int(at.y)
-	box := image.Rect(x, y, x+cellWidth, y+cellHeight)
+	box := image.Rect(x, y, x+figWidth, y+figHeight)
 	for _, o := range figureOverlays(f, at, true) {
 		box = box.Union(o.rect)
 	}

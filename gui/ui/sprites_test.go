@@ -4,8 +4,6 @@ import (
 	"image"
 	"testing"
 
-	"github.com/hajimehoshi/ebiten/v2"
-
 	"github.com/SamuelGhoop/HospitalCostenosNarcolepsia/gui/assets"
 )
 
@@ -86,7 +84,7 @@ func TestWalkAnimation_PicksTheDirectionAndFlipsForTheRight(t *testing.T) {
 
 // Pedido por Samuel: la rotación de 90° se aplica SOLO en la cama.
 func TestSpritePlacement_RotatesOnlyInsideTheBed(t *testing.T) {
-	bed := bedRect(zoneRoom101)
+	bed := bedCell(zoneRoom101) // donde va el paciente acostado
 	at := vec{200, 150}
 
 	tests := []struct {
@@ -116,7 +114,7 @@ func TestSpritePlacement_RotatesOnlyInsideTheBed(t *testing.T) {
 func TestSpritePlacement_InBedTheHeadPointsToTheHeadboard(t *testing.T) {
 	bed := bedRect(zoneRoom101)
 
-	g, _ := spritePlacement(animSleepBed, 0, bed, true, vec{}, false)
+	g, _ := spritePlacement(animSleepBed, 0, bedCell(zoneRoom101), true, vec{}, false)
 
 	headX, headY := g.Apply(2, 12)  // la cabeza, a la izquierda del cuadro
 	feetX, feetY := g.Apply(14, 12) // los pies, a la derecha
@@ -136,14 +134,14 @@ func TestSpritePlacement_WakeUpStartsInBedThenStandsBesideIt(t *testing.T) {
 	bed := bedRect(zoneRoom101)
 	beside := toVec(wakeSpot(zoneRoom101))
 
-	g, rotated := spritePlacement(animWakeUp, 0, bed, true, beside, false)
+	g, rotated := spritePlacement(animWakeUp, 0, bedCell(zoneRoom101), true, beside, false)
 	x, y := g.Apply(8, 12)
 	if !rotated || !image.Pt(int(x), int(y)).In(bed) {
 		t.Errorf("cuadro 1 de despertarse: rotado=%v en (%.0f, %.0f); se esperaba rotado y dentro de la cama %v", rotated, x, y, bed)
 	}
 
 	for frame := 1; frame < 4; frame++ {
-		g, rotated := spritePlacement(animWakeUp, frame, bed, true, beside, false)
+		g, rotated := spritePlacement(animWakeUp, frame, bedCell(zoneRoom101), true, beside, false)
 		x, y := g.Apply(0, 0)
 		if rotated || x != beside.x || y != beside.y {
 			t.Errorf("cuadro %d de despertarse: rotado=%v en (%.0f, %.0f); se esperaba sin rotar en %v", frame+1, rotated, x, y, beside)
@@ -153,33 +151,53 @@ func TestSpritePlacement_WakeUpStartsInBedThenStandsBesideIt(t *testing.T) {
 	// "Al lado" de verdad: el cuadro de pie no se monta sobre la cama, y
 	// queda a la IZQUIERDA (la derecha es para la etiqueta del que esté en cama).
 	p := wakeSpot(zoneRoom101)
-	if image.Rect(p.X, p.Y, p.X+cellWidth, p.Y+cellHeight).Overlaps(bed) {
+	if image.Rect(p.X, p.Y, p.X+figWidth, p.Y+figHeight).Overlaps(bed) {
 		t.Errorf("el puesto al lado de la cama %v se monta sobre la cama %v", p, bed)
 	}
-	if p.X+cellWidth > bed.Min.X {
+	if p.X+figWidth > bed.Min.X {
 		t.Errorf("el que se despierta debe quedar a la izquierda de la cama: x=%d, cama desde x=%d", p.X, bed.Min.X)
 	}
 }
 
 // Caminar a la derecha: la animación de la izquierda volteada, sin moverla
-// de su cuadro.
+// de su cuadro (que en pantalla mide 32×48: el sprite va ×2).
 func TestSpritePlacement_FlipKeepsTheSpriteInItsCell(t *testing.T) {
 	at := vec{100, 50}
 
-	g, _ := spritePlacement(animWalkLeft, 0, image.Rectangle{}, false, at, true)
+	g, _ := spritePlacement(animWalkLeft, 0, vec{}, false, at, true)
 
-	var want ebiten.GeoM
-	want.Scale(-1, 1)
-	want.Translate(cellWidth, 0)
-	want.Translate(at.x, at.y)
+	// El píxel px de la hoja queda en at.x + (16 − px) × 2: espejo y doble.
 	for _, px := range []float64{0, 15} {
 		gx, gy := g.Apply(px, 0)
-		wx, wy := want.Apply(px, 0)
-		if gx != wx || gy != wy {
-			t.Errorf("x=%v: (%v, %v); se esperaba (%v, %v)", px, gx, gy, wx, wy)
+		if wx := at.x + (cellWidth-px)*spriteScale; gx != wx || gy != at.y {
+			t.Errorf("x=%v: (%v, %v); se esperaba (%v, %v)", px, gx, gy, wx, at.y)
 		}
 	}
-	if x, _ := g.Apply(0, 0); x != at.x+cellWidth {
+	if x, _ := g.Apply(0, 0); x != at.x+figWidth {
 		t.Errorf("el borde izquierdo del sprite debe quedar a la derecha del cuadro: x=%v", x)
+	}
+}
+
+// §10.7: los personajes se dibujan ×2 (escalado entero): el cuadro de 16×24
+// de la hoja ocupa 32×48 en la pantalla de 1280×720.
+func TestSpritePlacement_DrawsTheFigureTwiceAsBig(t *testing.T) {
+	at := vec{100, 50}
+	g, _ := spritePlacement(animIdle, 0, vec{}, false, at, false)
+
+	if x, y := g.Apply(0, 0); x != at.x || y != at.y {
+		t.Errorf("la esquina del cuadro quedó en (%v, %v); se esperaba %v", x, y, at)
+	}
+	if x, y := g.Apply(cellWidth, cellHeight); x != at.x+figWidth || y != at.y+figHeight {
+		t.Errorf("la otra esquina quedó en (%v, %v); se esperaba (%v, %v): el cuadro debe medir 32×48", x, y, at.x+figWidth, at.y+figHeight)
+	}
+
+	// En la cama también va ×2: rotado mide 48×32 y queda dentro de la cama.
+	bed := bedRect(zoneRoom101)
+	g, _ = spritePlacement(animSleepBed, 0, bedCell(zoneRoom101), true, vec{}, false)
+	x0, y0 := g.Apply(0, 0)
+	x1, y1 := g.Apply(cellWidth, cellHeight)
+	box := image.Rect(int(min(x0, x1)), int(min(y0, y1)), int(max(x0, x1)), int(max(y0, y1)))
+	if box.Dx() != figHeight || box.Dy() != figWidth || !box.In(bed) {
+		t.Errorf("acostado ocupa %v (%d×%d); se esperaba 48×32 dentro de la cama %v", box, box.Dx(), box.Dy(), bed)
 	}
 }

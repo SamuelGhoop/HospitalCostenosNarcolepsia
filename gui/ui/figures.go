@@ -21,7 +21,7 @@ type figure struct {
 	target  vec // puesto final según la foto del modelo (sin coreografía)
 }
 
-// drawFigureBody dibuja el cuerpo de un personaje en su cuadro de 16×24
+// drawFigureBody dibuja el cuerpo de un personaje en su cuadro de 32×48
 // con esquina en at. Los rótulos (burbuja, etiqueta…) van aparte, en
 // figureOverlays, porque se dibujan encima de todo (incluida la cobija).
 // anim es la animación del paciente (nil para el personal).
@@ -45,27 +45,27 @@ func drawPatientSprite(dst *ebiten.Image, f figure, at vec, a *patientAnim) {
 
 	// ¿En qué cama se dibuja, si toca dibujarlo en una? En la que le asignó
 	// el modelo o, en el primer cuadro de despertarse, en la que acaba de dejar.
-	bed, hasBed := image.Rectangle{}, false
+	bedAt, hasBed := vec{}, false
 	switch {
 	case f.room != 0:
-		bed, hasBed = bedRect(roomZone(f.room)), true
+		bedAt, hasBed = bedCell(roomZone(f.room)), true
 	case a.anim == animWakeUp && a.room != 0:
-		bed, hasBed = bedRect(roomZone(a.room)), true
+		bedAt, hasBed = bedCell(roomZone(a.room)), true
 	}
 
-	g, _ := spritePlacement(a.anim, frame, bed, hasBed, at, a.flip)
+	g, _ := spritePlacement(a.anim, frame, bedAt, hasBed, at, a.flip)
 	op := &ebiten.DrawImageOptions{GeoM: g}
 	// SubImage recorta el cuadro de la hoja sin copiar píxeles.
 	dst.DrawImage(patientSheet.SubImage(frameRect(a.anim, frame)).(*ebiten.Image), op)
 }
 
-// drawStanding: personaje de pie (cabeza, tronco y piernas) con contorno.
-// Lo usa el personal mientras llegan sus sprites.
+// drawStanding: personaje de pie (cabeza, tronco y piernas) con contorno,
+// en su cuadro de 32×48. Lo usa el personal mientras llegan sus sprites.
 func drawStanding(dst *ebiten.Image, x, y int, body, legs color.RGBA) {
-	fillRect(dst, image.Rect(x+3, y+2, x+13, y+23), colInk) // contorno
-	fillRect(dst, image.Rect(x+4, y+3, x+12, y+9), colSkin) // cabeza
-	fillRect(dst, image.Rect(x+4, y+10, x+12, y+17), body)  // tronco
-	fillRect(dst, image.Rect(x+4, y+18, x+12, y+22), legs)  // piernas
+	fillRect(dst, image.Rect(x+6, y+4, x+26, y+46), colInk)  // contorno
+	fillRect(dst, image.Rect(x+8, y+6, x+24, y+18), colSkin) // cabeza
+	fillRect(dst, image.Rect(x+8, y+20, x+24, y+34), body)   // tronco
+	fillRect(dst, image.Rect(x+8, y+36, x+24, y+44), legs)   // piernas
 }
 
 // toVec convierte un punto entero de la pantalla en un vec.

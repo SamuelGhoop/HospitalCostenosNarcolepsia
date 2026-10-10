@@ -99,29 +99,33 @@ func walkAnimation(dx, dy float64) (anim animation, flip bool) {
 }
 
 // spritePlacement calcula la GeoM (la transformación) con la que se dibuja
-// el cuadro de un paciente, y dice si va rotado.
+// el cuadro de un paciente, y dice si va rotado. Las transformaciones se
+// aplican en orden, como en el código: primero voltear o rotar en el
+// cuadro de la hoja, después escalar ×2 y al final mover a su sitio.
 //
 //   - En la cama (dormido en cama, o el cuadro 1 de despertarse) el cuadro
 //     horizontal se rota 90° en sentido horario, para que la cabeza quede
-//     hacia la cabecera, y se pone sobre la cama.
+//     hacia la cabecera, y se pone en bedAt (ver bedCell).
 //   - En cualquier otro caso se dibuja tal cual en at, sin rotar (en el
 //     piso el cuerpo horizontal va así). Si flip, se voltea en su cuadro.
 //
 // Cuando lleguen las capas de camisa, pelo y sombrero, se dibujan con esta
-// misma GeoM, así rotan y se voltean junto con el cuerpo.
-func spritePlacement(a animation, frame int, bed image.Rectangle, hasBed bool, at vec, flip bool) (ebiten.GeoM, bool) {
+// misma GeoM, así rotan, se voltean y se escalan junto con el cuerpo.
+func spritePlacement(a animation, frame int, bedAt vec, hasBed bool, at vec, flip bool) (ebiten.GeoM, bool) {
 	var g ebiten.GeoM
 	inBedFrame := a == animSleepBed || (a == animWakeUp && frame == 0)
 	if hasBed && inBedFrame {
 		g.Rotate(math.Pi / 2)      // 90° horario: lo que estaba a la izquierda (la cabeza) queda arriba
 		g.Translate(cellHeight, 0) // al rotar, el cuadro queda en x negativas: se devuelve (ahora mide 24×16)
-		g.Translate(float64(bed.Min.X+(bed.Dx()-cellHeight)/2), float64(bed.Min.Y+4))
+		g.Scale(spriteScale, spriteScale)
+		g.Translate(bedAt.x, bedAt.y)
 		return g, true
 	}
 	if flip {
 		g.Scale(-1, 1)            // espejo horizontal…
 		g.Translate(cellWidth, 0) // …y de vuelta a su cuadro
 	}
+	g.Scale(spriteScale, spriteScale)
 	g.Translate(math.Round(at.x), math.Round(at.y))
 	return g, false
 }

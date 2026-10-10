@@ -21,8 +21,8 @@ func main() {
 		log.Fatal(err)
 	}
 
-	// Ventana al doble de la resolución lógica (640×360 → 1280×720).
-	ebiten.SetWindowSize(ui.ScreenWidth*2, ui.ScreenHeight*2)
+	// Ventana del tamaño de la resolución lógica: 1280×720.
+	ebiten.SetWindowSize(ui.ScreenWidth, ui.ScreenHeight)
 	ebiten.SetWindowTitle("Hospital de los Costeños con Narcolepsia — Demostración")
 	ebiten.SetWindowResizingMode(ebiten.WindowResizingModeEnabled)
 

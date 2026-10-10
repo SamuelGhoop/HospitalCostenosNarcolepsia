@@ -37,18 +37,18 @@ func (s *ReportScene) Update() (Scene, error) {
 func (s *ReportScene) Draw(screen *ebiten.Image) {
 	screen.Fill(colSand)
 
-	board := image.Rect(24, 14, 616, 352)
-	fillRect(screen, board.Add(image.Pt(3, 3)), colWoodDark) // sombra
+	board := image.Rect(48, 28, 1232, 704)
+	fillRect(screen, board.Add(image.Pt(6, 6)), colWoodDark) // sombra
 	panel(screen, board, colWood)
-	panel(screen, image.Rect(270, 6, 370, 22), colMetal) // gancho
-	paper := image.Rect(36, 28, 604, 340)
-	fillRect(screen, paper.Add(image.Pt(2, 2)), colPaperShade)
+	panel(screen, image.Rect(540, 12, 740, 44), colMetal) // gancho
+	paper := image.Rect(72, 56, 1208, 680)
+	fillRect(screen, paper.Add(image.Pt(4, 4)), colPaperShade)
 	panel(screen, paper, colPaper)
 
-	c := column{dst: screen, x: 46, y: 34}
+	c := column{dst: screen, x: 92, y: 68}
 	r := s.report
 	c.line("REPORTE DEL TURNO — DEMOSTRACIÓN DE LA SECCIÓN 6", boldFace, colBlue)
-	c.gap(4)
+	c.gap(8)
 
 	c.line("5.1  Pacientes dormidos en el pasillo", boldFace, colInk)
 	if len(r.Hallway) == 0 {
@@ -57,7 +57,7 @@ func (s *ReportScene) Draw(screen *ebiten.Image) {
 	for _, p := range r.Hallway {
 		c.indented(fmt.Sprintf("%s %s (%s)", p.ID, p.Name, p.Location), textFace, colInk)
 	}
-	c.gap(4)
+	c.gap(8)
 
 	c.line("5.2  Episodios atendidos por cada médico", boldFace, colInk)
 	for _, d := range r.Episodes {
@@ -73,7 +73,7 @@ func (s *ReportScene) Draw(screen *ebiten.Image) {
 			c.indented(fmt.Sprintf("   %s %s  %s %s · %s → %s", e.ID, e.Time, e.PatientID, e.PatientName, e.Location, destination), textFace, colInk)
 		}
 	}
-	c.gap(4)
+	c.gap(8)
 
 	c.line("5.3  Habitaciones", boldFace, colInk)
 	for _, room := range r.Rooms {
@@ -87,7 +87,7 @@ func (s *ReportScene) Draw(screen *ebiten.Image) {
 		c.indented("Último error de AssignRoom:", textFace, colMuted)
 		c.indented("   "+r.LastAssignError, textFace, colRedDark)
 	}
-	c.gap(4)
+	c.gap(8)
 
 	c.line("5.4  Reporte de severidad (pacientes Severe)", boldFace, colInk)
 	for _, sv := range r.Severe {
@@ -95,12 +95,12 @@ func (s *ReportScene) Draw(screen *ebiten.Image) {
 	}
 
 	// Pie: el botón del modo juego todavía deshabilitado.
-	button := image.Rect(46, 306, 186, 324)
+	button := image.Rect(92, 612, 372, 648)
 	panel(screen, button, colLightGray)
-	drawText(screen, "¡AHORA TE TOCA!", float64(button.Min.X+8), float64(button.Min.Y+3), boldFace, colMuted)
-	drawText(screen, "(modo juego: próximamente)", float64(button.Max.X+8), float64(button.Min.Y+5), textFace, colMuted)
+	drawText(screen, "¡AHORA TE TOCA!", float64(button.Min.X+16), float64(button.Min.Y+6), boldFace, colMuted)
+	drawText(screen, "(modo juego: próximamente)", float64(button.Max.X+16), float64(button.Min.Y+10), textFace, colMuted)
 	hint := "ESPACIO o clic: ver la demostración otra vez"
-	drawText(screen, hint, float64(paper.Max.X-10)-textWidth(hint, smallFace), 328, smallFace, colMuted)
+	drawText(screen, hint, float64(paper.Max.X-20)-textWidth(hint, smallFace), 656, smallFace, colMuted)
 }
 
 // column escribe líneas de texto una debajo de otra.
@@ -113,14 +113,14 @@ type column struct {
 func (c *column) line(s string, face *text.GoTextFace, clr color.Color) {
 	drawText(c.dst, s, c.x, c.y, face, clr)
 	m := face.Metrics()
-	c.y += m.HAscent + m.HDescent + 1
+	c.y += m.HAscent + m.HDescent + 2
 }
 
 // indented escribe una línea con sangría.
 func (c *column) indented(s string, face *text.GoTextFace, clr color.Color) {
-	c.x += 10
+	c.x += 20
 	c.line(s, face, clr)
-	c.x -= 10
+	c.x -= 20
 }
 
 // gap deja un espacio vertical extra.

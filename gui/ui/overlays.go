@@ -28,8 +28,8 @@ type overlay struct {
 // textBox es la caja de un rótulo de texto con su esquina en (left, top).
 func textBox(s string, left, top int, face text.Face) image.Rectangle {
 	m := face.Metrics()
-	w := int(textWidth(s, face)) + 4
-	h := int(m.HAscent+m.HDescent) + 2
+	w := int(textWidth(s, face)) + 8
+	h := int(m.HAscent+m.HDescent) + 4
 	return image.Rect(left, top, left+w, top+h)
 }
 
@@ -50,21 +50,21 @@ func figureOverlays(f figure, at vec, showBubble bool) []overlay {
 	if f.patient && f.room != 0 && at == bedCell(roomZone(f.room)) {
 		bed := bedRect(roomZone(f.room))
 		if txt, bg, ok := bubbleFor(f.state); ok && showBubble {
-			out = append(out, bubbleOverlays(txt, bg, f.level, textBox(txt, bed.Max.X+2, bed.Min.Y+2, smallFace))...)
+			out = append(out, bubbleOverlays(txt, bg, f.level, textBox(txt, bed.Max.X+4, bed.Min.Y+4, smallFace))...)
 		}
-		return append(out, overlay{rect: textBox(f.id, bed.Max.X+2, bed.Min.Y+14, smallFace), text: f.id, fg: colInk, bg: colPaper})
+		return append(out, overlay{rect: textBox(f.id, bed.Max.X+4, bed.Min.Y+28, smallFace), text: f.id, fg: colInk, bg: colPaper})
 	}
 
 	if f.patient {
 		if txt, bg, ok := bubbleFor(f.state); ok && showBubble {
-			out = append(out, bubbleOverlays(txt, bg, f.level, centeredBox(txt, x+cellWidth/2, y-10, smallFace))...)
+			out = append(out, bubbleOverlays(txt, bg, f.level, centeredBox(txt, x+figWidth/2, y-20, smallFace))...)
 		}
 	} else {
 		// Punto verde = libre. En la demo el personal nunca queda ocupado.
-		out = append(out, overlay{rect: image.Rect(x+6, y-5, x+10, y-1), bg: colGreen})
+		out = append(out, overlay{rect: image.Rect(x+12, y-10, x+20, y-2), bg: colGreen})
 	}
 	// En la demo los IDs se muestran siempre, para seguir los subtítulos.
-	return append(out, overlay{rect: centeredBox(f.id, x+cellWidth/2, y+cellHeight+1, smallFace), text: f.id, fg: colInk, bg: colPaper})
+	return append(out, overlay{rect: centeredBox(f.id, x+figWidth/2, y+figHeight+2, smallFace), text: f.id, fg: colInk, bg: colPaper})
 }
 
 // bubbleOverlays: la burbuja Zzz en box y, a su derecha, los rayitos de
@@ -73,7 +73,7 @@ func bubbleOverlays(txt string, bg color.RGBA, level hospital.NarcolepsyLevel, b
 	out := []overlay{{rect: box, text: txt, fg: colWhite, bg: bg}}
 	c, n := levelStyle(level)
 	for i := 0; i < n; i++ {
-		bolt := image.Rect(box.Max.X+2+i*4, box.Min.Y+2, box.Max.X+5+i*4, box.Max.Y-2)
+		bolt := image.Rect(box.Max.X+4+i*8, box.Min.Y+4, box.Max.X+10+i*8, box.Max.Y-4)
 		out = append(out, overlay{rect: bolt, bg: c})
 	}
 	return out
@@ -91,7 +91,7 @@ func roomBadges(rooms []game.RoomView) []overlay {
 		}
 		room := zones[roomZone(r.Number)].rect
 		txt := strings.ToUpper(r.State.String())
-		out = append(out, overlay{rect: centeredBox(txt, room.Min.X+room.Dx()/2, room.Max.Y-5, smallFace), text: txt, fg: colWhite, bg: bg})
+		out = append(out, overlay{rect: centeredBox(txt, room.Min.X+room.Dx()/2, room.Max.Y-10, smallFace), text: txt, fg: colWhite, bg: bg})
 	}
 	return out
 }
@@ -101,17 +101,17 @@ func roomBadges(rooms []game.RoomView) []overlay {
 // que es muy bajito y lo lleva arriba.
 func zoneLabelBox(z zone) image.Rectangle {
 	info := zones[z]
-	top := info.rect.Max.Y - 11
+	top := info.rect.Max.Y - 22
 	if z == zoneHallway1 {
-		top = info.rect.Min.Y + 1
+		top = info.rect.Min.Y + 2
 	}
-	return textBox(info.label, info.rect.Min.X+1, top, smallFace)
+	return textBox(info.label, info.rect.Min.X+2, top, smallFace)
 }
 
 // drawOverlay dibuja un rótulo: fondo con borde negro y, si tiene, su texto.
 func drawOverlay(dst *ebiten.Image, o overlay) {
 	panel(dst, o.rect, o.bg)
 	if o.text != "" {
-		drawText(dst, o.text, float64(o.rect.Min.X+2), float64(o.rect.Min.Y+1), smallFace, o.fg)
+		drawText(dst, o.text, float64(o.rect.Min.X+4), float64(o.rect.Min.Y+2), smallFace, o.fg)
 	}
 }
