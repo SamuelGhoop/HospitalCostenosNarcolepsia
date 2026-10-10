@@ -253,6 +253,8 @@ La demo no cambia: sigue el round-robin real de la Sección 6 (sección 4).
 
 ### 5.7 Despertar antes de tiempo
 - Clic derecho sobre un paciente en cama → **DESPERTAR**: `WakePatient(p)` libera la cama al instante. Cuesta **−0,25 estrellas** y ese paciente vuelve a dormirse en la mitad del tiempo normal.
+- Solo sirve con un paciente **revisado** y en cama (`InBed`): el sueño corre desde la revisión. Con otro, `ErrNotInBed`.
+- **No cuenta como sueño completo** para el alta, y la mitad del tiempo despierto es solo para esa vez.
 
 ### 5.8 Economía
 - **Pago por episodio**: uno solo, **en la revisión** del médico (5.5). Depende de los segundos que pasaron desde el desplome hasta la revisión: **$450** hasta 15 s; después **−$15 por cada segundo completo**, con mínimo **$100**. Ejemplos: a los 10 s paga $450; a los 25 s, $300; a los 60 s, $100. *(Reemplaza los $300/$150 por atención, 2026-10-10.)*
@@ -271,7 +273,8 @@ La demo no cambia: sigue el round-robin real de la Sección 6 (sección 4).
 
 ### 5.10 Derrota y puntaje
 - Pierde con: reputación en 0 ("¡PERDIÓ LA LICENCIA!"), quiebra al pagar la nómina ("¡QUIEBRA!") o **5 o más** pacientes `Collapsed` + `InHallway` a la vez ("¡HOSPITAL COLAPSADO!").
-- Puntaje: +100 por atención, +250 por alta, +500 por día completado; al final, + plata ÷ 10 + estrellas × 200.
+- Se revisa al final de cada `Tick`. Al perder, la partida queda **congelada**: `Tick` no hace nada, y `Dispatch` y `WakeEarly` devuelven `ErrGameOver`.
+- Puntaje: +100 por atención (cada **revisión**), +250 por alta, +500 por día completado (cuando el reloj llega a las 20:00; en F4 la nómina va después); al final, + plata ÷ 10 + estrellas × 200 (en centésimas: `reputación × 2`, aritmética entera).
 
 ### 5.11 Partida guardada (pendiente: F6)
 - Se guarda **automáticamente al terminar cada día** (después de la nómina), **nunca a mitad del día**: el estado interno del hospital (camas, episodios, quién duerme dónde) no se puede serializar sin tocar `hospital/`.
@@ -508,6 +511,13 @@ Prioridad si el tiempo no alcanza: F1 → F2 → F3 → F4 → F5 → F6. **F2 e
 - `Appearance` suma `hairColor`; `shirtColor` y `hairColor` son índices de paleta que decide la interfaz (sección 7).
 - `WakeEarly` (5.7) va en F1.4, con su costo de reputación.
 - Tareas anotadas para después: mapa de fondo y rutas (10.7), pantalla de inicio (9.3) y menú de pausa (9.4), antes de F3; partida guardada (5.11) y ajustes (9.5), en F6.
+
+### 12.4 Decisiones de F1.4 (2026-10-10)
+- El alta paga +$200 (5.8); "+100 por atención" es por revisión; los +500 del día se suman al llegar a las 20:00 (5.10).
+- `WakeEarly`: solo con pacientes revisados en cama, no cuenta como sueño completo y la mitad del tiempo despierto es solo esa vez (5.7).
+- Al perder, la partida queda congelada; el puntaje final se calcula con aritmética entera (5.10).
+- La penalización por espera sigue el cronómetro de espera y se detiene con la revisión; para el colapso cuentan solo desplomados y del pasillo (5.9).
+- La reputación sale en la foto en centésimas (la interfaz la muestra como "2,75 ★"); no hay aviso por cada pago, sí al perder.
 
 ---
 
