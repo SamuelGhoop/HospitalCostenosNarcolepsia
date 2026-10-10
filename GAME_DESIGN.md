@@ -440,6 +440,9 @@ Aplica a la demo y al juego (mismo código de `gui/`). Reemplaza la tarea "rutas
    - `gui/assets/map/taxi.png`: pasa por el carril de abajo, de izquierda a derecha, con la esquina superior izquierda en y = 651; sale por la derecha y vuelve a aparecer por la izquierda cada cierto tiempo (constante en la interfaz).
    - `gui/assets/map/steam_pot.png`: humo de la olla de la cafetería, hoja de 3 cuadros de 44 × 36 en fila; esquina superior izquierda en (40, 246), cambia de cuadro cada ~300 ms, en bucle.
    - Todo animado por ticks de `Update`, nunca con `time.Sleep`.
+6. **Arreglos del fondo** (2026-10-10, parches de Samuel pegados con un programa temporal y verificados): andén de losas en tono cálido en la acera, la línea verde del pasillo 2 centrada (x = 321 de la maqueta) y un extintor en vez de la pantallita del pasillo 1.
+7. **Puestos sobre piso libre** (`gui/ui/spots.go`): los muebles de la maqueta (`put(make(w, h), x, y)`) son obstáculos. Cada puesto deja el cuerpo visible dentro de su zona y sin tocar un mueble, con sus rótulos dentro de la zona y sin tapar a los vecinos. Si así no cabe, un segundo intento deja que los rótulos se salgan unos píxeles, sin tapar otro rótulo, un letrero ni un mueble (hoy solo lo usa el acostado de radiología). Los rótulos de zona tampoco van sobre muebles: el de radiología va arriba a la izquierda y el de la sala del personal, encima de la consola.
+8. **Escala de los personajes**: ×2. Se probó ×3 (48 × 72) y se descartó: el pasillo 1 mide 66 px de alto, el hueco de las puertas 38 px contra 42 del cuerpo, y en radiología no cabía un acostado con su ayudante.
 
 ---
 
