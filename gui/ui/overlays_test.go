@@ -79,12 +79,11 @@ func TestOverlays_DoNotOverlapInAnyStepOfTheDemo(t *testing.T) {
 }
 
 // figureBody es lo que ocupa el cuerpo de un personaje en at: su cuadro de
-// 32×48 en la pantalla, o el de 48×32 si está rotado en su cama.
+// 48×72 en la pantalla o, acostado en su cama, lo que se ve del cuerpo.
 func figureBody(f figure, at vec) image.Rectangle {
 	if f.patient && f.room != 0 && at == bedCell(roomZone(f.room)) {
 		cell := bedCell(roomZone(f.room))
-		x, y := int(cell.x), int(cell.y)
-		return image.Rect(x, y, x+figHeight, y+figWidth) // acostado (rotado): 48×32
+		return bedBody.Add(image.Pt(int(cell.x), int(cell.y))) // acostado en la cama: lo que se ve del cuerpo rotado
 	}
 	x, y := int(at.x), int(at.y)
 	return image.Rect(x, y, x+figWidth, y+figHeight)
@@ -112,17 +111,33 @@ func TestSpots_FigureAndItsLabelsStayInsideTheZone(t *testing.T) {
 
 	check := func(what string, f figure, at vec, z zone) {
 		t.Helper()
-		if box := figureBox(f, at); !box.In(zones[z].rect) {
-			t.Errorf("%s: %v se sale de %s %v", what, box, zones[z].label, zones[z].rect)
+		box := figureBox(f, at)
+		if box.In(zones[z].rect) {
+			return
+		}
+		// Se sale: solo vale si es un puesto del segundo intento del
+		// buscador y sus rótulos no tapan otro rótulo, un letrero ni un mueble.
+		if !relaxedSpot(z, image.Pt(int(at.x), int(at.y))) {
+			t.Errorf("%s: %v se sale de %s %v (y no es un puesto del segundo intento)", what, box, zones[z].label, zones[z].rect)
+			return
+		}
+		for _, o := range figureOverlays(f, at, true) {
+			if onFurniture(o.rect) || coversALabel(o.rect) {
+				t.Errorf("%s: el rótulo %q (%v) se sale de %s y tapa un mueble o un rótulo", what, o.text, o.rect, zones[z].label)
+			}
 		}
 	}
 
-	// Zonas donde alguien se queda quieto en la demo (el pasillo 1 es solo de paso).
-	for _, z := range []zone{zoneLobby, zoneCafeteria, zoneRadiology, zoneHallway2, zoneStaffRoom} {
-		for k := 0; k < 2; k++ {
-			check(fmt.Sprintf("de pie %d", k), standing, toVec(slot(z, k)), z)
-			check(fmt.Sprintf("personal %d", k), staff, toVec(slot(z, k)), z)
-		}
+	// Lo que usa la demo: los 5 pacientes de pie en la recepción, el
+	// personal en su sala y un acostado (con quien lo atiende) donde se
+	// desploman Yeimy, Kevin, Ludys y Wilfrido.
+	for k := 0; k < 5; k++ {
+		check(fmt.Sprintf("de pie %d", k), standing, toVec(slot(zoneLobby, k)), zoneLobby)
+	}
+	for k := 0; k < 3; k++ {
+		check(fmt.Sprintf("personal %d", k), staff, toVec(slot(zoneStaffRoom, k)), zoneStaffRoom)
+	}
+	for _, z := range []zone{zoneLobby, zoneCafeteria, zoneRadiology, zoneHallway2} {
 		floor := toVec(floorSpot(z, 0))
 		check("dormido en el piso", sleeper, floor, z)
 		check("el que lo atiende", staff, helperSpot(floor), z)

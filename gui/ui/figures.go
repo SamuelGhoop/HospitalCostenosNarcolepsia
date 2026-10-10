@@ -59,13 +59,16 @@ func drawPatientSprite(dst *ebiten.Image, f figure, at vec, a *patientAnim) {
 	dst.DrawImage(patientSheet.SubImage(frameRect(a.anim, frame)).(*ebiten.Image), op)
 }
 
-// drawStanding: personaje de pie (cabeza, tronco y piernas) con contorno,
-// en su cuadro de 32×48. Lo usa el personal mientras llegan sus sprites.
+// drawStanding: personaje de pie (cabeza, tronco y piernas) con contorno.
+// Las medidas están en píxeles de la hoja (un cuadro de 16×24) y se
+// escalan como los sprites, así el personal mide lo mismo que los pacientes.
+// Lo usa el personal mientras llegan sus sprites.
 func drawStanding(dst *ebiten.Image, x, y int, body, legs color.RGBA) {
-	fillRect(dst, image.Rect(x+6, y+4, x+26, y+46), colInk)  // contorno
-	fillRect(dst, image.Rect(x+8, y+6, x+24, y+18), colSkin) // cabeza
-	fillRect(dst, image.Rect(x+8, y+20, x+24, y+34), body)   // tronco
-	fillRect(dst, image.Rect(x+8, y+36, x+24, y+44), legs)   // piernas
+	at := image.Pt(x, y)
+	fillRect(dst, scaleRect(image.Rect(3, 2, 13, 23)).Add(at), colInk) // contorno
+	fillRect(dst, scaleRect(image.Rect(4, 3, 12, 9)).Add(at), colSkin) // cabeza
+	fillRect(dst, scaleRect(image.Rect(4, 10, 12, 17)).Add(at), body)  // tronco
+	fillRect(dst, scaleRect(image.Rect(4, 18, 12, 22)).Add(at), legs)  // piernas
 }
 
 // toVec convierte un punto entero de la pantalla en un vec.

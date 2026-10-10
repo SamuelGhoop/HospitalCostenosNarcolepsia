@@ -40,7 +40,7 @@ func TestAttendChoreography_WithBedFollowsTheFourPhases(t *testing.T) {
 
 	// Ya acostado: fase 2, el médico camina hasta él.
 	c.step(func(string) bool { return true }, func(string) bool { return true })
-	if to, _ := c.target("D-01"); to != (vec{attack.x + slotStepX, attack.y}) {
+	if to, _ := c.target("D-01"); to != helperSpot(attack) {
 		t.Errorf("fase 2: el médico va a %v; se esperaba al lado del paciente", to)
 	}
 	if to, _ := c.target("P-001"); to != attack {
@@ -91,7 +91,7 @@ func TestAttendChoreography_WithoutBedWaitsBesideThePatient(t *testing.T) {
 	for i := 0; i < helperHold-1; i++ {
 		c.step(yes, yes)
 	}
-	if to, _ := c.target("D-01"); to != (vec{attack.x + slotStepX, attack.y}) {
+	if to, _ := c.target("D-01"); to != helperSpot(attack) {
 		t.Errorf("antes de %d ticks el médico ya se fue a %v", helperHold, to)
 	}
 }
@@ -107,7 +107,7 @@ func TestCarryChoreography_TheOrderlyTakesThePatientToBed(t *testing.T) {
 	if to, ok := c.target("P-004"); !ok || to != hallway {
 		t.Fatalf("fase 1: el paciente va a (%v, %v); debe quedarse en el pasillo %v", to, ok, hallway)
 	}
-	if to, _ := c.target("C-01"); to != (vec{hallway.x + slotStepX, hallway.y}) {
+	if to, _ := c.target("C-01"); to != helperSpot(hallway) {
 		t.Errorf("fase 1: el camillero va a %v; se esperaba al lado del paciente", to)
 	}
 

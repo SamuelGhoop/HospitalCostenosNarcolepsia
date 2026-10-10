@@ -2,9 +2,11 @@ package ui
 
 import (
 	"fmt"
+	"image"
 	"testing"
 
 	"github.com/SamuelGhoop/HospitalCostenosNarcolepsia/game"
+	"github.com/SamuelGhoop/HospitalCostenosNarcolepsia/hospital"
 )
 
 // Pedido por Samuel: ningún tramo entre dos puntos de paso conectados cruza
@@ -75,11 +77,14 @@ func TestRoute_FromTheSidewalkEntersThroughTheMainDoor(t *testing.T) {
 	t.Errorf("la ruta desde la acera (%v) no cruza la puerta principal (%v → %v)", path, out, in)
 }
 
-// Todas las zonas quedan conectadas entre sí, y con la acera.
+// Todas las zonas quedan conectadas entre sí, y con la acera. Se usa el
+// centro de cada zona (con los pies ahí), no un puesto de pie: en el
+// pasillo 1 nadie se para.
 func TestRoute_ConnectsEveryPairOfZones(t *testing.T) {
 	spots := map[string]vec{"acera": toVec(entrance)}
 	for _, z := range zoneOrder {
-		spots[zones[z].label] = toVec(slot(z, 0))
+		c := zones[z].rect.Min.Add(zones[z].rect.Max).Div(2)
+		spots[zones[z].label] = vec{float64(c.X) - feetOffset.x, float64(c.Y) - feetOffset.y}
 	}
 	for a, from := range spots {
 		for b, to := range spots {
@@ -90,8 +95,11 @@ func TestRoute_ConnectsEveryPairOfZones(t *testing.T) {
 
 // En toda la demo, en cada tick: los pies de cada personaje están sobre algo
 // caminable (nadie atraviesa una pared), y los que están quietos no quedan
-// uno encima del otro.
+// uno encima del otro ni sobre un mueble del fondo.
 func TestDemo_NobodyWalksThroughWallsOrStandsOnSomeoneElse(t *testing.T) {
+	if err := loadFonts(); err != nil {
+		t.Fatal(err)
+	}
 	s := NewDemoScene(game.NewDemo())
 	for step := 1; step <= game.DemoSteps; step++ {
 		if err := s.advance(); err != nil {
@@ -104,6 +112,22 @@ func TestDemo_NobodyWalksThroughWallsOrStandsOnSomeoneElse(t *testing.T) {
 				break
 			}
 		}
+	}
+}
+
+// visibleBody es lo que se ve del cuerpo de un personaje en su puesto. ok
+// es false para el que duerme en su cama: la cama es un mueble, pero ahí sí
+// va.
+func visibleBody(s *DemoScene, f figure) (image.Rectangle, bool) {
+	at := s.pos[f.id]
+	p := image.Pt(int(at.x), int(at.y))
+	switch {
+	case f.patient && s.onBed(f):
+		return image.Rectangle{}, false
+	case f.patient && f.state != hospital.Awake:
+		return floorBody.Add(p), true // acostado en el piso
+	default:
+		return standingBody.Add(p), true
 	}
 }
 
@@ -127,6 +151,11 @@ func checkTick(t *testing.T, s *DemoScene, step, tick int) {
 		}
 		if at == s.destination(f) {
 			still = append(still, f)
+		}
+	}
+	for _, f := range still {
+		if body, ok := visibleBody(s, f); ok && onFurniture(body) {
+			t.Fatalf("paso %d, tick %d: %s está quieto sobre un mueble (%v)", step, tick, f.id, body)
 		}
 	}
 	for i, a := range still {

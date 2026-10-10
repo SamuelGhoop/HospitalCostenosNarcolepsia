@@ -178,9 +178,9 @@ func TestSpritePlacement_FlipKeepsTheSpriteInItsCell(t *testing.T) {
 	}
 }
 
-// §10.7: los personajes se dibujan ×2 (escalado entero): el cuadro de 16×24
-// de la hoja ocupa 32×48 en la pantalla de 1280×720.
-func TestSpritePlacement_DrawsTheFigureTwiceAsBig(t *testing.T) {
+// Los personajes se dibujan ×spriteScale (escalado entero): el cuadro de
+// 16×24 de la hoja ocupa figWidth×figHeight en la pantalla de 1280×720.
+func TestSpritePlacement_DrawsTheFigureAtSpriteScale(t *testing.T) {
 	at := vec{100, 50}
 	g, _ := spritePlacement(animIdle, 0, vec{}, false, at, false)
 
@@ -188,16 +188,17 @@ func TestSpritePlacement_DrawsTheFigureTwiceAsBig(t *testing.T) {
 		t.Errorf("la esquina del cuadro quedó en (%v, %v); se esperaba %v", x, y, at)
 	}
 	if x, y := g.Apply(cellWidth, cellHeight); x != at.x+figWidth || y != at.y+figHeight {
-		t.Errorf("la otra esquina quedó en (%v, %v); se esperaba (%v, %v): el cuadro debe medir 32×48", x, y, at.x+figWidth, at.y+figHeight)
+		t.Errorf("la otra esquina quedó en (%v, %v); se esperaba (%v, %v): el cuadro debe medir %d×%d", x, y, at.x+figWidth, at.y+figHeight, figWidth, figHeight)
 	}
 
-	// En la cama también va ×2: rotado mide 48×32 y queda dentro de la cama.
+	// En la cama también va escalado: lo que se ve del cuerpo acostado (en
+	// la hoja, x 0–16 e y 9–24) queda, ya rotado, dentro de la cama.
 	bed := bedRect(zoneRoom101)
 	g, _ = spritePlacement(animSleepBed, 0, bedCell(zoneRoom101), true, vec{}, false)
-	x0, y0 := g.Apply(0, 0)
-	x1, y1 := g.Apply(cellWidth, cellHeight)
+	x0, y0 := g.Apply(0, 9)
+	x1, y1 := g.Apply(16, 24)
 	box := image.Rect(int(min(x0, x1)), int(min(y0, y1)), int(max(x0, x1)), int(max(y0, y1)))
-	if box.Dx() != figHeight || box.Dy() != figWidth || !box.In(bed) {
-		t.Errorf("acostado ocupa %v (%d×%d); se esperaba 48×32 dentro de la cama %v", box, box.Dx(), box.Dy(), bed)
+	if box.Dx() != 15*spriteScale || box.Dy() != 16*spriteScale || !box.In(bed) {
+		t.Errorf("acostado, el cuerpo ocupa %v (%d×%d); se esperaba %d×%d dentro de la cama %v", box, box.Dx(), box.Dy(), 15*spriteScale, 16*spriteScale, bed)
 	}
 }

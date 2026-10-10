@@ -25,6 +25,8 @@ const (
 
 // Cada personaje es un cuadro de 16×24 px en su hoja de sprites y se
 // dibuja ×2 (escalado entero, sin suavizar): en la pantalla mide 32×48.
+// (Se probó ×3 y se descartó: los personajes quedaban más altos que el
+// pasillo 1 y más anchos que el hueco de las puertas.)
 const (
 	cellWidth   = 16
 	cellHeight  = 24
@@ -139,43 +141,6 @@ func roomZone(number int) zone {
 	return zoneFor(fmt.Sprintf("habitación %d", number))
 }
 
-// Separación entre los puestos de los personajes dentro de una zona. Dejan
-// sitio para los rótulos: el punto del personal arriba y la etiqueta abajo.
-const (
-	slotPad     = 12 // margen a los lados (la etiqueta es más ancha que el cuadro)
-	slotTop     = 16 // margen de arriba: el punto del personal va 10 px encima del cuadro
-	slotStepX   = 56 // distancia horizontal: lo que mide la etiqueta "P-001"
-	slotStepY   = 80 // distancia vertical: cuadro de 48 px + etiqueta + aire
-	floorBottom = 46 // margen de abajo de los puestos de piso: su etiqueta y, debajo, el rótulo de la zona
-)
-
-// slot devuelve la esquina superior izquierda del cuadro de 32×48 del
-// i-ésimo personaje DE PIE en una zona: filas desde arriba, de izquierda a
-// derecha.
-func slot(z zone, i int) image.Point {
-	r := zones[z].rect
-	// Cuántos caben por fila: el primero ocupa su cuadro (32 px) y cada uno
-	// de los siguientes suma un paso de 56 px, con margen a los dos lados.
-	perRow := (r.Dx()-2*slotPad-figWidth)/slotStepX + 1
-	if perRow < 1 {
-		perRow = 1
-	}
-	return image.Pt(r.Min.X+slotPad+(i%perRow)*slotStepX, r.Min.Y+slotTop+(i/perRow)*slotStepY)
-}
-
-// floorSpot es el k-ésimo puesto en el PISO de una zona, para los dormidos
-// sin cama: en la parte de abajo, lejos de los que están de pie arriba.
-// Deja un puesto libre a la derecha de cada uno para quien lo atienda.
-func floorSpot(z zone, k int) image.Point {
-	r := zones[z].rect
-	return image.Pt(r.Min.X+slotPad+k*2*slotStepX, r.Max.Y-figHeight-floorBottom)
-}
-
-// helperSpot es donde se para quien atiende a un paciente en el piso: a su derecha.
-func helperSpot(patient vec) vec {
-	return vec{patient.x + slotStepX, patient.y}
-}
-
 // blanketSpot es la esquina de la cobija (bed_blanket.png, 56×48) de la cama
 // de una habitación. Es el recorte que se sacó de la maqueta: un píxel del
 // sprite de la cama (1,5 en el mundo) a la izquierda de la cama y 13 abajo
@@ -184,24 +149,33 @@ func blanketSpot(room zone) image.Point {
 	return fromMockup(roomMockupX[room]+37.5, 32, 0, 0).Min
 }
 
-// bedCell es donde va el paciente acostado en su cama: el cuadro rotado
-// (48×32) centrado a lo ancho de la cama y con la mitad de abajo bajo la
-// cobija, para que se vea arropado.
+// bedCell es donde va el cuadro (rotado) del paciente acostado en su cama:
+// el cuerpo que se ve (bedBody) centrado a lo ancho de la cama y con la
+// mitad de abajo bajo la cobija, para que se vea arropado.
 func bedCell(room zone) vec {
 	bed := bedRect(room)
-	return vec{float64(bed.Min.X + (bed.Dx()-figHeight)/2), float64(blanketSpot(room).Y - figWidth/2)}
+	x := bed.Min.X + bed.Dx()/2 - (bedBody.Min.X+bedBody.Max.X)/2
+	y := blanketSpot(room).Y - bedBody.Dy()/2
+	return vec{float64(x), float64(y)}
 }
 
+// idLabelHalfWidth: la mitad de la etiqueta "P-001" (unos 50 px), con aire.
+const idLabelHalfWidth = 27
+
 // wakeSpot: donde queda de pie el que se despierta, a la IZQUIERDA de la
-// cama. La derecha es para los rótulos del que esté acostado, así no chocan.
+// cama (la derecha es para los rótulos del que esté acostado): con el
+// cuerpo justo debajo de la mesita de noche y su etiqueta sin tocar la cama.
 func wakeSpot(room zone) image.Point {
 	bed := bedRect(room)
-	return image.Pt(bed.Min.X-12-figWidth, bed.Min.Y+12) // 12 px de aire: su etiqueta es más ancha que el cuadro
+	nightstand := sprite(roomMockupX[room]+28, 19, 6, 6)
+	return image.Pt(bed.Min.X-figWidth/2-idLabelHalfWidth, nightstand.Max.Y-standingBody.Min.Y)
 }
 
 // carrySpot: donde se para, a la DERECHA de la cama, quien trae a un
-// paciente. Es de paso: después vuelve a la sala del personal.
+// paciente: con el cuerpo justo debajo del suero. Es de paso: después
+// vuelve a su sala.
 func carrySpot(room zone) image.Point {
 	bed := bedRect(room)
-	return image.Pt(bed.Max.X+4, bed.Min.Y+12)
+	iv := sprite(roomMockupX[room]+60, 19, 5, 9)
+	return image.Pt(bed.Max.X+4, iv.Max.Y-standingBody.Min.Y)
 }

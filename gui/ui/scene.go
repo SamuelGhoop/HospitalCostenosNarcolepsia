@@ -15,6 +15,6 @@ type Scene interface {
 	// Update avanza un tick (60 por segundo) y devuelve la escena que
 	// sigue: ella misma si no hay cambio de pantalla.
 	Update() (Scene, error)
-	// Draw dibuja la escena en la pantalla lógica de 640×360.
+	// Draw dibuja la escena en la pantalla lógica de 1280×720.
 	Draw(screen *ebiten.Image)
 }

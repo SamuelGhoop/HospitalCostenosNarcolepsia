@@ -74,19 +74,41 @@ func TestZoneFor_MapsEveryLocationOfTheDemo(t *testing.T) {
 	}
 }
 
-func TestSlot_StaysInsideItsZoneWithoutOverlapping(t *testing.T) {
+// Las zonas donde alguien se queda quieto en la demo tienen los puestos que
+// hacen falta: de pie (los 5 pacientes en la recepción en los pasos 3 y 4,
+// y el personal en su sala) y en el piso, con su ayudante al lado (donde
+// se desploman Yeimy, Kevin, Ludys y Wilfrido).
+func TestSpots_EnoughFreePlacesWhereTheDemoNeedsThem(t *testing.T) {
+	if err := loadFonts(); err != nil {
+		t.Fatal(err)
+	}
+	standing := map[zone]int{zoneLobby: 5, zoneStaffRoom: 3}
+	for z, n := range standing {
+		s := spotsOf(z).standing
+		if len(s) < n {
+			t.Errorf("%s: hay %d puestos de pie libres; la demo necesita %d", zones[z].label, len(s), n)
+		}
+		for _, p := range s {
+			if body := standingBody.Add(p); !body.In(zones[z].rect) || onFurniture(body) {
+				t.Errorf("%s: el puesto %v deja el cuerpo fuera de la zona o sobre un mueble", zones[z].label, p)
+			}
+		}
+	}
+	for _, z := range []zone{zoneLobby, zoneCafeteria, zoneRadiology, zoneHallway2} {
+		if len(spotsOf(z).floor) == 0 {
+			t.Errorf("%s: no hay ningún puesto en el piso libre para un paciente acostado con su ayudante", zones[z].label)
+		}
+	}
+}
+
+// Pedido por Samuel: los rótulos de zona tampoco van sobre muebles.
+func TestZoneLabels_AreNotOverFurniture(t *testing.T) {
+	if err := loadFonts(); err != nil {
+		t.Fatal(err)
+	}
 	for _, z := range zoneOrder {
-		seen := map[image.Point]bool{}
-		for i := 0; i < 4; i++ {
-			p := slot(z, i)
-			cell := image.Rect(p.X, p.Y, p.X+figWidth, p.Y+figHeight)
-			if !cell.In(zones[z].rect) {
-				t.Errorf("%s: el puesto %d (%v) se sale de la zona %v", zones[z].label, i, cell, zones[z].rect)
-			}
-			if seen[p] {
-				t.Errorf("%s: el puesto %d repite la posición %v", zones[z].label, i, p)
-			}
-			seen[p] = true
+		if box := zoneLabelBox(z); onFurniture(box) {
+			t.Errorf("el rótulo %q (%v) queda sobre un mueble", zones[z].label, box)
 		}
 	}
 }
@@ -111,18 +133,17 @@ func TestBlanketSpot_IsExactlyWhereTheMapHasTheBeds(t *testing.T) {
 	}
 }
 
-// Acostado, el paciente (rotado: 48×32) queda centrado en la cama y con la
-// mitad de abajo bajo la cobija, como en la escala anterior.
+// Acostado, lo que se ve del paciente cabe a lo ancho de la cama y queda
+// con la mitad de abajo bajo la cobija.
 func TestBedCell_HalfOfThePatientIsUnderTheBlanket(t *testing.T) {
 	for _, room := range []zone{zoneRoom101, zoneRoom102, zoneRoom103} {
-		cell, blanket := bedCell(room), blanketSpot(room)
-		lying := image.Rect(int(cell.x), int(cell.y), int(cell.x)+figHeight, int(cell.y)+figWidth) // rotado
-		if lying.Min.Y+figWidth/2 != blanket.Y {
-			t.Errorf("%s: el paciente va de y=%d a %d y la cobija empieza en y=%d; debía taparle la mitad", zones[room].label, lying.Min.Y, lying.Max.Y, blanket.Y)
+		cell, blanket, bed := bedCell(room), blanketSpot(room), bedRect(room)
+		body := bedBody.Add(image.Pt(int(cell.x), int(cell.y)))
+		if body.Min.Y+body.Dy()/2 != blanket.Y {
+			t.Errorf("%s: el cuerpo va de y=%d a %d y la cobija empieza en y=%d; debía taparle la mitad", zones[room].label, body.Min.Y, body.Max.Y, blanket.Y)
 		}
-		cover := image.Rectangle{blanket, blanket.Add(image.Pt(56, 48))}
-		if lying.Min.X < cover.Min.X || lying.Max.X > cover.Max.X {
-			t.Errorf("%s: el paciente (%v) se sale a los lados de la cobija (%v)", zones[room].label, lying, cover)
+		if body.Min.X < bed.Min.X || body.Max.X > bed.Max.X {
+			t.Errorf("%s: el cuerpo (%v) no cabe a lo ancho de la cama (%v)", zones[room].label, body, bed)
 		}
 	}
 }
