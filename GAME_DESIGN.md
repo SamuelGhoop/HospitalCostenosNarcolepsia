@@ -374,9 +374,9 @@ La demo no cambia: sigue el round-robin real de la Sección 6 (sección 4).
 ## 10. Interfaz con Ebitengine (`gui/ui/`)
 
 ### 10.1 Pantalla
-- Resolución lógica **640 × 360**; ventana 1280 × 720 (×2), pantalla completa ×3. Escalado entero, filtro *nearest*. *(Pasa a 1280 × 720 con el mapa de fondo, sección 10.7.)*
-- Tiles de **16 × 16 px**; personajes en cuadros de **16 × 24 px**.
-- **Mapa**: `hospital.dc.html` dibuja un mundo de **464 × 261** (también 16:9). `gui/ui/layout.go` copia sus coordenadas tal cual (para poder compararlas con la maqueta) y las escala a 640 × 360 multiplicando por 640/464 y redondeando. Las proporciones quedan iguales y los personajes se dibujan a 1× en su cuadro de 16 × 24.
+- Resolución lógica **1280 × 720**, igual que la ventana y el mapa de fondo (sección 10.7); en pantalla completa Ebitengine la escala. *(Antes de la tarea A era 640 × 360 con la ventana ×2.)*
+- Tiles de **16 × 16 px**; personajes en cuadros de **16 × 24 px** en su hoja, dibujados **×2** (escalado entero, *nearest*): en la pantalla miden 32 × 48.
+- **Mapa**: `hospital.dc.html` dibuja un mundo de **464 × 261** (también 16:9). `gui/ui/layout.go` copia sus coordenadas tal cual (para poder compararlas con la maqueta) y las escala a 1280 × 720 multiplicando por 1280/464 y redondeando, igual que se renderizó el mapa de fondo.
 - **Idioma**: todos los textos de la interfaz van en español. Las maquetas están en inglés, pero solo son referencia visual; los textos se escriben en el código, y los estados salen del `String()` del modelo ("disponible", "ocupada", "dormido en el pasillo").
 
 ### 10.2 Escenas (otra interfaz)
@@ -422,7 +422,7 @@ type Scene interface {
 - Hover → tooltip; **Shift** → todas las etiquetas; **Esc** → pausa; flechas + Enter en los portapapeles.
 
 ### 10.5 Texto
-- Fuente **Press Start 2P** (OFL) en `assets/fonts/`, con `text/v2`.
+- Fuente **Press Start 2P** (OFL) en `assets/fonts/`, con `text/v2`. Llega con la pantalla de inicio (9.3); mientras tanto la interfaz usa Go Mono a 16/14/20 px.
 - ⚠️ **Tildes**: en Press Start 2P la Ó, É, Í, Ú y Ñ vienen encogidas (para que la tilde quepa en el cuadro de 8 × 8) y parecen minúsculas. Donde se use esa fuente, la tilde se dibuja **a mano encima de la letra normal**, como la virgulilla de COSTEÑOS en la maqueta. Lo hace solo un helper de texto.
 
 ### 10.6 Comunicación con `game/`
@@ -430,12 +430,12 @@ type Scene interface {
 - Las acciones son métodos de `Game` (`Dispatch`, `WakeEarly`, `Hire`, `Pause`, `Resume`, `Report`). Una partida nueva es un `game.New(rng)` nuevo con su propio `context`, que cancela la anterior. La demo usa el tipo `game.Demo` (`Next`, `Skip`, `Snapshot`, `Report`). Los errores se muestran como avisos.
 - Los estados se muestran con el `String()` de las constantes tipadas del modelo.
 
-### 10.7 Mapa con imagen de fondo y rutas (pendiente: después de F1.4, antes de F3)
+### 10.7 Mapa con imagen de fondo y rutas (hecho, 2026-10-10)
 Aplica a la demo y al juego (mismo código de `gui/`). Reemplaza la tarea "rutas por puntos de paso" y el detalle del camillero que atravesaba la 102.
 1. **Fondo**: `gui/assets/map/hospital_map_1280x720.png` es la maqueta (`hospital.dc.html`) renderizada a 1280 × 720 (1280/464 px de pantalla por px de mundo, bordes redondeados, sin antialias). Solo trae lo que nunca se mueve: sin personajes, sin taxi, sin humo y sin rayitas de movimiento. Se embebe con `//go:embed` y se dibuja de fondo; la interfaz deja de dibujar pisos, paredes y muebles con rectángulos.
 2. **Resolución lógica 1280 × 720** (antes 640 × 360): `layout.go` escala con 1280/464; los personajes se dibujan ×2 (escalado entero, *nearest*), incluidas la rotación en la cama y el volteo; la fuente se ajusta al tamaño nuevo; la ventana sigue en 1280 × 720.
-3. **Camas**: ya vienen dibujadas en la imagen. La cobija que va encima del paciente debe coincidir píxel a píxel con la cama de la imagen (se verifica con una captura).
-4. **Rutas**: puntos de paso con coordenadas de la maqueta (puerta de cada habitación, pasillos y entrada de cada zona) y la ruta más corta entre ellos. Un test verifica que ningún tramo entre dos puntos conectados cruza una pared (las paredes salen de los mismos rectángulos de la maqueta). Los personajes no se quedan parados uno encima del otro.
+3. **Camas**: el fondo trae las **3 camas libres** (la cobija doblada). `gui/assets/map/bed_blanket.png` (56 × 48, la cobija subida) va **encima del paciente acostado**, en (126, 88), (399, 88) y (672, 88); esas posiciones salen de `layout.go` y las revisa un test. Orden de dibujo: fondo → paciente en la cama → cobija. Las dos imágenes salen de la misma maqueta y se verificaron píxel a píxel contra el mapa original.
+4. **Rutas**: los puntos de paso son los dos lados de cada puerta de la maqueta (`hDoor`, `vDoor` y la puerta principal), y la ruta más corta sale con Dijkstra. Las rutas son para los **pies** del personaje (abajo al centro de su cuadro). Un test verifica que ningún tramo entre dos puntos conectados cruza una pared (las paredes salen de los mismos rectángulos de la maqueta), y otro recorre toda la demo tick a tick: nadie pisa una pared y los que están quietos no quedan uno encima del otro.
 5. **Lo que se mueve** va como sprite aparte, ya escalado (se dibuja a 1×, en píxeles de 1280 × 720):
    - `gui/assets/map/taxi.png`: pasa por el carril de abajo, de izquierda a derecha, con la esquina superior izquierda en y = 651; sale por la derecha y vuelve a aparecer por la izquierda cada cierto tiempo (constante en la interfaz).
    - `gui/assets/map/steam_pot.png`: humo de la olla de la cafetería, hoja de 3 cuadros de 44 × 36 en fila; esquina superior izquierda en (40, 246), cambia de cuadro cada ~300 ms, en bucle.
