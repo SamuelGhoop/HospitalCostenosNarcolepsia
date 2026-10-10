@@ -36,6 +36,7 @@ type Game struct {
 	patientCount              int               // para los IDs: P-001, P-002…
 	nextArrival               time.Duration     // cuánto falta para que aparezca el paciente siguiente
 	notes                     map[string]string // ID del paciente → cómo sale en el Shift Report: "(alta)"
+	lastAssignErr             string            // último error de AssignRoom (consulta 5.3); "" si no hubo
 	episodeTimes              map[string]string // ID del episodio → hora del juego ("14:15"), §3.2
 	notices                   []string          // últimos avisos para la interfaz, del más viejo al más nuevo
 }

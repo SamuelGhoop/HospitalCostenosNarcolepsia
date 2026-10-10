@@ -178,8 +178,7 @@ func realTime(rec hospital.EpisodeRecord) string {
 func (g *Game) Report() Report {
 	g.mu.Lock()
 	defer g.mu.Unlock()
-	// lastAssignErr va vacío: el AssignRoom del modo juego llega en F1.3b.
-	r := buildReport(g.h, g.doctorsLocked(), "", g.gameTimeOf)
+	r := buildReport(g.h, g.doctorsLocked(), g.lastAssignErr, g.gameTimeOf)
 
 	// Los que ya se fueron siguen en el modelo (no tiene alta): el reporte
 	// los marca con la nota que les dejó el juego al irse.

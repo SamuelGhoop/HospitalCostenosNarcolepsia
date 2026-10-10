@@ -88,10 +88,11 @@ func (s *StaffMember) view() StaffMemberView {
 type Activity int
 
 const (
-	Free          Activity = iota // libre: se le puede despachar
-	GoingToPickUp                 // camina hasta el paciente desplomado
-	Carrying                      // lo lleva a la cama
-	GoingToReview                 // camina hasta la habitación a revisarlo
+	Free            Activity = iota // libre: se le puede despachar
+	GoingToPickUp                   // camina hasta el paciente desplomado
+	Carrying                        // lo lleva a la cama
+	GoingToReview                   // camina hasta la habitación a revisarlo
+	GoingToTransfer                 // camina hasta el paciente del pasillo para llevarlo a una cama
 )
 
 // String implementa fmt.Stringer para Activity.
@@ -105,6 +106,8 @@ func (a Activity) String() string {
 		return "lo lleva a la cama"
 	case GoingToReview:
 		return "va a revisarlo"
+	case GoingToTransfer:
+		return "va a llevarlo a una cama"
 	default:
 		return fmt.Sprintf("Activity(%d)", int(a))
 	}

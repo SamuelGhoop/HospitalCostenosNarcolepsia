@@ -113,6 +113,9 @@ func (g *Game) tickPatientsLocked(dt time.Duration) {
 			}
 		case Collapsed, InHallway, AwaitingReview:
 			pt.waited += dt // corre hasta la revisión, sin volver a empezar
+			if pt.waited >= angryAfter {
+				g.leaveAngryLocked(pt)
+			}
 		case InBed: // timer = sueño que le queda
 			if pt.countdown(dt) {
 				g.wakeUpLocked(pt)
@@ -161,6 +164,22 @@ func (g *Game) wakeUpLocked(pt *patient) {
 	pt.stage, pt.zone = Wandering, wanderZones[g.rng.Intn(len(wanderZones))]
 	pt.timer = awakeDuration(g.rng, pt.p.Level())
 	pt.wanderLeft = randomDuration(g.rng, wanderMin, wanderMax)
+}
+
+// leaveAngryLocked: pasaron 45 s desde el desplome y nadie lo revisó. Se
+// despierta solo y se va enojado (§5.4).
+func (g *Game) leaveAngryLocked(pt *patient) {
+	// Si estaba desplomado, el modelo nunca se enteró: sigue Awake y no hay
+	// episodio, así que no hay nada que decirle. Si estaba en el pasillo o
+	// esperando revisión, WakePatient lo despierta y libera la cama si tenía.
+	if pt.stage != Collapsed {
+		if err := g.h.WakePatient(pt.p); err != nil {
+			g.noticeLocked(fmt.Sprintf("%s no se pudo despertar: %v", pt.p, err))
+		}
+	}
+	g.cancelJobsForLocked(pt)
+	g.noticeLocked(fmt.Sprintf("%s se fue enojado", pt.p))
+	g.leaveLocked(pt, "(se fue enojado)")
 }
 
 // leaveLocked manda al paciente hacia la puerta para irse del mapa. note es

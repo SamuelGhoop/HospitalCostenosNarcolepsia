@@ -19,6 +19,7 @@ type job struct {
 //
 //   - Collapsed: a recogerlo. Le toca a un camillero; un médico solo si no
 //     hay ningún camillero libre.
+//   - InHallway: a llevarlo a una cama (§5.6), con la misma regla.
 //   - AwaitingReview: a revisarlo en la habitación. Solo un médico.
 //
 // La persona sale caminando; lo demás pasa en Tick, cuando llega.
@@ -42,11 +43,15 @@ func (g *Game) Dispatch(patientID, staffID string) error {
 	}
 
 	switch pt.stage {
-	case Collapsed:
+	case Collapsed, InHallway:
 		if s.isDoctor() && g.anyOrderlyFreeLocked() {
-			return fmt.Errorf("%w (%s no puede recoger a %s)", ErrOrderlyAvailable, s.Name(), pt.p.Name())
+			return fmt.Errorf("%w (%s no puede ir por %s)", ErrOrderlyAvailable, s.Name(), pt.p.Name())
 		}
-		s.job = &job{activity: GoingToPickUp, patient: pt, left: s.walkTime()}
+		activity := GoingToPickUp
+		if pt.stage == InHallway {
+			activity = GoingToTransfer
+		}
+		s.job = &job{activity: activity, patient: pt, left: s.walkTime()}
 	case AwaitingReview:
 		if !s.isDoctor() {
 			return fmt.Errorf("%w (%s es camillero)", ErrNotADoctor, s.Name())
@@ -68,6 +73,17 @@ func (g *Game) someoneOnTheWayLocked(pt *patient) bool {
 		}
 	}
 	return false
+}
+
+// cancelJobsForLocked libera a quien tuviera un trabajo con pt (iba en
+// camino o lo llevaba a la cama), porque pt se fue. No llama nada del
+// modelo: el despacho todavía no había llegado (§5.5).
+func (g *Game) cancelJobsForLocked(pt *patient) {
+	for _, s := range g.staff {
+		if s.job != nil && s.job.patient == pt {
+			s.job = nil
+		}
+	}
 }
 
 // anyOrderlyFreeLocked dice si hay al menos un camillero sin trabajo.
@@ -98,6 +114,8 @@ func (g *Game) tickStaffLocked(dt time.Duration) {
 			s.job = nil // lo dejó en la cama: queda libre
 		case GoingToReview:
 			g.reviewLocked(s, s.job.patient)
+		case GoingToTransfer:
+			g.transferLocked(s, s.job.patient)
 		}
 	}
 }
@@ -125,6 +143,22 @@ func (g *Game) pickUpLocked(s *StaffMember, pt *patient) {
 	if pt.p.Room() == nil {
 		pt.stage = InHallway
 		g.noticeLocked(fmt.Sprintf("%s se quedó en el pasillo: %v", pt.p, hospital.ErrNoRoomAvailable))
+		return
+	}
+	pt.stage = AwaitingReview
+	s.job = &job{activity: Carrying, patient: pt, left: carryDuration}
+}
+
+// transferLocked: s llegó donde el paciente del pasillo y lo carga. Recién
+// aquí el juego llama AssignRoom (§5.6): la cama que estaba libre cuando el
+// jugador lo mandó pudo ocuparse mientras caminaba.
+func (g *Game) transferLocked(s *StaffMember, pt *patient) {
+	s.job = nil
+	if _, err := g.h.AssignRoom(pt.p); err != nil {
+		// Sigue en el pasillo. El error del modelo se muestra como aviso y
+		// queda como último error de AssignRoom para la consulta 5.3.
+		g.lastAssignErr = err.Error()
+		g.noticeLocked(fmt.Sprintf("%s sigue en el pasillo: %v", pt.p, err))
 		return
 	}
 	pt.stage = AwaitingReview

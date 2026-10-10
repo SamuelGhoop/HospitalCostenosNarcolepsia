@@ -57,6 +57,7 @@ const (
 	wanderMin        = 10 * time.Second // despierto, cambia de zona cada wanderMin…
 	wanderMax        = 20 * time.Second // …a wanderMax
 	exitWalk         = 4 * time.Second  // lo que tarda en llegar a la puerta cuando se va
+	angryAfter       = 45 * time.Second // sin revisión desde el desplome, se despierta y se va enojado
 
 	mildSleep         = 15 * time.Second // duración del sueño en cama, según el nivel…
 	moderateSleep     = 22 * time.Second
