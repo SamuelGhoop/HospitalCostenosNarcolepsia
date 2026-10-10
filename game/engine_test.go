@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/SamuelGhoop/HospitalCostenosNarcolepsia/game"
 	"github.com/SamuelGhoop/HospitalCostenosNarcolepsia/hospital"
 )
 
@@ -47,8 +48,8 @@ func TestStart_EngineAdvancesTheClockAndStopsWithTheContext(t *testing.T) {
 // (por ejemplo, Snapshot sin candado) pasaría desapercibida.
 func TestStart_SnapshotsWhileTheEngineRunsAreRaceFree(t *testing.T) {
 	g := newGame(t)
-	collapse(t, g, "P-001", "Yeimy Padilla", hospital.Severe, "cafetería")
-	collapse(t, g, "P-002", "Kevin Mercado", hospital.Moderate, "fila de radiología")
+	collapse(t, g, "P-001", "Yeimy Padilla", hospital.Severe, game.Cafeteria)
+	collapse(t, g, "P-002", "Kevin Mercado", hospital.Moderate, game.Radiology)
 	ctx, cancel := context.WithTimeout(context.Background(), 400*time.Millisecond)
 	defer cancel()
 

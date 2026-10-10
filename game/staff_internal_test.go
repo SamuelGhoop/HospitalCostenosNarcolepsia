@@ -79,7 +79,7 @@ func TestPickUp_OnCallIsOffEvenIfRegisterEpisodeFails(t *testing.T) {
 
 	// Un paciente que el hospital nunca admitió: RegisterEpisode falla con
 	// ErrNotAdmitted. En el juego no pasa, pero así se prueba el camino del error.
-	ghost := &patient{p: hospital.NewPatient("P-404", "Fantasma", 30, hospital.Mild), stage: Collapsed, location: "cafetería"}
+	ghost := &patient{p: hospital.NewPatient("P-404", "Fantasma", 30, hospital.Mild), stage: Collapsed, zone: Cafeteria}
 	g.patients = append(g.patients, ghost)
 
 	if err := g.Dispatch("P-404", "C-01"); err != nil {

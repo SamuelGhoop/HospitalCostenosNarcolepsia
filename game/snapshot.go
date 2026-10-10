@@ -1,5 +1,7 @@
 package game
 
+import "time"
+
 // Snapshot es la foto de la partida que dibuja la interfaz en cada cuadro.
 //
 // Solo tiene valores (números, textos, estados), nunca punteros del modelo:
@@ -16,6 +18,7 @@ type Snapshot struct {
 	Staff    []StaffMemberView // en orden de contratación
 	Patients []GamePatientView // en orden de llegada
 	Notices  []string          // últimos avisos, del más viejo al más nuevo: "08:12 …"
+	DoorOpen bool              // la puerta del hospital está abierta: alguien la va a cruzar (§5.3)
 }
 
 // StaffMemberView es la foto de un miembro del personal en el modo juego.
@@ -35,7 +38,10 @@ type StaffMemberView struct {
 type GamePatientView struct {
 	PatientView
 	Stage      Stage
-	ReviewedBy string // ID del médico que lo revisó; "" si nadie
+	Zone       Zone          // dónde está; la interfaz lo hace caminar hasta ahí
+	Look       Appearance    // cómo se ve
+	Waited     time.Duration // cronómetro de espera del episodio (§5.4): del desplome a la revisión
+	ReviewedBy string        // ID del médico que lo revisó; "" si nadie
 }
 
 // Snapshot devuelve la foto actual de la partida.
@@ -61,6 +67,9 @@ func (g *Game) Snapshot() Snapshot {
 	}
 	for _, pt := range g.patients {
 		snap.Patients = append(snap.Patients, pt.view())
+		if pt.nearTheDoor() {
+			snap.DoorOpen = true
+		}
 	}
 	return snap
 }

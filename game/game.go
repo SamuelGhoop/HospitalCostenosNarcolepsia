@@ -33,6 +33,9 @@ type Game struct {
 	staff                     []*StaffMember    // todo el personal, en orden de contratación
 	doctorCount, orderlyCount int               // para los IDs: D-01, D-02… y C-01, C-02…
 	patients                  []*patient        // los pacientes de la partida, en orden de llegada
+	patientCount              int               // para los IDs: P-001, P-002…
+	nextArrival               time.Duration     // cuánto falta para que aparezca el paciente siguiente
+	notes                     map[string]string // ID del paciente → cómo sale en el Shift Report: "(alta)"
 	episodeTimes              map[string]string // ID del episodio → hora del juego ("14:15"), §3.2
 	notices                   []string          // últimos avisos para la interfaz, del más viejo al más nuevo
 }
@@ -48,7 +51,7 @@ func New(rng *rand.Rand) (*Game, error) {
 			return nil, fmt.Errorf("creando la habitación %d: %w", number, err)
 		}
 	}
-	g := &Game{rng: rng, h: h, clock: newClock(), episodeTimes: map[string]string{}}
+	g := &Game{rng: rng, h: h, clock: newClock(), episodeTimes: map[string]string{}, notes: map[string]string{}}
 
 	// Los helpers ...Locked se pueden llamar sin tomar g.mu porque la
 	// partida todavía no existe para ninguna otra goroutine.
@@ -58,6 +61,7 @@ func New(rng *rand.Rand) (*Game, error) {
 	if err := g.hireLocked(g.newOrderlyLocked(startSpeed)); err != nil {
 		return nil, fmt.Errorf("contratando al camillero inicial: %w", err)
 	}
+	g.nextArrival = arrivalInterval(rng, g.clock.day)
 	return g, nil
 }
 
@@ -78,6 +82,8 @@ func (g *Game) tickLocked(dt time.Duration) {
 		return
 	}
 	g.clock.advance(dt)
+	g.tickArrivalsLocked(dt)
+	g.tickPatientsLocked(dt)
 	g.tickStaffLocked(dt)
 }
 

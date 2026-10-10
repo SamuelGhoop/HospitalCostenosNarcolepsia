@@ -47,6 +47,7 @@ type EpisodeLine struct {
 	AttendedBy     string // quién lo atendió (médico o camillero)
 	AttendedByID   string // su ID: la interfaz lo usa para saber a quién mover
 	TreatingDoctor string // médico tratante en ese momento; "" si no tenía
+	PatientNote    string // modo juego: "(alta)" o "(se fue enojado)"; "" si sigue en el mapa
 }
 
 // DoctorEpisodes agrupa los episodios que atendió un médico (consulta 5.2).
@@ -59,6 +60,7 @@ type DoctorEpisodes struct {
 type SevereLine struct {
 	PatientID, PatientName string
 	Episodes               int
+	Note                   string // modo juego: "(alta)" o "(se fue enojado)"
 }
 
 // Report reúne las cuatro consultas de la Sección 5 (el Shift Report).
@@ -176,8 +178,21 @@ func realTime(rec hospital.EpisodeRecord) string {
 func (g *Game) Report() Report {
 	g.mu.Lock()
 	defer g.mu.Unlock()
-	// lastAssignErr va vacío: el AssignRoom del modo juego llega en F1.3.
-	return buildReport(g.h, g.doctorsLocked(), "", g.gameTimeOf)
+	// lastAssignErr va vacío: el AssignRoom del modo juego llega en F1.3b.
+	r := buildReport(g.h, g.doctorsLocked(), "", g.gameTimeOf)
+
+	// Los que ya se fueron siguen en el modelo (no tiene alta): el reporte
+	// los marca con la nota que les dejó el juego al irse.
+	for i := range r.Episodes {
+		for j := range r.Episodes[i].Episodes {
+			line := &r.Episodes[i].Episodes[j] // puntero: para cambiar el elemento, no una copia
+			line.PatientNote = g.notes[line.PatientID]
+		}
+	}
+	for i := range r.Severe {
+		r.Severe[i].Note = g.notes[r.Severe[i].PatientID]
+	}
+	return r
 }
 
 // doctorsLocked devuelve los médicos reales (sin envolver) de la partida.

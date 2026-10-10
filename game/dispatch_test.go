@@ -11,11 +11,17 @@ import (
 	"github.com/SamuelGhoop/HospitalCostenosNarcolepsia/hospital"
 )
 
-// collapse deja a un paciente nuevo desplomado en location (ver export_test.go).
-func collapse(t *testing.T, g *game.Game, id, name string, level hospital.NarcolepsyLevel, location string) {
+// collapse deja a un paciente nuevo desplomado en zone (ver export_test.go).
+// El ID lo pone el juego, igual que con las llegadas reales; wantID es el que
+// el test espera, para escribir los tests con IDs fijos y legibles.
+func collapse(t *testing.T, g *game.Game, wantID, name string, level hospital.NarcolepsyLevel, zone game.Zone) {
 	t.Helper()
-	if err := g.CollapseForTest(id, name, level, location); err != nil {
-		t.Fatalf("CollapseForTest(%s): %v", id, err)
+	id, err := g.CollapseForTest(name, level, zone)
+	if err != nil {
+		t.Fatalf("CollapseForTest(%s): %v", name, err)
+	}
+	if id != wantID {
+		t.Fatalf("CollapseForTest le puso %s a %s; el test esperaba %s", id, name, wantID)
 	}
 }
 
@@ -47,7 +53,7 @@ func patientByID(t *testing.T, snap game.Snapshot, id string) game.GamePatientVi
 // el despacho "de guardia" y lo lleva a la cama en 2 s.
 func TestDispatch_OrderlyWalksPicksUpAndCarries(t *testing.T) {
 	g := newGame(t)
-	collapse(t, g, "P-001", "Yeimy Padilla", hospital.Severe, "cafetería")
+	collapse(t, g, "P-001", "Yeimy Padilla", hospital.Severe, game.Cafeteria)
 
 	if err := g.Dispatch("P-001", "C-01"); err != nil {
 		t.Fatalf("Dispatch: %v", err)
@@ -87,7 +93,7 @@ func TestDispatch_OrderlyWalksPicksUpAndCarries(t *testing.T) {
 
 func TestDispatch_UnknownPatientOrStaff(t *testing.T) {
 	g := newGame(t)
-	collapse(t, g, "P-001", "Yeimy Padilla", hospital.Severe, "cafetería")
+	collapse(t, g, "P-001", "Yeimy Padilla", hospital.Severe, game.Cafeteria)
 
 	if err := g.Dispatch("P-999", "C-01"); !errors.Is(err, game.ErrUnknownPatient) {
 		t.Errorf("paciente inexistente: err = %v; se esperaba ErrUnknownPatient", err)
@@ -111,7 +117,7 @@ func dispatch(t *testing.T, g *game.Game, patientID, staffID string) {
 // que quedar a nombre del camillero y no del médico.
 func TestDispatch_TheChosenOneAttendsEvenIfItIsNotTheirTurn(t *testing.T) {
 	g := newGame(t)
-	collapse(t, g, "P-001", "Yeimy Padilla", hospital.Severe, "cafetería")
+	collapse(t, g, "P-001", "Yeimy Padilla", hospital.Severe, game.Cafeteria)
 	dispatch(t, g, "P-001", "C-01")
 	tickFor(g, 5*time.Second)
 
@@ -129,8 +135,8 @@ func TestDispatch_TheChosenOneAttendsEvenIfItIsNotTheirTurn(t *testing.T) {
 // hora del juego.
 func TestDispatch_DoctorPicksUpOnlyWhenNoOrderlyIsFree(t *testing.T) {
 	g := newGame(t)
-	collapse(t, g, "P-001", "Yeimy Padilla", hospital.Severe, "cafetería")
-	collapse(t, g, "P-002", "Kevin Mercado", hospital.Moderate, "fila de radiología")
+	collapse(t, g, "P-001", "Yeimy Padilla", hospital.Severe, game.Cafeteria)
+	collapse(t, g, "P-002", "Kevin Mercado", hospital.Moderate, game.Radiology)
 
 	if err := g.Dispatch("P-001", "D-01"); !errors.Is(err, game.ErrOrderlyAvailable) {
 		t.Errorf("con C-01 libre, mandar a D-01 a recoger: err = %v; se esperaba ErrOrderlyAvailable", err)
@@ -144,8 +150,8 @@ func TestDispatch_DoctorPicksUpOnlyWhenNoOrderlyIsFree(t *testing.T) {
 		t.Fatalf("D-01 debe tener 1 episodio en la consulta 5.2: %+v", rep.Episodes)
 	}
 	e := rep.Episodes[0].Episodes[0]
-	if e.PatientID != "P-002" || e.AttendedByID != "D-01" || e.Location != "fila de radiología" || e.Time != "08:12" {
-		t.Errorf("episodio de D-01 = %+v; se esperaba P-002 en la fila de radiología a las 08:12 (hora del juego)", e)
+	if e.PatientID != "P-002" || e.AttendedByID != "D-01" || e.Location != "radiología" || e.Time != "08:12" {
+		t.Errorf("episodio de D-01 = %+v; se esperaba P-002 en radiología a las 08:12 (hora del juego)", e)
 	}
 }
 
@@ -154,11 +160,11 @@ func TestDispatch_DoctorPicksUpOnlyWhenNoOrderlyIsFree(t *testing.T) {
 func TestDispatch_WithoutBedThePatientStaysInTheHallway(t *testing.T) {
 	g := newGame(t)
 	for _, id := range []string{"P-001", "P-002", "P-003"} { // llenan la 101, la 102 y la 103
-		collapse(t, g, id, "Paciente "+id, hospital.Mild, "cafetería")
+		collapse(t, g, id, "Paciente "+id, hospital.Mild, game.Cafeteria)
 		dispatch(t, g, id, "C-01")
 		tickFor(g, 7*time.Second) // 5 s caminando + 2 s llevándolo
 	}
-	collapse(t, g, "P-004", "Wilfrido Berrío", hospital.Severe, "pasillo 2")
+	collapse(t, g, "P-004", "Wilfrido Berrío", hospital.Severe, game.Hallway2)
 	dispatch(t, g, "P-004", "C-01")
 	tickFor(g, 5*time.Second)
 
@@ -180,7 +186,7 @@ func TestDispatch_WithoutBedThePatientStaysInTheHallway(t *testing.T) {
 // (tampoco DiagnosePatient, que llenaría el cupo de 4 del médico para siempre).
 func TestDispatch_DoctorReviewsWithoutTouchingTheModel(t *testing.T) {
 	g := newGame(t)
-	collapse(t, g, "P-001", "Yeimy Padilla", hospital.Severe, "cafetería")
+	collapse(t, g, "P-001", "Yeimy Padilla", hospital.Severe, game.Cafeteria)
 	dispatch(t, g, "P-001", "C-01")
 	tickFor(g, 5*time.Second) // C-01 lo recoge y empieza a llevarlo a la 101
 
@@ -212,7 +218,7 @@ func TestDispatch_DoctorReviewsWithoutTouchingTheModel(t *testing.T) {
 
 func TestDispatch_OnlyADoctorCanReview(t *testing.T) {
 	g := newGame(t)
-	collapse(t, g, "P-001", "Yeimy Padilla", hospital.Severe, "cafetería")
+	collapse(t, g, "P-001", "Yeimy Padilla", hospital.Severe, game.Cafeteria)
 	dispatch(t, g, "P-001", "C-01")
 	tickFor(g, 7*time.Second) // C-01 lo deja en la cama y queda libre
 
@@ -224,8 +230,8 @@ func TestDispatch_OnlyADoctorCanReview(t *testing.T) {
 // Dispatch rechaza lo que no se puede hacer, y al rechazar no cambia nada.
 func TestDispatch_RejectsWhatCannotBeDone(t *testing.T) {
 	g := newGame(t)
-	collapse(t, g, "P-001", "Yeimy Padilla", hospital.Severe, "cafetería")
-	collapse(t, g, "P-002", "Kevin Mercado", hospital.Moderate, "fila de radiología")
+	collapse(t, g, "P-001", "Yeimy Padilla", hospital.Severe, game.Cafeteria)
+	collapse(t, g, "P-002", "Kevin Mercado", hospital.Moderate, game.Radiology)
 	dispatch(t, g, "P-001", "C-01")
 
 	if err := g.Dispatch("P-002", "C-01"); !errors.Is(err, game.ErrStaffBusy) {
@@ -252,7 +258,7 @@ func TestDispatch_RejectsWhatCannotBeDone(t *testing.T) {
 // La pausa también congela al personal: todo avanza dentro de Tick.
 func TestPause_FreezesTheStaff(t *testing.T) {
 	g := newGame(t)
-	collapse(t, g, "P-001", "Yeimy Padilla", hospital.Severe, "cafetería")
+	collapse(t, g, "P-001", "Yeimy Padilla", hospital.Severe, game.Cafeteria)
 	dispatch(t, g, "P-001", "C-01")
 
 	g.Pause()
@@ -272,7 +278,7 @@ func TestPause_FreezesTheStaff(t *testing.T) {
 func TestSnapshot_NoticesAreCopies(t *testing.T) {
 	g := newGame(t)
 	for _, id := range []string{"P-001", "P-002", "P-003", "P-004"} { // P-004 se queda sin cama
-		collapse(t, g, id, "Paciente "+id, hospital.Mild, "cafetería")
+		collapse(t, g, id, "Paciente "+id, hospital.Mild, game.Cafeteria)
 		dispatch(t, g, id, "C-01")
 		tickFor(g, 7*time.Second)
 	}

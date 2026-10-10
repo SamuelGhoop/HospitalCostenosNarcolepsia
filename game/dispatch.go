@@ -135,12 +135,13 @@ func (g *Game) pickUpLocked(s *StaffMember, pt *patient) {
 //
 // Es SOLO lógica del juego: no llama nada del modelo. Tampoco
 // DiagnosePatient, porque llena el cupo de 4 pacientes del médico y el
-// modelo no lo libera nunca. (F1.3 arranca aquí el cronómetro de sueño, con
-// la pericia de s, y F1.4 hace aquí el pago.)
+// modelo no lo libera nunca. Aquí arranca el sueño, que dura según la
+// pericia de s. (F1.4 hace aquí el pago.)
 func (g *Game) reviewLocked(s *StaffMember, pt *patient) {
 	s.job = nil
 	pt.stage = InBed
 	pt.reviewedBy = s
+	pt.timer = sleepDuration(pt.p.Level(), s.skill)
 }
 
 // registerOnCallLocked es el mecanismo "de guardia" (§3.2). Por un momento s
@@ -150,5 +151,5 @@ func (g *Game) reviewLocked(s *StaffMember, pt *patient) {
 func (g *Game) registerOnCallLocked(s *StaffMember, pt *patient) error {
 	s.onCall = true
 	defer func() { s.onCall = false }() // se apaga aunque RegisterEpisode falle
-	return g.h.RegisterEpisode(pt.p, pt.location)
+	return g.h.RegisterEpisode(pt.p, pt.zone.String())
 }
