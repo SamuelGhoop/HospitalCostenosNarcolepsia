@@ -151,13 +151,3 @@ func textWidth(s string, face text.Face) float64 {
 	w, _ := text.Measure(s, face, 0)
 	return w
 }
-
-// label dibuja un rótulo con fondo (letreros, burbujas, IDs) centrado en x.
-// Devuelve el rectángulo que ocupó.
-func label(dst *ebiten.Image, s string, centerX, top int, face text.Face, fg, bg color.Color) image.Rectangle {
-	w := int(textWidth(s, face)) + 4
-	r := image.Rect(centerX-w/2, top, centerX-w/2+w, top+int(face.Metrics().HAscent+face.Metrics().HDescent)+2)
-	panel(dst, r, bg)
-	drawText(dst, s, float64(r.Min.X+2), float64(r.Min.Y+1), face, fg)
-	return r
-}

@@ -8,6 +8,7 @@ import (
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 
 	"github.com/SamuelGhoop/HospitalCostenosNarcolepsia/game"
+	"github.com/SamuelGhoop/HospitalCostenosNarcolepsia/hospital"
 )
 
 // walkSpeed: cuántos píxeles avanza por tick un personaje que cambia de
@@ -17,14 +18,17 @@ const walkSpeed = 3.0
 // DemoScene muestra la demostración de la Sección 6 paso a paso.
 //
 // No decide nada: llama demo.Next() o demo.Skip() y dibuja la foto que
-// devuelve demo.Snapshot(). Lo único propio es la animación (a dónde se
-// desliza cada personaje) y lo que el usuario ve (subtítulos, HUD).
+// devuelve demo.Snapshot(). Lo propio es la animación: a dónde camina cada
+// personaje (la coreografía del paso) y lo que el usuario ve (HUD,
+// subtítulos).
 type DemoScene struct {
 	demo     *game.Demo
 	snap     game.DemoSnapshot
 	figures  []figure
 	pos      map[string]vec          // posición dibujada de cada personaje, por ID
 	anims    map[string]*patientAnim // animación de cada paciente, por ID
+	choreo   *choreography           // coreografía del último paso; nil si no hay o ya terminó
+	carried  string                  // paciente que el último paso pasó del pasillo a una cama
 	auto     autoAdvance
 	showSubs bool
 }
@@ -38,8 +42,8 @@ func NewDemoScene(d *game.Demo) *DemoScene {
 
 // Update lee el teclado y el ratón y avanza la animación.
 //
-//	Espacio o clic: siguiente paso · A: avance automático cada 3 s
-//	S: saltar al final · C: mostrar u ocultar los subtítulos
+//	Espacio o clic: siguiente paso (o adelantar la coreografía en curso)
+//	A: avance automático cada 3 s · S: saltar al final · C: subtítulos
 func (s *DemoScene) Update() (Scene, error) {
 	if inpututil.IsKeyJustPressed(ebiten.KeyC) {
 		s.showSubs = !s.showSubs
@@ -52,43 +56,152 @@ func (s *DemoScene) Update() (Scene, error) {
 			return s, err
 		}
 		s.refresh()
+		s.choreo = nil // al saltar no se reproducen coreografías
 	}
 
-	advance := inpututil.IsKeyJustPressed(ebiten.KeySpace) ||
-		inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft) ||
-		s.auto.tick()
-	if advance {
+	pressed := inpututil.IsKeyJustPressed(ebiten.KeySpace) ||
+		inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft)
+	switch {
+	case s.choreo != nil && pressed:
+		s.finishChoreography() // adelanta: cada uno queda en su sitio final
+	case pressed || (s.choreo == nil && s.auto.tick()): // el automático cuenta cuando termina la coreografía
 		if s.demo.Done() {
 			return NewReportScene(s.demo.Report()), nil // fin: Shift Report
 		}
-		if _, err := s.demo.Next(); err != nil {
+		if err := s.advance(); err != nil {
 			return s, err // error inesperado: el escenario está hecho para no fallar
 		}
 		s.auto.reset()
-		s.refresh()
 	}
 
-	// Cada personaje se desliza un poco hacia su puesto en cada tick, y la
-	// animación de cada paciente avanza según cuánto se movió.
-	for _, f := range s.figures {
-		old := s.pos[f.id]
-		now := moveToward(old, f.target, walkSpeed)
-		s.pos[f.id] = now
-		if a, ok := s.anims[f.id]; ok {
-			a.step(now.x-old.x, now.y-old.y, f.room != 0)
-		}
-	}
+	s.animate()
 	return s, nil
 }
 
-// refresh pide una foto nueva a la demo y recalcula el puesto de cada
-// personaje: en su cama si tiene habitación; de pie al lado de la cama si
-// está despierto en una habitación; si no, en la zona de su ubicación
-// (zoneFor), uno al lado del otro.
+// advance da el siguiente paso de la demo y arma su coreografía.
+func (s *DemoScene) advance() error {
+	step, err := s.demo.Next()
+	if err != nil {
+		return err
+	}
+	s.refresh()
+	s.choreo = s.choreographyFor(step)
+	return nil
+}
+
+// animate hace un tick de animación: cada personaje se desliza hacia su
+// destino (el de la coreografía si lo hay; si no, su puesto final), la
+// animación de cada paciente avanza según cuánto se movió, y la
+// coreografía pasa a la siguiente fase cuando todos llegaron.
+func (s *DemoScene) animate() {
+	for _, f := range s.figures {
+		old := s.pos[f.id]
+		now := moveToward(old, s.destination(f), walkSpeed)
+		s.pos[f.id] = now
+		if a, ok := s.anims[f.id]; ok {
+			a.step(now.x-old.x, now.y-old.y, s.onBed(f))
+		}
+	}
+
+	if s.choreo == nil {
+		return
+	}
+	s.choreo.step(
+		func(id string) bool { // ¿ya llegó?
+			f, _ := s.figure(id)
+			return s.pos[id] == s.destination(f)
+		},
+		func(id string) bool { // ¿ya está acostado?
+			a, ok := s.anims[id]
+			return ok && a.showsBubble()
+		},
+	)
+	if s.choreo.done() {
+		s.choreo = nil
+	}
+}
+
+// destination es a dónde tiene que caminar un personaje ahora mismo.
+func (s *DemoScene) destination(f figure) vec {
+	if s.choreo != nil {
+		if to, ok := s.choreo.target(f.id); ok {
+			return to
+		}
+	}
+	return f.target
+}
+
+// onBed dice si un paciente ya está SOBRE su cama (no solo asignada: la
+// cama se asigna en el modelo antes de que lo terminen de llevar).
+func (s *DemoScene) onBed(f figure) bool {
+	return f.room != 0 && s.pos[f.id] == bedCell(roomZone(f.room))
+}
+
+// figure busca un personaje por ID.
+func (s *DemoScene) figure(id string) (figure, bool) {
+	for _, f := range s.figures {
+		if f.id == id {
+			return f, true
+		}
+	}
+	return figure{}, false
+}
+
+// finishChoreography adelanta la coreografía en curso: cada personaje
+// queda de una vez en su puesto final, con su animación de reposo.
+func (s *DemoScene) finishChoreography() {
+	s.choreo = nil
+	for _, f := range s.figures {
+		s.pos[f.id] = f.target
+		if a, ok := s.anims[f.id]; ok {
+			a.settle(s.onBed(f))
+		}
+	}
+}
+
+// choreographyFor arma la coreografía del paso que se acaba de dar:
+//
+//   - pasos 5–8 (crearon un episodio): quien lo atendió, según el modelo,
+//     camina hasta el paciente y lo lleva a su cama, o lo acompaña si no hubo;
+//   - paso 11 (un paciente pasó del pasillo a una cama): lo lleva el camillero.
+func (s *DemoScene) choreographyFor(step game.DemoStep) *choreography {
+	if e := step.Episode; e != nil {
+		patient, okP := s.figure(e.PatientID)
+		attender, okA := s.figure(e.AttendedByID)
+		if !okP || !okA {
+			return nil
+		}
+		attackAt := patient.target // sin cama: el puesto del piso donde se va a quedar
+		if e.Room != 0 {
+			attackAt = toVec(floorSpot(zoneFor(e.Location), 0)) // con cama: se desploma donde le dio el ataque
+		}
+		return attendChoreography(patient.id, attender.id, attackAt, attender.target, roomZone(e.Room), e.Room != 0)
+	}
+
+	if s.carried != "" {
+		patient, _ := s.figure(s.carried)
+		for _, f := range s.figures {
+			if !f.patient && !f.doctor { // el camillero
+				return carryChoreography(patient.id, f.id, s.pos[patient.id], f.target, roomZone(patient.room))
+			}
+		}
+	}
+	return nil
+}
+
+// refresh pide una foto nueva a la demo y recalcula el puesto FINAL de
+// cada personaje:
+//
+//   - con cama: acostado en su cama;
+//   - dormido sin cama: en un puesto del piso, en la parte de abajo de su zona;
+//   - despierto en una habitación: de pie a la izquierda de la cama;
+//   - despierto en otra zona: en la fila de arriba, uno al lado del otro.
 func (s *DemoScene) refresh() {
 	s.snap = s.demo.Snapshot()
 	s.figures = s.figures[:0]
-	used := map[zone]int{} // cuántos puestos van ocupados en cada zona
+	s.carried = ""
+	standing := map[zone]int{} // puestos de pie usados en cada zona
+	lying := map[zone]int{}    // puestos de piso usados en cada zona
 
 	for _, p := range s.snap.Patients {
 		f := figure{id: p.ID, patient: true, state: p.State, level: p.Level, room: p.Room}
@@ -97,12 +210,15 @@ func (s *DemoScene) refresh() {
 		switch {
 		case p.Room != 0:
 			f.target = bedCell(roomZone(p.Room))
-		case inRoomZone && used[z] == 0:
-			f.target = toVec(besideBed(z)) // se despertó en su habitación: de pie al lado de la cama
-			used[z]++
+		case p.State != hospital.Awake:
+			f.target = toVec(floorSpot(z, lying[z]))
+			lying[z]++
+		case inRoomZone && standing[z] == 0:
+			f.target = toVec(wakeSpot(z)) // se despertó en su habitación
+			standing[z]++
 		default:
-			f.target = toVec(slot(z, used[z]))
-			used[z]++
+			f.target = toVec(slot(z, standing[z]))
+			standing[z]++
 		}
 
 		a, seen := s.anims[p.ID]
@@ -111,8 +227,12 @@ func (s *DemoScene) refresh() {
 			s.anims[p.ID] = a
 			s.pos[p.ID] = toVec(entrance) // los pacientes nuevos entran desde la acera
 		}
+		was := a.state
 		if leftBed := a.observe(p.State, p.Room); leftBed {
 			s.pos[p.ID] = f.target // se levanta y queda de una al lado de la cama, sin deslizarse
+		}
+		if was == hospital.AsleepInHallway && p.State == hospital.AsleepInBed {
+			s.carried = p.ID // pasó del pasillo a una cama (paso 11)
 		}
 		s.figures = append(s.figures, f)
 	}
@@ -126,13 +246,34 @@ func (s *DemoScene) refresh() {
 	}
 }
 
-// Draw dibuja el mapa, las camas, los personajes, el HUD y los subtítulos.
+// Draw dibuja por capas: mapa → colchones → personajes → cobijas →
+// rótulos (letreros, burbujas, etiquetas) → HUD y subtítulos.
 func (s *DemoScene) Draw(screen *ebiten.Image) {
 	drawMap(screen)
-	drawRooms(screen, s.snap.Rooms)
+	drawBeds(screen, s.snap.Rooms)
+
+	lyingIn := map[int]bool{} // habitaciones con alguien ya acostado en la cama
 	for _, f := range s.figures {
-		drawFigure(screen, f, s.pos[f.id], s.anims[f.id]) // anims[id] es nil para el personal
+		drawFigureBody(screen, f, s.pos[f.id], s.anims[f.id]) // anims[id] es nil para el personal
+		if f.patient && s.onBed(f) {
+			lyingIn[f.room] = true
+		}
 	}
+	drawBlankets(screen, s.snap.Rooms, lyingIn)
+
+	for _, o := range roomBadges(s.snap.Rooms) {
+		drawOverlay(screen, o)
+	}
+	for _, f := range s.figures {
+		showBubble := false
+		if a, ok := s.anims[f.id]; ok {
+			showBubble = a.showsBubble()
+		}
+		for _, o := range figureOverlays(f, s.pos[f.id], showBubble) {
+			drawOverlay(screen, o)
+		}
+	}
+
 	s.drawHUD(screen)
 	if s.showSubs {
 		s.drawSubtitles(screen)

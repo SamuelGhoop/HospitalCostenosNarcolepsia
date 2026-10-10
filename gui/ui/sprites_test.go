@@ -134,7 +134,7 @@ func TestSpritePlacement_InBedTheHeadPointsToTheHeadboard(t *testing.T) {
 // (rotado) y desde el cuadro 2 (sentado) va de pie al lado, sin rotar.
 func TestSpritePlacement_WakeUpStartsInBedThenStandsBesideIt(t *testing.T) {
 	bed := bedRect(zoneRoom101)
-	beside := toVec(besideBed(zoneRoom101))
+	beside := toVec(wakeSpot(zoneRoom101))
 
 	g, rotated := spritePlacement(animWakeUp, 0, bed, true, beside, false)
 	x, y := g.Apply(8, 12)
@@ -150,10 +150,14 @@ func TestSpritePlacement_WakeUpStartsInBedThenStandsBesideIt(t *testing.T) {
 		}
 	}
 
-	// "Al lado" de verdad: el cuadro de pie no se monta sobre la cama.
-	p := besideBed(zoneRoom101)
+	// "Al lado" de verdad: el cuadro de pie no se monta sobre la cama, y
+	// queda a la IZQUIERDA (la derecha es para la etiqueta del que esté en cama).
+	p := wakeSpot(zoneRoom101)
 	if image.Rect(p.X, p.Y, p.X+cellWidth, p.Y+cellHeight).Overlaps(bed) {
 		t.Errorf("el puesto al lado de la cama %v se monta sobre la cama %v", p, bed)
+	}
+	if p.X+cellWidth > bed.Min.X {
+		t.Errorf("el que se despierta debe quedar a la izquierda de la cama: x=%d, cama desde x=%d", p.X, bed.Min.X)
 	}
 }
 

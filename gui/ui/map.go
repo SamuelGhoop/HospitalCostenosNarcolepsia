@@ -2,12 +2,10 @@ package ui
 
 import (
 	"image"
-	"strings"
 
 	"github.com/hajimehoshi/ebiten/v2"
 
 	"github.com/SamuelGhoop/HospitalCostenosNarcolepsia/game"
-	"github.com/SamuelGhoop/HospitalCostenosNarcolepsia/hospital"
 )
 
 // drawMap dibuja el hospital vacío siguiendo hospital.dc.html: arena,
@@ -46,40 +44,39 @@ func drawMap(dst *ebiten.Image) {
 	// Puerta principal entre la recepción y la acera.
 	fillRect(dst, fromMockup(199, 178, 30, 4), colMuted)
 
-	// Rótulos: abajo a la izquierda de cada zona (donde no estorban las
-	// camas ni los personajes), salvo el pasillo 1, que es muy bajito.
+	// Rótulo de cada zona, en el sitio que calcula zoneLabelBox (el mismo
+	// que revisa el test de rótulos sin solaparse).
 	for _, z := range zoneOrder {
-		info := zones[z]
-		y := info.rect.Max.Y - 10
-		if z == zoneHallway1 {
-			y = info.rect.Min.Y + 2
-		}
-		drawText(dst, info.label, float64(info.rect.Min.X+3), float64(y), smallFace, colInk)
+		box := zoneLabelBox(z)
+		drawText(dst, zones[z].label, float64(box.Min.X+2), float64(box.Min.Y+1), smallFace, colInk)
 	}
 }
 
-// drawRooms dibuja la cama de cada habitación y su letrero de estado,
-// centrado sobre el borde de abajo como en la maqueta. El texto del
-// letrero sale del String() del modelo ("ocupada", "disponible").
-func drawRooms(dst *ebiten.Image, rooms []game.RoomView) {
-	for _, r := range rooms {
-		z := roomZone(r.Number)
-		bed := bedRect(z)
+// La cama se dibuja en dos capas para que el paciente se vea arropado:
+//
+//	drawBeds (colchón y almohada) → el paciente → drawBlankets (la cobija)
 
+// drawBeds dibuja la primera capa de cada cama: colchón, cabecera y almohada.
+func drawBeds(dst *ebiten.Image, rooms []game.RoomView) {
+	for _, r := range rooms {
+		bed := bedRect(roomZone(r.Number))
 		panel(dst, bed, colPaper)                                                                // colchón
 		fillRect(dst, image.Rect(bed.Min.X, bed.Min.Y, bed.Max.X, bed.Min.Y+4), colMetal)        // cabecera
 		fillRect(dst, image.Rect(bed.Min.X+2, bed.Min.Y+6, bed.Max.X-2, bed.Min.Y+12), colWhite) // almohada
-		blanketTop := bed.Min.Y + 24
-		if len(r.Occupants) > 0 {
-			blanketTop = bed.Min.Y + 14 // ocupada: la cobija sube
-		}
-		fillRect(dst, image.Rect(bed.Min.X+1, blanketTop, bed.Max.X-1, bed.Max.Y-1), colBlue)
+	}
+}
 
-		bg := colBadgeAvailable
-		if r.State == hospital.Occupied {
-			bg = colBadgeOccupied
+// drawBlankets dibuja la cobija ENCIMA del paciente. Si alguien está
+// acostado en esa cama (lyingIn[número]), la cobija le tapa la mitad de
+// abajo; si no, queda doblada al pie de la cama.
+func drawBlankets(dst *ebiten.Image, rooms []game.RoomView, lyingIn map[int]bool) {
+	for _, r := range rooms {
+		bed := bedRect(roomZone(r.Number))
+		top := bed.Min.Y + 24 // doblada al pie
+		if lyingIn[r.Number] {
+			top = bed.Min.Y + 12 // el paciente rotado ocupa de +4 a +20: le tapa de +12 hacia abajo
 		}
-		room := zones[z].rect
-		label(dst, strings.ToUpper(r.State.String()), room.Min.X+room.Dx()/2, room.Max.Y-5, smallFace, colWhite, bg)
+		fillRect(dst, image.Rect(bed.Min.X+1, top, bed.Max.X-1, bed.Max.Y-1), colBlue)
+		fillRect(dst, image.Rect(bed.Min.X+1, top, bed.Max.X-1, top+2), colLightBlue) // el doblez de la sábana
 	}
 }

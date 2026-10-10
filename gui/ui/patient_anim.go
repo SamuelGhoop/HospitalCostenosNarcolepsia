@@ -45,10 +45,10 @@ func (a *patientAnim) observe(state hospital.PatientState, room int) (leftBed bo
 	}
 
 	switch {
-	case was == hospital.Awake && state == hospital.AsleepInBed:
-		a.set(animCollapse) // se desploma y lo llevan cargado a su cama
-	case was == hospital.Awake && state == hospital.AsleepInHallway:
-		a.pendingCollapse = true // camina hasta donde le dio el ataque y ahí se desploma
+	case was == hospital.Awake && state != hospital.Awake:
+		// Camina hasta donde le dio el ataque y ahí se desploma. Si le tocó
+		// cama, después lo llevan cargado (lo dirige la coreografía).
+		a.pendingCollapse = true
 	case was != hospital.Awake && state == hospital.Awake:
 		a.set(animWakeUp)
 		leftBed = was == hospital.AsleepInBed
@@ -56,8 +56,27 @@ func (a *patientAnim) observe(state hospital.PatientState, room int) (leftBed bo
 	return leftBed
 }
 
+// settle deja al paciente de una vez en la animación de reposo de su estado.
+// Se usa cuando el usuario adelanta la coreografía. Si se estaba despertando
+// o saludando, lo deja terminar.
+func (a *patientAnim) settle(inBed bool) {
+	a.pendingCollapse = false
+	a.flip = false
+	switch {
+	case a.state != hospital.Awake && inBed:
+		a.set(animSleepBed)
+	case a.state != hospital.Awake:
+		a.set(animSleepFloor)
+	case a.anim == animWakeUp || a.anim == animWave:
+		// que termine de despertarse y de saludar
+	default:
+		a.set(animIdle)
+	}
+}
+
 // step avanza un tick. dx, dy es cuánto se movió el paciente en este tick;
-// inBed dice si el modelo le tiene asignada una cama.
+// inBed dice si ya está sobre su cama (no solo si el modelo se la asignó:
+// mientras lo cargan hacia ella todavía no lo está).
 func (a *patientAnim) step(dx, dy float64, inBed bool) {
 	a.ticks++
 	moving := dx != 0 || dy != 0

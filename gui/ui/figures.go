@@ -18,14 +18,15 @@ type figure struct {
 	state   hospital.PatientState
 	level   hospital.NarcolepsyLevel
 	room    int // habitación con cama asignada en el modelo; 0 = ninguna
-	target  vec // puesto al que tiene que llegar
+	target  vec // puesto final según la foto del modelo (sin coreografía)
 }
 
-// drawFigure dibuja un personaje en su cuadro de 16×24 con esquina en at.
+// drawFigureBody dibuja el cuerpo de un personaje en su cuadro de 16×24
+// con esquina en at. Los rótulos (burbuja, etiqueta…) van aparte, en
+// figureOverlays, porque se dibujan encima de todo (incluida la cobija).
 // anim es la animación del paciente (nil para el personal).
-func drawFigure(dst *ebiten.Image, f figure, at vec, anim *patientAnim) {
+func drawFigureBody(dst *ebiten.Image, f figure, at vec, anim *patientAnim) {
 	x, y := int(math.Round(at.x)), int(math.Round(at.y))
-
 	switch {
 	case f.patient:
 		drawPatientSprite(dst, f, at, anim)
@@ -34,24 +35,6 @@ func drawFigure(dst *ebiten.Image, f figure, at vec, anim *patientAnim) {
 	default:
 		drawStanding(dst, x, y, colGreen, colGreenDark) // uniforme verde del camillero
 	}
-
-	if f.patient {
-		// Dormido y ya acostado: burbuja Zzz encima del cuadro y "rayitos" de nivel.
-		if txt, bg, ok := bubbleFor(f.state); ok && anim.showsBubble() {
-			bubble := label(dst, txt, x+cellWidth/2, y-10, smallFace, colWhite, bg)
-			c, n := levelStyle(f.level)
-			for i := 0; i < n; i++ {
-				bolt := image.Rect(bubble.Max.X+2+i*4, bubble.Min.Y+2, bubble.Max.X+5+i*4, bubble.Max.Y-2)
-				panel(dst, bolt, c)
-			}
-		}
-	} else {
-		// Punto verde = libre. En la demo el personal nunca queda ocupado.
-		panel(dst, image.Rect(x+6, y-5, x+10, y-1), colGreen)
-	}
-
-	// En la demo los IDs se muestran siempre, para seguir los subtítulos.
-	label(dst, f.id, x+cellWidth/2, y+cellHeight+1, smallFace, colInk, colPaper)
 }
 
 // drawPatientSprite dibuja el cuadro actual de la animación del paciente
@@ -83,13 +66,6 @@ func drawStanding(dst *ebiten.Image, x, y int, body, legs color.RGBA) {
 	fillRect(dst, image.Rect(x+4, y+3, x+12, y+9), colSkin) // cabeza
 	fillRect(dst, image.Rect(x+4, y+10, x+12, y+17), body)  // tronco
 	fillRect(dst, image.Rect(x+4, y+18, x+12, y+22), legs)  // piernas
-}
-
-// bedCell es el cuadro de 16×24 del paciente acostado en la cama de una
-// habitación: centrado sobre la cama.
-func bedCell(room zone) vec {
-	bed := bedRect(room)
-	return vec{float64(bed.Min.X + (bed.Dx()-cellWidth)/2), float64(bed.Min.Y + 4)}
 }
 
 // toVec convierte un punto entero de la pantalla en un vec.

@@ -16,17 +16,25 @@ func stepN(a *patientAnim, n int, dx, dy float64, inBed bool) {
 // ticksOf: cuánto dura completa una animación que no se repite.
 func ticksOf(an animation) int { return animSpecs[an].frames * animSpecs[an].ticksPerFrame }
 
-// Se duerme y le toca cama (pasos 5–7 de la demo): se desploma, lo llevan
-// cargado (dormido en el piso, sin rotar) y al llegar queda dormido en cama.
+// Se duerme y le toca cama (pasos 5–7 de la demo): camina hasta donde le
+// dio el ataque, se desploma ahí, lo llevan cargado (dormido en el piso, sin
+// rotar) y al llegar a la cama queda dormido en cama.
 func TestPatientAnim_FallsAsleepAndIsCarriedToBed(t *testing.T) {
 	a := &patientAnim{state: hospital.Awake, anim: animIdle}
 
 	a.observe(hospital.AsleepInBed, 101)
-	if a.anim != animCollapse {
-		t.Fatalf("al dormirse: animación %d; se esperaba desplomarse", a.anim)
+	stepN(a, 5, -3, 1, false) // camina hacia la cafetería
+	if a.anim != animWalkLeft {
+		t.Fatalf("antes del desplome: animación %d; se esperaba caminar", a.anim)
 	}
 
-	stepN(a, ticksOf(animCollapse), 2, -2, true) // se mueve: lo van cargando
+	stepN(a, 1, 0, 0, false) // llegó al sitio del ataque
+	if a.anim != animCollapse {
+		t.Fatalf("al llegar: animación %d; se esperaba desplomarse", a.anim)
+	}
+
+	stepN(a, ticksOf(animCollapse), 0, 0, false) // se desplomó y espera
+	stepN(a, 3, 2, -2, false)                    // ya lo van cargando
 	if a.anim != animSleepFloor {
 		t.Errorf("mientras lo cargan: animación %d; se esperaba dormido en el piso", a.anim)
 	}
@@ -56,6 +64,31 @@ func TestPatientAnim_WithoutBedWalksFirstThenCollapses(t *testing.T) {
 	stepN(a, ticksOf(animCollapse), 0, 0, false)
 	if a.anim != animSleepFloor {
 		t.Errorf("después de desplomarse: animación %d; se esperaba dormido en el piso", a.anim)
+	}
+}
+
+// Si el usuario adelanta la coreografía (Espacio), cada paciente salta a la
+// animación de reposo de su estado.
+func TestPatientAnim_SettleJumpsToTheRestingAnimation(t *testing.T) {
+	inBed := &patientAnim{state: hospital.Awake, anim: animIdle}
+	inBed.observe(hospital.AsleepInBed, 101) // iba caminando al sitio del ataque
+	inBed.settle(true)
+	if inBed.anim != animSleepBed || inBed.pendingCollapse {
+		t.Errorf("en cama: (animación %d, pendiente %v); se esperaba dormido en cama", inBed.anim, inBed.pendingCollapse)
+	}
+
+	floor := &patientAnim{state: hospital.Awake, anim: animIdle}
+	floor.observe(hospital.AsleepInHallway, 0)
+	floor.settle(false)
+	if floor.anim != animSleepFloor {
+		t.Errorf("en el piso: animación %d; se esperaba dormido en el piso", floor.anim)
+	}
+
+	waking := &patientAnim{state: hospital.AsleepInBed, room: 101, anim: animSleepBed}
+	waking.observe(hospital.Awake, 0)
+	waking.settle(false)
+	if waking.anim != animWakeUp {
+		t.Errorf("despertándose: animación %d; debe dejarlo terminar de despertarse y saludar", waking.anim)
 	}
 }
 

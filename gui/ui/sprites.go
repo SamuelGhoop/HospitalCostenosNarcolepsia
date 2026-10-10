@@ -126,13 +126,6 @@ func spritePlacement(a animation, frame int, bed image.Rectangle, hasBed bool, a
 	return g, false
 }
 
-// besideBed es el puesto de pie al lado de la cama de una habitación: a
-// la derecha de la cama, a la altura de la almohada.
-func besideBed(room zone) image.Point {
-	bed := bedRect(room)
-	return image.Pt(bed.Max.X+2, bed.Min.Y+6)
-}
-
 // decodePNG lee un PNG de un sistema de archivos (por ejemplo, el embebido).
 func decodePNG(fsys fs.FS, path string) (image.Image, error) {
 	f, err := fsys.Open(path)
