@@ -106,7 +106,7 @@ func (s *StaffMember) IsAvailable() bool { return s.onCall }
 - Todo el personal del modo juego se contrata con `HireStaff(staffMember)`. **Invariante: en el hospital del juego no hay ningún Attender sin envolver.** Un `Orderly` suelto devuelve siempre `IsAvailable() == true` y se robaría los despachos. Un test lo verifica.
 - Como `HireStaff` solo registra como médico a un `*hospital.Doctor` real, **los médicos envueltos no aparecen en `Doctors()`**. `Game` guarda su propia lista de `StaffMember` y usa `doctor.MyEpisodes()` para la consulta 5.2.
 - Los registros del historial muestran al Doctor/Orderly real como quien atendió, porque `Attend` se delega.
-- El `IsAvailable` del decorador **ya ignora** el cupo de 4 pacientes del médico: el `IsAvailable` del Doctor interno nunca se consulta. El juego no llama `DiagnosePatient` porque no hay diagnóstico en el modo juego, y por eso en sus registros `TreatingDoctor()` queda vacío ("sin tratante").
+- El `IsAvailable` del decorador **ya ignora** el cupo de 4 pacientes del médico: el `IsAvailable` del Doctor interno nunca se consulta. El juego no llama `DiagnosePatient`: la revisión del médico (5.5) es solo lógica del juego, porque `DiagnosePatient` llena ese cupo y el modelo no lo libera nunca. Por eso en sus registros `TreatingDoctor()` queda vacío ("sin tratante").
 - ⚠️ `IsAvailable`, `Attend`, `ID` y `Name` se llaman desde adentro de los métodos del hospital, con su candado tomado y mientras `Game` ya tiene el suyo. **Nunca deben tomar el mutex de `Game`** (sería un deadlock). El orden de candados siempre es `g.mu` → `h.mu`.
 
 ### 3.2 Despacho elegido por el jugador ("de guardia")
@@ -129,10 +129,12 @@ Cuando el despacho crea un episodio, `game/` guarda la **hora del juego** en un 
 | Crear el hospital y las habitaciones | `NewHospital`, `AddRoom(n, 1)` |
 | Contratar personal | `NewDoctor` / `NewOrderly` + `HireStaff(&StaffMember{...})` |
 | Llega un costeño | `NewPatient` + `AdmitPatient` |
-| El personal llega donde el paciente dormido | `RegisterEpisode(p, zona)` con el mecanismo "de guardia" |
+| El camillero (o un médico) recoge al paciente dormido | `RegisterEpisode(p, zona)` con el mecanismo "de guardia" |
 | Saber si consiguió cama | `p.Room()` después de `RegisterEpisode` (nil = se queda en el pasillo) |
 | Triaje: darle una cama libre a alguien del pasillo | `AssignRoom(p)`; su error se muestra como aviso |
+| El médico revisa al paciente en la habitación | **Ninguna**: es solo lógica del juego (5.5) |
 | Termina el sueño o el jugador lo despierta | `WakePatient(p)` (libera la cama) |
+| Se va enojado desde el pasillo o esperando revisión | `WakePatient(p)`. Si estaba `Collapsed`, ninguna (sección 3.4) |
 | Alerta de pasillo / consulta 5.1 | `PatientsInHallway()` |
 | Consulta 5.2 | `doctor.MyEpisodes()` de cada médico |
 | Consulta 5.3 | `Rooms()` + el último error de `AssignRoom` |
@@ -145,15 +147,17 @@ Cuando el despacho crea un episodio, `game/` guarda la **hora del juego** en un 
 | Momento | Estado en `game/` | Estado en el modelo |
 |---|---|---|
 | Despierto, deambulando | `Walking` / `Idle` | `Awake` |
-| Le dio el ataque y nadie lo ha atendido | `Collapsed` (en el piso, con cronómetro) | `Awake` (el hospital aún no se ha enterado) |
-| Atendido y con cama | `InBed` | `AsleepInBed` |
-| Atendido pero sin cama | `InHallway` | `AsleepInHallway` |
+| Le dio el ataque y nadie lo ha recogido | `Collapsed` (en el piso, con cronómetro de espera) | `Awake` (el hospital aún no se ha enterado) |
+| Recogido y con cama, sin revisar | `AwaitingReview` ("esperando revisión") | `AsleepInBed` |
+| Revisado por un médico | `InBed` (con cronómetro de sueño) | `AsleepInBed` |
+| Recogido pero sin cama | `InHallway` | `AsleepInHallway` |
 | Se fue de alta | `Discharged` (sale del mapa) | `Awake` (sigue en la lista; el modelo no tiene alta) |
+| Se cansó de esperar | `LeftAngry` (sale del mapa) | `Awake`: si estaba `Collapsed` nunca se durmió en el modelo; si no, el juego llamó `WakePatient` |
 
-- El episodio entra al historial cuando alguien lo atiende: "un episodio existe en el sistema cuando el personal lo reporta".
-- Para el colapso y la reputación cuentan los `Collapsed` **y** los `InHallway`.
-- **Los `Collapsed` y los `InHallway` no se despiertan solos.** El `Collapsed` espera a que alguien lo atienda y el `InHallway`, a que le den cama. Solo un evento que lo diga explícitamente puede despertarlos. Mientras esperan corren las penalizaciones de reputación de 5.9. Si el juego queda muy difícil, se balancea con `config.go` (intervalo de llegadas, duración del sueño en cama), sin cambiar esta regla.
-- Los dados de alta siguen en el modelo como `Awake`, así que `SevereReport()` los incluye; el Shift Report los marca "(alta)".
+- El episodio entra al historial cuando el personal **lo recoge** (`RegisterEpisode`): "un episodio existe en el sistema cuando el personal lo reporta". La revisión del médico es solo del juego y no toca el modelo (sección 5.5).
+- Para la reputación cuentan los `Collapsed`, los `InHallway` y los que esperan revisión (5.9). Para la derrota por colapso cuentan **solo** los `Collapsed` y los `InHallway` (5.10).
+- **Nadie espera para siempre.** Si a los **45 s** del desplome nadie lo ha revisado, el paciente se despierta solo y se va enojado (5.4). Si estaba `Collapsed`, el modelo nunca se enteró: no se llama `WakePatient` y no queda episodio. Si estaba `InHallway` o esperando revisión, se llama `WakePatient` (libera la cama si tenía). *(Reemplaza la regla anterior "los `Collapsed` y los `InHallway` no se despiertan solos", 2026-10-10.)*
+- Los dados de alta y los que se fueron enojados siguen en el modelo como `Awake`, así que `SevereReport()` puede incluirlos; el Shift Report los marca "(alta)" o "(se fue enojado)".
 
 ---
 
@@ -210,36 +214,51 @@ La demo es un **tipo aparte**, `game.Demo`, con métodos `Next()`, `Skip()`, `Sn
 ### 5.4 Comportamiento del paciente
 - Despierto, deambula cada **10–20 s** entre Lobby, Cafetería, Hallway 1, Hallway 2 y Radiología.
 - Tiempo despierto antes del ataque: **Mild 60–90 s**, **Moderate 35–55 s**, **Severe 15–30 s**.
-- ~2 s antes del ataque hace la animación de aviso (cabeceo) y luego se desploma: estado `Collapsed`, arranca su **cronómetro de pasillo**.
-- Duración del sueño en cama: **Mild 15 s**, **Moderate 22 s**, **Severe 30 s**; si lo atendió un médico, −8 % por punto de pericia. Al cumplirse, el juego llama `WakePatient`. El cronómetro de sueño arranca **cuando consigue cama**: el que está en el pasillo sigue dormido hasta que se la den (sección 3.4).
+- ~2 s antes del ataque hace la animación de aviso (cabeceo) y luego se desploma: estado `Collapsed`, arranca su **cronómetro de espera**. Es uno solo por episodio: sigue corriendo mientras está `Collapsed`, `InHallway` o esperando revisión, y se detiene con la revisión del médico. De él salen el pago (5.8), la reputación (5.9) y el enojo (abajo).
+- Duración del sueño en cama: **Mild 15 s**, **Moderate 22 s**, **Severe 30 s**, con −8 % por punto de pericia **del médico que lo revisó**. El cronómetro de sueño arranca **con la revisión** (5.5), no al llegar a la cama: el que espera revisión o está en el pasillo sigue dormido. Al cumplirse, el juego llama `WakePatient`.
+- **Se va enojado**: si a los **45 s** del desplome nadie lo ha revisado, se despierta solo y sale del mapa caminando por la puerta del lobby: **−0,5 ★** y **$0**, además de las penalizaciones de espera que ya corrían (5.9). Qué se le dice al modelo depende de dónde estaba (sección 3.4). Si alguien del personal iba en camino hacia él, ese despacho se cancela (5.5). En el Shift Report sale marcado "(se fue enojado)".
 - **Alta**: al despertar después de **1 / 2 / 3** episodios atendidos (Mild / Moderate / Severe), sale caminando por la puerta.
 
 ### 5.5 Despacho (decisión del jugador)
-1. Clic en un paciente `Collapsed` y luego en un miembro del personal libre.
-2. El personal camina **(8 − rapidez) s** hasta el paciente (de 3 a 7 s); queda `busy`.
-3. Al llegar, el juego hace el despacho "de guardia" (sección 3.2):
-   - **Con cama**: lo lleva a la habitación (animación de 2 s) y luego queda libre.
-   - **Sin cama**: el paciente queda `InHallway`, aviso rojo "sin cama disponible" y el personal queda libre.
-4. Pago: atendido por médico **$300**, por camillero **$150**.
-5. Si el paciente se despertó antes de que llegara el personal (eventos), el despacho se cancela sin llamar al modelo. Como solo un evento puede despertar a un `Collapsed` (sección 3.4), esta cancelación se implementa en F5, junto con los eventos.
+Cada episodio necesita dos despachos: primero alguien **recoge** al paciente y después un médico lo **revisa** en la habitación. En los dos el personal camina **(8 − rapidez) s** (de 3 a 7 s) y queda `busy` hasta terminar.
+
+**Recoger**
+1. Clic en un paciente `Collapsed` y luego en un **camillero** libre. Si no hay ningún camillero libre, también se puede mandar a un **médico** libre; así la consulta 5.2 (`MyEpisodes`) sigue teniendo datos.
+2. El personal camina hasta el paciente, lo carga y **ahí** se hace el despacho "de guardia" con `RegisterEpisode` (sección 3.2):
+   - **Con cama**: lo lleva a la habitación (animación de 2 s) y queda libre. El paciente queda **esperando revisión** (en el modelo, `AsleepInBed`).
+   - **Sin cama**: el paciente queda `InHallway`, sale el aviso rojo "sin cama disponible" y el personal queda libre.
+
+**Revisar**
+3. Clic en un paciente que espera revisión y luego en un **médico** libre. El médico camina hasta la habitación, lo revisa (animación *atender*) y ahí arranca el cronómetro de sueño, con la pericia de ese médico (5.4).
+4. La revisión es **solo lógica del juego: no llama nada del modelo**. Tampoco llama `DiagnosePatient`, porque llena el cupo de 4 pacientes del médico y el modelo no lo libera nunca.
+5. **Pago**: uno solo por episodio, en la revisión (5.8).
+
+**Cancelación**
+6. Si el paciente se va enojado (5.4) mientras alguien del personal va en camino hacia él, el despacho se cancela **sin llamar al modelo** y ese miembro del personal queda libre. *(Antes estaba en F5 con los eventos; pasa a F1.3.)*
+
+La demo no cambia: sigue el round-robin real de la Sección 6 (sección 4).
 
 ### 5.6 Triaje de camas
 - Cuando una cama se libera, el letrero de la habitación parpadea en verde.
-- Clic en un paciente `InHallway` → el juego llama `AssignRoom(p)`. Si no hay cama, el error del modelo se muestra como aviso.
+- Clic en un paciente `InHallway` → el juego llama `AssignRoom(p)`. Si no hay cama, el error del modelo se muestra como aviso. Al recibir la cama queda **esperando revisión** (5.5).
 - Si nadie decide en **10 s**, la cama se le da automáticamente a quien lleve más tiempo en el pasillo.
 
 ### 5.7 Despertar antes de tiempo
 - Clic derecho sobre un paciente en cama → **DESPERTAR**: `WakePatient(p)` libera la cama al instante. Cuesta **−0,25 estrellas** y ese paciente vuelve a dormirse en la mitad del tiempo normal.
 
 ### 5.8 Economía
-- Ingresos: $300 (médico) / $150 (camillero) por atención; alta **+$200**.
+- **Pago por episodio**: uno solo, **en la revisión** del médico (5.5). Depende de los segundos que pasaron desde el desplome hasta la revisión: **$450** hasta 15 s; después **−$15 por cada segundo completo**, con mínimo **$100**. Ejemplos: a los 10 s paga $450; a los 25 s, $300; a los 60 s, $100. *(Reemplaza los $300/$150 por atención, 2026-10-10.)*
+- El que se va enojado no paga: **$0**.
+- Alta: **+$200**.
 - Nómina a las 20:00. Médico: `250 + 50 × (rapidez + pericia)`; camillero: `120 + 60 × rapidez`.
 - Contratar cuesta un día de salario por adelantado.
 - (Opcional, fase final) **Ampliar**: comprar la habitación 104 por $2.500 con `AddRoom`.
 
 ### 5.9 Reputación (0–5)
-- Más de **20 s** `Collapsed` o `InHallway`: **−0,5**, y luego **−0,25** cada 10 s más. Corre para los dos estados mientras esperan.
-- Atendido en menos de **10 s** desde el ataque: **+0,1**. Alta: **+0,1**. Tope 5.
+- Más de **20 s** de espera (`Collapsed`, `InHallway` o esperando revisión): **−0,5**, y luego **−0,25** cada 10 s más. Se mide con el cronómetro de espera (5.4), así que no vuelve a empezar cuando el paciente cambia de estado.
+- Se va enojado: **−0,5**, además de lo anterior.
+- Recogido en menos de **10 s** desde el desplome: **+0,1**. Alta: **+0,1**. Tope 5.
+- Para la derrota por colapso (5.10) cuentan **solo** los `Collapsed` y los `InHallway`; los que esperan revisión no.
 - En el código la reputación se guarda como **entero en centésimas de estrella** (300 = 3 ★). Así sumar 0,1 y restar 0,25 no acumula errores de redondeo.
 
 ### 5.10 Derrota y puntaje
@@ -356,7 +375,7 @@ type Scene interface {
 - Las animaciones avanzan por ticks de `Update` (60/s), nunca con `time.Sleep`.
 
 ### 10.4 Entrada
-- Clic en paciente `Collapsed` + clic en personal libre → `Game.Dispatch(patientID, staffID)`.
+- Clic en paciente `Collapsed` o esperando revisión + clic en personal libre → `Game.Dispatch(patientID, staffID)`. El estado del paciente dice si es recoger o revisar (5.5).
 - Clic en paciente `InHallway` → `Game.AssignBed(patientID)`. Clic derecho en paciente en cama → `Game.WakeEarly(patientID)`.
 - Hover → tooltip; **Shift** → todas las etiquetas; **Esc** → pausa; flechas + Enter en los portapapeles.
 
@@ -419,6 +438,14 @@ Prioridad si el tiempo no alcanza: F1 → F2 → F3 → F4 → F5 → F6. **F2 e
 - ✅ El "despierto" en masculino que aparece con pacientes mujeres viene del `String()` del modelo congelado, y se deja así.
 - Velocidad del tiempo (×2, ×3): fuera de alcance por ahora; si se quiere, va como constante en `config.go`.
 
+### 12.2 Cambio de diseño del modo juego (2026-10-10)
+- **Episodio en dos despachos**: el camillero recoge (ahí va el `RegisterEpisode` "de guardia") y el médico revisa en la habitación (solo lógica del juego). Estado nuevo: **esperando revisión** (secciones 3.4 y 5.5).
+- **Pago único en la revisión**, según el tiempo de espera: $450 → −$15/s → mínimo $100 (5.8). Reemplaza los $300/$150 por atención.
+- **Se va enojado a los 45 s** sin revisión: reemplaza "los `Collapsed` y los `InHallway` no se despiertan solos" (3.4 y 5.4).
+- La **cancelación** de un despacho en camino pasa de F5 a **F1.3**.
+- "Esperando revisión" baja reputación igual que `InHallway`, pero no cuenta para la derrota por colapso (5.9).
+- La demo no cambia.
+
 ---
 
 ## 13. Notas para la sustentación
@@ -427,6 +454,7 @@ Por cada fase, Claude Code debe explicarle a Samuel:
 - Por qué `StaffMember` es un **decorador**: cumple `hospital.Attender`, envuelve al Doctor/Orderly real y cambia la disponibilidad sin modificar el hospital.
 - Cómo el mecanismo "de guardia" deja que el jugador elija mientras el round-robin del modelo sigue funcionando.
 - Por qué los médicos envueltos no salen en `Doctors()` (la aserción de tipo de `HireStaff`) y cómo se resuelve la consulta 5.2.
+- Por qué la revisión del médico no llama `DiagnosePatient` (el cupo de 4 se llena y el modelo no lo libera).
 - Por qué el mutex de `Game` es necesario aunque `Hospital` ya tenga el suyo, y por qué `StaffMember` no puede tomarlo (deadlock).
 - Cómo agregar una `Nurse` en vivo: un tipo nuevo que cumpla `Attender`, envuelto en `StaffMember` y contratado con `HireStaff`.
 - Cómo `ui.App` cumple `ebiten.Game` y cómo la interfaz `Scene` cambia de pantalla sin `switch` gigantes.
