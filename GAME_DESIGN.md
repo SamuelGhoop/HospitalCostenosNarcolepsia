@@ -53,7 +53,7 @@ HospitalCostenosNarcolepsia/          ← módulo raíz (go 1.21, solo stdlib)
     staff.go             → StaffMember: decorador que cumple hospital.Attender
     dispatch.go          → despacho elegido por el jugador ("de guardia")
     patients.go          → estado de cada paciente en el juego, avanzado por ticks
-    beds.go              → triaje de camas, despertar y alta
+    beds.go              → sueño en cama, despertar, alta y traslado desde el pasillo
     spawner.go           → llegada de pacientes
     economy.go, reputation.go, hiring.go, events.go, names.go
     snapshot.go          → Snapshot(): copia de solo lectura para la interfaz
@@ -131,7 +131,7 @@ Cuando el despacho crea un episodio, `game/` guarda la **hora del juego** en un 
 | Llega un costeño | `NewPatient` + `AdmitPatient` |
 | El camillero (o un médico) recoge al paciente dormido | `RegisterEpisode(p, zona)` con el mecanismo "de guardia" |
 | Saber si consiguió cama | `p.Room()` después de `RegisterEpisode` (nil = se queda en el pasillo) |
-| Triaje: darle una cama libre a alguien del pasillo | `AssignRoom(p)`; su error se muestra como aviso |
+| Traslado desde el pasillo: el personal llega donde un paciente `InHallway` | `AssignRoom(p)`; su error se muestra como aviso y queda para la consulta 5.3 |
 | El médico revisa al paciente en la habitación | **Ninguna**: es solo lógica del juego (5.5) |
 | Termina el sueño o el jugador lo despierta | `WakePatient(p)` (libera la cama) |
 | Se va enojado desde el pasillo o esperando revisión | `WakePatient(p)`. Si estaba `Collapsed`, ninguna (sección 3.4) |
@@ -210,14 +210,18 @@ La demo es un **tipo aparte**, `game.Demo`, con métodos `Next()`, `Skip()`, `Sn
 - Intervalo día 1: aleatorio entre **18 y 25 s**; cada día ×0,9 (mínimo **8 s**). Máximo **10** pacientes simultáneos en el mapa.
 - Nivel: **Mild 40 %**, **Moderate 35 %**, **Severe 25 %**. IDs consecutivos (P-001, P-002…) porque `AdmitPatient` rechaza IDs repetidos.
 - Aparecen en la **calle**, caminan unos **4 s** por la acera y `AdmitPatient` se llama al cruzar la puerta del lobby. Hay peatones y carros decorativos.
+- Si el mapa está lleno cuando toca una llegada, se sortea otro intervalo.
+- **La puerta del hospital se abre sola**: `Snapshot.DoorOpen` vale `true` mientras algún paciente está a 1 s de cruzarla, entrando o saliendo. Lo decide el juego, así la interfaz solo la dibuja.
+- Cada paciente llega con una apariencia al azar (sección 7).
 
 ### 5.4 Comportamiento del paciente
 - Despierto, deambula cada **10–20 s** entre Lobby, Cafetería, Hallway 1, Hallway 2 y Radiología.
-- Tiempo despierto antes del ataque: **Mild 60–90 s**, **Moderate 35–55 s**, **Severe 15–30 s**.
-- ~2 s antes del ataque hace la animación de aviso (cabeceo) y luego se desploma: estado `Collapsed`, arranca su **cronómetro de espera**. Es uno solo por episodio: sigue corriendo mientras está `Collapsed`, `InHallway` o esperando revisión, y se detiene con la revisión del médico. De él salen el pago (5.8), la reputación (5.9) y el enojo (abajo).
+- Tiempo despierto antes del ataque: **Mild 60–90 s**, **Moderate 35–55 s**, **Severe 15–30 s**. Arranca **al cruzar la puerta** (después de `AdmitPatient`), nunca en la acera: un paciente en la calle no se desploma.
+- ~2 s antes del ataque hace la animación de aviso (cabeceo; estado `Drowsy` del juego, para que la interfaz sepa cuándo animarlo) y luego se desploma: estado `Collapsed`, arranca su **cronómetro de espera**. Es uno solo por episodio: sigue corriendo mientras está `Collapsed`, `InHallway` o esperando revisión, y se detiene con la revisión del médico. De él salen el pago (5.8), la reputación (5.9) y el enojo (abajo).
 - Duración del sueño en cama: **Mild 15 s**, **Moderate 22 s**, **Severe 30 s**, con −8 % por punto de pericia **del médico que lo revisó**. El cronómetro de sueño arranca **con la revisión** (5.5), no al llegar a la cama: el que espera revisión o está en el pasillo sigue dormido. Al cumplirse, el juego llama `WakePatient`.
 - **Se va enojado**: si a los **45 s** del desplome nadie lo ha revisado, se despierta solo y sale del mapa caminando por la puerta del lobby: **−0,5 ★** y **$0**, además de las penalizaciones de espera que ya corrían (5.9). Qué se le dice al modelo depende de dónde estaba (sección 3.4). Si alguien del personal iba en camino hacia él, ese despacho se cancela (5.5). En el Shift Report sale marcado "(se fue enojado)".
-- **Alta**: al despertar después de **1 / 2 / 3** episodios atendidos (Mild / Moderate / Severe), sale caminando por la puerta.
+- **Alta**: al despertar después de **1 / 2 / 3** sueños completos (revisado y despertado solo; Mild / Moderate / Severe), sale caminando por la puerta. Si no le toca el alta, vuelve a deambular con un tiempo despierto nuevo.
+- **Salir del mapa** (por alta o enojado) dura **4 s** hasta cruzar la puerta; después desaparece del mapa, pero sigue en el modelo como `Awake`. **Quien va saliendo no vuelve a tener ataque.**
 
 ### 5.5 Despacho (decisión del jugador)
 Cada episodio necesita dos despachos: primero alguien **recoge** al paciente y después un médico lo **revisa** en la habitación. En los dos el personal camina **(8 − rapidez) s** (de 3 a 7 s) y queda `busy` hasta terminar.
@@ -238,10 +242,14 @@ Cada episodio necesita dos despachos: primero alguien **recoge** al paciente y d
 
 La demo no cambia: sigue el round-robin real de la Sección 6 (sección 4).
 
-### 5.6 Triaje de camas
+### 5.6 Traslado desde el pasillo
 - Cuando una cama se libera, el letrero de la habitación parpadea en verde.
-- Clic en un paciente `InHallway` → el juego llama `AssignRoom(p)`. Si no hay cama, el error del modelo se muestra como aviso. Al recibir la cama queda **esperando revisión** (5.5).
-- Si nadie decide en **10 s**, la cama se le da automáticamente a quien lleve más tiempo en el pasillo.
+- Clic en un paciente `InHallway` y luego en un **camillero** libre → `Dispatch`: el camillero camina hasta él, lo carga y, **al llegar**, el juego llama `AssignRoom(p)`.
+  - **Hay cama**: lo lleva a la habitación (2 s) y el paciente queda **esperando revisión** (5.5).
+  - **Ya no hay cama**: sale el aviso con el error del modelo (queda como último error de `AssignRoom` para la consulta 5.3), el paciente sigue `InHallway` y el camillero queda libre.
+- Un **médico** también puede hacerlo si no hay camillero libre (la misma regla que para recoger).
+- **Ya no hay asignación automática**: el jugador decide a quién manda. *(Reemplaza el clic que llamaba `AssignRoom` directo y el triaje automático a los 10 s, 2026-10-10.)*
+- Solo modo juego: la demo no cambia (sigue sola, con el round-robin real de la Sección 6).
 
 ### 5.7 Despertar antes de tiempo
 - Clic derecho sobre un paciente en cama → **DESPERTAR**: `WakePatient(p)` libera la cama al instante. Cuesta **−0,25 estrellas** y ese paciente vuelve a dormirse en la mitad del tiempo normal.
@@ -280,7 +288,9 @@ La demo no cambia: sigue el round-robin real de la Sección 6 (sección 4).
 
 - **Nombres** costeños. Nombres: Wilfrido, Yeimy, Dairo, Yuleidis, Éder, Keyner, Nayibe, Yeferson, Ledys, Aníbal, Rosiris, Hernando, Yorledis, Dagoberto, Marelvis, Ronaldo. Apellidos: Berrío, Padilla, Barrios, Arrieta, Mendoza, Julio, Polo, Pertuz, Cassiani, Ospina, Castro, Herrera, Altamar, Cantillo. Médicos con "Dr." o "Dra.".
 - **Edad**: pacientes 18–80; personal 25–60.
-- **Apariencia** (`Appearance`): `skinTone` (4), `shirtColor`, `shirtPattern` (liso, floreada, rayas), `hat` (vueltiao, gorra, ninguno; solo pacientes), `hair` (corto, afro, trenzas, calvo). El personal usa uniforme por rol.
+- **Apariencia** (`Appearance`, con `RandomAppearance(rng)`): `skinTone` (4), `shirtColor`, `shirtPattern` (liso, floreada, rayas), `hat` (vueltiao, gorra, ninguno; solo pacientes), `hair` (corto, afro, trenzas, calvo) y `hairColor`. El personal usa uniforme por rol.
+  - **Cada campo se sortea por separado, con la misma probabilidad y sin restricciones entre campos** (por ejemplo, afro con o sin sombrero).
+  - `shirtColor` es un índice en una paleta de **6** colores y `hairColor`, un índice en una paleta propia de **4** (negro, castaño oscuro, castaño claro y canoso). El juego solo guarda el índice; **la interfaz decide qué color es cada uno**. Con pelo calvo, `hairColor` se sortea igual y simplemente no se usa.
 - El azar se inyecta en `Game` como `*rand.Rand` para que los tests usen semilla fija.
 
 ---
@@ -332,7 +342,7 @@ La demo no cambia: sigue el round-robin real de la Sección 6 (sección 4).
 ## 10. Interfaz con Ebitengine (`gui/ui/`)
 
 ### 10.1 Pantalla
-- Resolución lógica **640 × 360**; ventana 1280 × 720 (×2), pantalla completa ×3. Escalado entero, filtro *nearest*.
+- Resolución lógica **640 × 360**; ventana 1280 × 720 (×2), pantalla completa ×3. Escalado entero, filtro *nearest*. *(Pasa a 1280 × 720 con el mapa de fondo, sección 10.7.)*
 - Tiles de **16 × 16 px**; personajes en cuadros de **16 × 24 px**.
 - **Mapa**: `hospital.dc.html` dibuja un mundo de **464 × 261** (también 16:9). `gui/ui/layout.go` copia sus coordenadas tal cual (para poder compararlas con la maqueta) y las escala a 640 × 360 multiplicando por 640/464 y redondeando. Las proporciones quedan iguales y los personajes se dibujan a 1× en su cuadro de 16 × 24.
 - **Idioma**: todos los textos de la interfaz van en español. Las maquetas están en inglés, pero solo son referencia visual; los textos se escriben en el código, y los estados salen del `String()` del modelo ("disponible", "ocupada", "dormido en el pasillo").
@@ -375,8 +385,8 @@ type Scene interface {
 - Las animaciones avanzan por ticks de `Update` (60/s), nunca con `time.Sleep`.
 
 ### 10.4 Entrada
-- Clic en paciente `Collapsed` o esperando revisión + clic en personal libre → `Game.Dispatch(patientID, staffID)`. El estado del paciente dice si es recoger o revisar (5.5).
-- Clic en paciente `InHallway` → `Game.AssignBed(patientID)`. Clic derecho en paciente en cama → `Game.WakeEarly(patientID)`.
+- Clic en paciente `Collapsed`, `InHallway` o esperando revisión + clic en personal libre → `Game.Dispatch(patientID, staffID)`. El estado del paciente dice si es recoger, trasladar desde el pasillo o revisar (5.5 y 5.6).
+- Clic derecho en paciente en cama → `Game.WakeEarly(patientID)`.
 - Hover → tooltip; **Shift** → todas las etiquetas; **Esc** → pausa; flechas + Enter en los portapapeles.
 
 ### 10.5 Texto
@@ -384,8 +394,19 @@ type Scene interface {
 
 ### 10.6 Comunicación con `game/`
 - Cada `Draw` usa `game.Snapshot()`: una copia de solo lectura construida con el mutex de `Game` tomado. `Snapshot()` y `Report()` contienen **solo valores** (textos, números y estados), nunca punteros del modelo como `*hospital.Patient`: la interfaz no puede leer el hospital sin pasar por `Game`.
-- Las acciones son métodos de `Game` (`Dispatch`, `AssignBed`, `WakeEarly`, `Hire`, `Pause`, `Resume`, `Report`). Una partida nueva es un `game.New(rng)` nuevo con su propio `context`, que cancela la anterior. La demo usa el tipo `game.Demo` (`Next`, `Skip`, `Snapshot`, `Report`). Los errores se muestran como avisos.
+- Las acciones son métodos de `Game` (`Dispatch`, `WakeEarly`, `Hire`, `Pause`, `Resume`, `Report`). Una partida nueva es un `game.New(rng)` nuevo con su propio `context`, que cancela la anterior. La demo usa el tipo `game.Demo` (`Next`, `Skip`, `Snapshot`, `Report`). Los errores se muestran como avisos.
 - Los estados se muestran con el `String()` de las constantes tipadas del modelo.
+
+### 10.7 Mapa con imagen de fondo y rutas (pendiente: después de F1.4, antes de F3)
+Aplica a la demo y al juego (mismo código de `gui/`). Reemplaza la tarea "rutas por puntos de paso" y el detalle del camillero que atravesaba la 102.
+1. **Fondo**: `gui/assets/map/hospital_map_1280x720.png` es la maqueta (`hospital.dc.html`) renderizada a 1280 × 720 (1280/464 px de pantalla por px de mundo, bordes redondeados, sin antialias). Solo trae lo que nunca se mueve: sin personajes, sin taxi, sin humo y sin rayitas de movimiento. Se embebe con `//go:embed` y se dibuja de fondo; la interfaz deja de dibujar pisos, paredes y muebles con rectángulos.
+2. **Resolución lógica 1280 × 720** (antes 640 × 360): `layout.go` escala con 1280/464; los personajes se dibujan ×2 (escalado entero, *nearest*), incluidas la rotación en la cama y el volteo; la fuente se ajusta al tamaño nuevo; la ventana sigue en 1280 × 720.
+3. **Camas**: ya vienen dibujadas en la imagen. La cobija que va encima del paciente debe coincidir píxel a píxel con la cama de la imagen (se verifica con una captura).
+4. **Rutas**: puntos de paso con coordenadas de la maqueta (puerta de cada habitación, pasillos y entrada de cada zona) y la ruta más corta entre ellos. Un test verifica que ningún tramo entre dos puntos conectados cruza una pared (las paredes salen de los mismos rectángulos de la maqueta). Los personajes no se quedan parados uno encima del otro.
+5. **Lo que se mueve** va como sprite aparte, ya escalado (se dibuja a 1×, en píxeles de 1280 × 720):
+   - `gui/assets/map/taxi.png`: pasa por el carril de abajo, de izquierda a derecha, con la esquina superior izquierda en y = 651; sale por la derecha y vuelve a aparecer por la izquierda cada cierto tiempo (constante en la interfaz).
+   - `gui/assets/map/steam_pot.png`: humo de la olla de la cafetería, hoja de 3 cuadros de 44 × 36 en fila; esquina superior izquierda en (40, 246), cambia de cuadro cada ~300 ms, en bucle.
+   - Todo animado por ticks de `Update`, nunca con `time.Sleep`.
 
 ---
 
@@ -393,10 +414,10 @@ type Scene interface {
 
 > Decisión del 2026-10-08: **un solo reloj (`Tick`) y una sola goroutine motor**, en lugar de una goroutine por paciente.
 
-- El bono de concurrencia ya está cubierto por `simulation/`. En el juego hay **una única fuente de tiempo**: `Game.Tick(dt)`, que avanza en un solo paso el reloj, los cronómetros de cada paciente (máquina de estados en `patients.go`), las llegadas, el triaje automático, la reputación y la derrota.
+- El bono de concurrencia ya está cubierto por `simulation/`. En el juego hay **una única fuente de tiempo**: `Game.Tick(dt)`, que avanza en un solo paso el reloj, los cronómetros de cada paciente (máquina de estados en `patients.go`), las llegadas, la reputación y la derrota.
 - **Dos goroutines tocan `Game`:**
   - la **goroutine motor** (`Start(ctx)`, en `engine.go`): un `time.Ticker` que llama `Tick` cada 100 ms hasta que se cancela el `context` de la partida;
-  - la **goroutine de Ebitengine**: llama `Snapshot()` en cada `Draw` y las acciones del jugador (`Dispatch`, `AssignBed`…).
+  - la **goroutine de Ebitengine**: llama `Snapshot()` en cada `Draw` y las acciones del jugador (`Dispatch`, `WakeEarly`…).
   
   Por eso el mutex de `Game` es necesario, y `-race` lo verifica.
 - Los tests no lanzan el motor: llaman `Tick` a mano con un `*rand.Rand` de semilla fija, así que son deterministas. Un test aparte arranca el motor y lee `Snapshot()` en paralelo para que `-race` revise la concurrencia real.
@@ -417,9 +438,9 @@ Cada fase termina con `gofmt`, `go vet`, tests en verde, un commit y una explica
 | Fase | Entregable | Criterio de aceptación |
 |---|---|---|
 | F0 | Modelo cerrado (ya hecho) | Tag `modelo-cerrado` sobre el commit actual. Desde aquí `hospital/` y `simulation/` no cambian |
-| F1 | `game/` núcleo | `StaffMember`, despacho "de guardia", triaje, despertar, guion de la demo, reloj, llegadas, plata (ingresos), reputación y derrota por licencia o colapso, con tick manual y tests con semilla fija. La quiebra llega con la nómina en F4 |
+| F1 | `game/` núcleo | `StaffMember`, despacho "de guardia", traslado desde el pasillo, despertar, guion de la demo, reloj, llegadas, plata (ingresos), reputación y derrota por licencia o colapso, con tick manual y tests con semilla fija. La quiebra llega con la nómina en F4 |
 | F2 | `gui/` + **modo demostración** | La ventana reproduce los 12 pasos de la Sección 6 con subtítulos y termina en el Shift Report. **Con esto ya está el bono de interfaz** |
-| F3 | Modo juego jugable | Despachar, triaje y despertar con clics; HUD; goroutine motor + interfaz con `-race` limpio |
+| F3 | Modo juego jugable | Despachar, trasladar y despertar con clics; HUD; goroutine motor + interfaz con `-race` limpio |
 | F4 | Contratación + nómina + Shift Report diario | Bolsa de empleo funcional |
 | F5 | Eventos aleatorios | Los 8 eventos con banner y su test |
 | F6 | Pulido | README actualizado (cómo correr la demo y el juego), Game Over, sonido opcional, `AI_USAGE.md` |
@@ -429,8 +450,11 @@ Prioridad si el tiempo no alcanza: F1 → F2 → F3 → F4 → F5 → F6. **F2 e
 **Orden real (2026-10-08), para asegurar primero el bono de interfaz:**
 1. F1.5: `game.Demo` + `Report`, que no dependen del resto de F1.
 2. F2 mínima: la demo de los 12 pasos en Ebitengine, con rectángulos de colores en lugar de sprites, subtítulos y Shift Report.
-3. F1.1–F1.4: reloj y motor, `StaffMember` + despacho, pacientes, llegadas y camas, y economía, reputación y derrota.
-4. F3 → F6.
+3. F1.1–F1.4: reloj y motor, `StaffMember` + despacho, pacientes, llegadas y camas, y economía, reputación y derrota. F1.3 se parte en dos (2026-10-10):
+   - **F1.3a**, el paciente vive solo: apariencia, llegadas por la calle, puerta, deambular, ataque, cronómetro de espera, sueño según la pericia, despertar y alta;
+   - **F1.3b**, la espera tiene límite: el que se va enojado a los 45 s, la cancelación del despacho y el traslado desde el pasillo.
+4. Mapa con imagen de fondo y rutas (sección 10.7), antes de F3 porque el juego también lo necesita.
+5. F3 → F6.
 
 ### 12.1 Decisiones tomadas antes de F2 (2026-10-08)
 - ✅ **Idioma de la interfaz**: español en todo (sección 10.1). Las maquetas en inglés son solo referencia visual.
@@ -445,6 +469,14 @@ Prioridad si el tiempo no alcanza: F1 → F2 → F3 → F4 → F5 → F6. **F2 e
 - La **cancelación** de un despacho en camino pasa de F5 a **F1.3**.
 - "Esperando revisión" baja reputación igual que `InHallway`, pero no cuenta para la derrota por colapso (5.9).
 - La demo no cambia.
+
+### 12.3 Decisiones de F1.3 (2026-10-10)
+- El paciente `InHallway` se despacha: el personal camina, lo carga y al llegar se llama `AssignRoom`. Sin asignación automática (5.6).
+- La puerta la decide el juego (`DoorOpen`); salir del mapa dura 4 s; si el mapa está lleno, se sortea otro intervalo (5.3 y 5.4).
+- El tiempo despierto arranca al cruzar la puerta; quien va saliendo no vuelve a tener ataque; el cabeceo es el estado `Drowsy` (5.4).
+- Para el alta cuentan los sueños completos (5.4).
+- `Appearance` suma `hairColor`; `shirtColor` y `hairColor` son índices de paleta que decide la interfaz (sección 7).
+- `WakeEarly` (5.7) va en F1.4, con su costo de reputación.
 
 ---
 
