@@ -165,3 +165,34 @@ func episodeLineOf(rec hospital.EpisodeRecord, timeOf func(hospital.EpisodeRecor
 func realTime(rec hospital.EpisodeRecord) string {
 	return rec.At().Format("15:04")
 }
+
+// Report arma las cuatro consultas de la Sección 5 de la partida (el Shift
+// Report), con el modelo real.
+//
+// Los médicos de la consulta 5.2 salen de la lista de Game, porque los
+// envueltos en StaffMember no aparecen en h.Doctors() (§3.1). Sus episodios
+// salen de MyEpisodes: como StaffMember delega Attend, el Doctor real los
+// guarda.
+func (g *Game) Report() Report {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	// lastAssignErr va vacío: el AssignRoom del modo juego llega en F1.3.
+	return buildReport(g.h, g.doctorsLocked(), "", g.gameTimeOf)
+}
+
+// doctorsLocked devuelve los médicos reales (sin envolver) de la partida.
+func (g *Game) doctorsLocked() []*hospital.Doctor {
+	var doctors []*hospital.Doctor
+	for _, s := range g.staff {
+		if s.isDoctor() {
+			doctors = append(doctors, s.doctor)
+		}
+	}
+	return doctors
+}
+
+// gameTimeOf muestra la hora del JUEGO en que ocurrió el episodio, guardada
+// al recogerlo. La usa el modo juego, siempre con g.mu tomado.
+func (g *Game) gameTimeOf(rec hospital.EpisodeRecord) string {
+	return g.episodeTimes[rec.ID()]
+}

@@ -25,15 +25,22 @@ import (
 type Game struct {
 	mu sync.Mutex
 
-	rng    *rand.Rand // azar inyectado (se usa desde F1.3); solo con g.mu tomado
+	rng    *rand.Rand // azar inyectado; solo con g.mu tomado
 	h      *hospital.Hospital
 	clock  clock
 	paused bool
+
+	staff                     []*StaffMember    // todo el personal, en orden de contratación
+	doctorCount, orderlyCount int               // para los IDs: D-01, D-02… y C-01, C-02…
+	patients                  []*patient        // los pacientes de la partida, en orden de llegada
+	episodeTimes              map[string]string // ID del episodio → hora del juego ("14:15"), §3.2
+	notices                   []string          // últimos avisos para la interfaz, del más viejo al más nuevo
 }
 
-// New crea una partida: un hospital con las habitaciones 101, 102 y 103
-// (GAME_DESIGN §5.2), el día 1 a las 08:00. rng es el azar de la partida;
-// los tests pasan uno con semilla fija para que todo sea repetible.
+// New crea una partida (GAME_DESIGN §5.2): un hospital con las habitaciones
+// 101, 102 y 103, un médico y un camillero, el día 1 a las 08:00. rng es el
+// azar de la partida; los tests pasan uno con semilla fija para que todo sea
+// repetible.
 func New(rng *rand.Rand) (*Game, error) {
 	h := hospital.NewHospital("Hospital de los Costeños con Narcolepsia")
 	for _, number := range []int{101, 102, 103} {
@@ -41,7 +48,17 @@ func New(rng *rand.Rand) (*Game, error) {
 			return nil, fmt.Errorf("creando la habitación %d: %w", number, err)
 		}
 	}
-	return &Game{rng: rng, h: h, clock: newClock()}, nil
+	g := &Game{rng: rng, h: h, clock: newClock(), episodeTimes: map[string]string{}}
+
+	// Los helpers ...Locked se pueden llamar sin tomar g.mu porque la
+	// partida todavía no existe para ninguna otra goroutine.
+	if err := g.hireLocked(g.newDoctorLocked(startSpeed, startSkill)); err != nil {
+		return nil, fmt.Errorf("contratando al médico inicial: %w", err)
+	}
+	if err := g.hireLocked(g.newOrderlyLocked(startSpeed)); err != nil {
+		return nil, fmt.Errorf("contratando al camillero inicial: %w", err)
+	}
+	return g, nil
 }
 
 // Tick avanza la partida dt de tiempo real. Es la ÚNICA fuente de tiempo
@@ -61,6 +78,7 @@ func (g *Game) tickLocked(dt time.Duration) {
 		return
 	}
 	g.clock.advance(dt)
+	g.tickStaffLocked(dt)
 }
 
 // Pause congela la partida: reloj, cronómetros y llegadas (todo pasa por Tick).
@@ -88,4 +106,13 @@ func (g *Game) StartNextDay() error {
 	}
 	g.clock.nextDay()
 	return nil
+}
+
+// noticeLocked agrega un aviso para la interfaz, con la hora del juego, y
+// descarta los más viejos si hay más de maxNotices.
+func (g *Game) noticeLocked(msg string) {
+	g.notices = append(g.notices, g.clock.String()+" "+msg)
+	if extra := len(g.notices) - maxNotices; extra > 0 {
+		g.notices = g.notices[extra:]
+	}
 }

@@ -5,6 +5,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/SamuelGhoop/HospitalCostenosNarcolepsia/hospital"
 )
 
 // El motor llama Tick solo (cada 100 ms) y se detiene cuando se cancela el
@@ -36,14 +38,17 @@ func TestStart_EngineAdvancesTheClockAndStopsWithTheContext(t *testing.T) {
 }
 
 // Varias goroutines tocan la partida a la vez, como en el juego real: el
-// motor (Tick), la interfaz (lee Snapshot sin parar) y el jugador (pausa y
-// reanuda de vez en cuando). Con -race (en Docker) no debe haber carreras.
+// motor (Tick), la interfaz (lee Snapshot sin parar) y el jugador (despacha,
+// pausa y reanuda de vez en cuando). Con -race (en Docker) no debe haber
+// carreras.
 //
 // La que lee NO pausa: si una misma goroutine leyera y tomara el candado
 // todo el tiempo, quedaría sincronizada con el motor y una carrera real
 // (por ejemplo, Snapshot sin candado) pasaría desapercibida.
 func TestStart_SnapshotsWhileTheEngineRunsAreRaceFree(t *testing.T) {
 	g := newGame(t)
+	collapse(t, g, "P-001", "Yeimy Padilla", hospital.Severe, "cafetería")
+	collapse(t, g, "P-002", "Kevin Mercado", hospital.Moderate, "fila de radiología")
 	ctx, cancel := context.WithTimeout(context.Background(), 400*time.Millisecond)
 	defer cancel()
 
@@ -63,6 +68,17 @@ func TestStart_SnapshotsWhileTheEngineRunsAreRaceFree(t *testing.T) {
 			g.Pause()
 			time.Sleep(time.Millisecond)
 			g.Resume()
+
+			// Los errores se ignoran a propósito: desde la segunda vuelta los
+			// dos ya van ocupados. Aquí solo importa que no haya carreras.
+			//
+			// Dispatch va DESPUÉS de reanudar y lo sigue una espera sin tocar
+			// el candado. Si Dispatch se llamara justo antes de Pause, el
+			// Lock/Unlock de Pause dejaría "ordenada" su escritura antes de la
+			// lectura de la interfaz, y un Dispatch sin candado pasaría
+			// desapercibido para -race (se comprobó quitándole el candado).
+			_ = g.Dispatch("P-001", "C-01")
+			_ = g.Dispatch("P-002", "D-01")
 			time.Sleep(20 * time.Millisecond)
 		}
 	}()
