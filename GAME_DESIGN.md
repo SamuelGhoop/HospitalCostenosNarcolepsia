@@ -273,6 +273,14 @@ La demo no cambia: sigue el round-robin real de la Sección 6 (sección 4).
 - Pierde con: reputación en 0 ("¡PERDIÓ LA LICENCIA!"), quiebra al pagar la nómina ("¡QUIEBRA!") o **5 o más** pacientes `Collapsed` + `InHallway` a la vez ("¡HOSPITAL COLAPSADO!").
 - Puntaje: +100 por atención, +250 por alta, +500 por día completado; al final, + plata ÷ 10 + estrellas × 200.
 
+### 5.11 Partida guardada (pendiente: F6)
+- Se guarda **automáticamente al terminar cada día** (después de la nómina), **nunca a mitad del día**: el estado interno del hospital (camas, episodios, quién duerme dónde) no se puede serializar sin tocar `hospital/`.
+- Se guarda: día, plata, reputación, puntaje, el siguiente ID de paciente, la cantidad de habitaciones y el personal (nombre, rol, rapidez, pericia, salario y apariencia).
+- `game/` expone un struct **de solo valores** con `encoding/json`, que se escribe y se lee con `io.Writer` / `io.Reader`, para probarlo con `bytes.Buffer`. La interfaz decide la ruta del archivo (`os.UserConfigDir()`).
+- **Cargar** arma un hospital nuevo con la API pública (`AddRoom`, `NewDoctor` / `NewOrderly` + `HireStaff` envuelto en `StaffMember`) y arranca el día siguiente.
+- Tests: guardar y cargar da el mismo estado; un archivo dañado devuelve un error, sin `panic`.
+- Salir al menú a mitad del día (9.4) pierde el día en curso: lo guardado es el final del día anterior.
+
 ---
 
 ## 6. Contratación (Bolsa de empleo)
@@ -318,11 +326,12 @@ La demo no cambia: sigue el round-robin real de la Sección 6 (sección 4).
 
 | Pantalla | Maqueta (Claude Design) | Contenido |
 |---|---|---|
-| Inicio | `index.html` | Logo, hospital en la playa, menú en portapapeles: CONTINUE, NEW ROUND, DEMO SECCIÓN 6, SETTINGS, CREDITS, EXIT |
+| Inicio | `Hospital de los Costeños/Title Screen.dc.html` | Paisaje de playa animado, logo y menú en portapapeles: CONTINUAR, NUEVA PARTIDA, DEMO SECCIÓN 6, AJUSTES, CRÉDITOS, SALIR (sección 9.3) |
 | Hospital | `hospital.html` | Mapa top-down (habitaciones, lobby, pasillos, cafetería, radiología, sala del personal) y calle con paradero |
 | Catálogo de sprites | `sprites.html` | Exportador de spritesheets PNG |
 | Bolsa de empleo | por diseñar | Portapapeles con 3 fichas |
-| Pausa / Settings | por diseñar | REANUDAR, SETTINGS, SALIR AL MENÚ |
+| Pausa | assets en `gui/assets/pause/` | Portapapeles derecho y centrado: REANUDAR, AJUSTES, SALIR AL MENÚ, sobre el mapa oscurecido (sección 9.4) |
+| Ajustes | por diseñar | Pantalla completa, etiquetas siempre visibles, subtítulos de la demo y volumen si hay sonido (sección 9.5) |
 | Shift Report | por diseñar | Las 4 consultas + balance del día; en la demo, botón "¡AHORA TE TOCA!". La 5.4 va rotulada "episodios en esta partida" y los episodios muestran la hora del juego (en la demo, la hora real) |
 | Game Over | por diseñar | Motivo, puntaje, días sobrevividos, NUEVA PARTIDA |
 
@@ -336,6 +345,26 @@ La demo no cambia: sigue el round-robin real de la Sección 6 (sección 4).
 ### 9.2 Transiciones
 - Inicio → Hospital: el portapapeles se voltea + pixel dissolve.
 - Fin del día → Shift Report: las fichas caen y se clavan en un tablero de corcho.
+
+### 9.3 Pantalla de inicio (pendiente: junto con el mapa de fondo, 10.7, antes de F3)
+- Escena `Title`. Capas, animaciones y portapapeles en `gui/assets/title/`, explicados en `gui/assets/title/TITLE_ASSETS.md`:
+  - el paisaje va a **320 × 180** y se dibuja **×4** (escalado entero, *nearest*);
+  - el portapapeles va como **imagen ya inclinada**: una por opción seleccionada, 2 cuadros del cursor, la variante con CONTINUAR en gris (`sincontinuar`) y `hitboxes.json` para el mouse.
+- El **logo**, la banda "con Narcolepsia", las Zzz del título, "PRESIONA ENTER" y la versión los dibuja el juego con **Press Start 2P**. Referencia: `gui/design/claude-design/Hospital de los Costeños/Title Screen.dc.html`, con los textos en español.
+- **Menú**: CONTINUAR, NUEVA PARTIDA, DEMO SECCIÓN 6, AJUSTES, CRÉDITOS y SALIR. CONTINUAR sale en gris si no hay partida guardada (5.11); hasta F6 siempre sale en gris.
+- Se navega con **↑/↓** (o **W/S**), **Enter** y el mouse.
+- Todo se anima por ticks de `Update`, nunca con `time.Sleep`.
+
+### 9.4 Menú de pausa (pendiente: junto con la pantalla de inicio)
+- Capa encima de la escena (10.2). Assets y medidas en `gui/assets/pause/PAUSE_ASSETS.md`: portapapeles derecho y centrado con REANUDAR, AJUSTES y SALIR AL MENÚ, sobre el mapa oscurecido.
+- **Esc** abre la pausa y, con la pausa abierta, la cierra.
+- En el modo juego llama `Game.Pause()` y `Game.Resume()`; en la demo detiene el avance automático.
+- **SALIR AL MENÚ** cancela el `context` de la partida y vuelve a la portada. En el modo juego se pierde el día en curso: lo guardado es el final del día anterior (5.11).
+- **AJUSTES** abre la pantalla de ajustes (9.5); mientras no exista, muestra el aviso "Próximamente".
+
+### 9.5 Ajustes (pendiente: F6)
+- Se guardan en un **JSON aparte** de la partida y se abren desde la portada y desde la pausa.
+- Opciones: pantalla completa, etiquetas siempre visibles, subtítulos de la demo y volumen (solo si se agrega sonido).
 
 ---
 
@@ -391,6 +420,7 @@ type Scene interface {
 
 ### 10.5 Texto
 - Fuente **Press Start 2P** (OFL) en `assets/fonts/`, con `text/v2`.
+- ⚠️ **Tildes**: en Press Start 2P la Ó, É, Í, Ú y Ñ vienen encogidas (para que la tilde quepa en el cuadro de 8 × 8) y parecen minúsculas. Donde se use esa fuente, la tilde se dibuja **a mano encima de la letra normal**, como la virgulilla de COSTEÑOS en la maqueta. Lo hace solo un helper de texto.
 
 ### 10.6 Comunicación con `game/`
 - Cada `Draw` usa `game.Snapshot()`: una copia de solo lectura construida con el mutex de `Game` tomado. `Snapshot()` y `Report()` contienen **solo valores** (textos, números y estados), nunca punteros del modelo como `*hospital.Patient`: la interfaz no puede leer el hospital sin pasar por `Game`.
@@ -443,7 +473,7 @@ Cada fase termina con `gofmt`, `go vet`, tests en verde, un commit y una explica
 | F3 | Modo juego jugable | Despachar, trasladar y despertar con clics; HUD; goroutine motor + interfaz con `-race` limpio |
 | F4 | Contratación + nómina + Shift Report diario | Bolsa de empleo funcional |
 | F5 | Eventos aleatorios | Los 8 eventos con banner y su test |
-| F6 | Pulido | README actualizado (cómo correr la demo y el juego), Game Over, sonido opcional, `AI_USAGE.md` |
+| F6 | Pulido | README actualizado (cómo correr la demo y el juego), Game Over, partida guardada (5.11) y ajustes (9.5), sonido opcional, `AI_USAGE.md` |
 
 Prioridad si el tiempo no alcanza: F1 → F2 → F3 → F4 → F5 → F6. **F2 es la meta mínima.**
 
@@ -453,7 +483,7 @@ Prioridad si el tiempo no alcanza: F1 → F2 → F3 → F4 → F5 → F6. **F2 e
 3. F1.1–F1.4: reloj y motor, `StaffMember` + despacho, pacientes, llegadas y camas, y economía, reputación y derrota. F1.3 se parte en dos (2026-10-10):
    - **F1.3a**, el paciente vive solo: apariencia, llegadas por la calle, puerta, deambular, ataque, cronómetro de espera, sueño según la pericia, despertar y alta;
    - **F1.3b**, la espera tiene límite: el que se va enojado a los 45 s, la cancelación del despacho y el traslado desde el pasillo.
-4. Mapa con imagen de fondo y rutas (sección 10.7), antes de F3 porque el juego también lo necesita.
+4. Mapa con imagen de fondo y rutas (sección 10.7), pantalla de inicio (9.3) y menú de pausa (9.4), antes de F3 porque el juego también los necesita.
 5. F3 → F6.
 
 ### 12.1 Decisiones tomadas antes de F2 (2026-10-08)
@@ -477,6 +507,7 @@ Prioridad si el tiempo no alcanza: F1 → F2 → F3 → F4 → F5 → F6. **F2 e
 - Para el alta cuentan los sueños completos (5.4).
 - `Appearance` suma `hairColor`; `shirtColor` y `hairColor` son índices de paleta que decide la interfaz (sección 7).
 - `WakeEarly` (5.7) va en F1.4, con su costo de reputación.
+- Tareas anotadas para después: mapa de fondo y rutas (10.7), pantalla de inicio (9.3) y menú de pausa (9.4), antes de F3; partida guardada (5.11) y ajustes (9.5), en F6.
 
 ---
 
