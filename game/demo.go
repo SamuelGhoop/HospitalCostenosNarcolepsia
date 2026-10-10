@@ -19,6 +19,11 @@ type DemoStep struct {
 	Call     string // la llamada real que se le hizo al modelo
 	Result   string // lo que respondió el modelo (no es texto fijo)
 	Err      error  // error PREVISTO del modelo (solo el paso 8); nil en los demás
+
+	// Episode es el episodio que creó este paso (pasos 5–8): quién atendió,
+	// dónde se durmió el paciente y a qué habitación fue. La interfaz lo usa
+	// para que el personal camine. nil en los pasos que no crean episodio.
+	Episode *EpisodeLine
 }
 
 // DemoSnapshot es la foto de la demo en un momento dado. Solo valores.
@@ -234,18 +239,19 @@ func (d *Demo) attack(p *hospital.Patient, location, subtitle string) (DemoStep,
 	if err := d.h.RegisterEpisode(p, location); err != nil {
 		return DemoStep{}, err
 	}
-	// Quién atendió: el último registro del historial.
+	// El episodio que se acaba de crear es el último registro del historial.
 	history := d.h.History()
-	attendedBy := history[len(history)-1].AttendedBy().Name()
+	episode := episodeLineOf(history[len(history)-1], realTime)
 
 	destination := "pasillo (sin cama)"
-	if r := p.Room(); r != nil {
-		destination = fmt.Sprintf("habitación %d", r.Number())
+	if episode.Room != 0 {
+		destination = fmt.Sprintf("habitación %d", episode.Room)
 	}
 	return DemoStep{
 		Subtitle: subtitle,
 		Call:     fmt.Sprintf("h.RegisterEpisode(%s, %q)", p.ID(), location),
-		Result:   fmt.Sprintf("%s → %s · atendió: %s", p, destination, attendedBy),
+		Result:   fmt.Sprintf("%s → %s · atendió: %s", p, destination, episode.AttendedBy),
+		Episode:  &episode, // una copia con valores: no es un puntero al modelo
 	}, nil
 }
 

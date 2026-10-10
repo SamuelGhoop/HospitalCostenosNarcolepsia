@@ -45,6 +45,7 @@ type EpisodeLine struct {
 	Location       string // dónde se quedó dormido
 	Room           int    // habitación asignada; 0 = se quedó en el pasillo
 	AttendedBy     string // quién lo atendió (médico o camillero)
+	AttendedByID   string // su ID: la interfaz lo usa para saber a quién mover
 	TreatingDoctor string // médico tratante en ese momento; "" si no tenía
 }
 
@@ -142,12 +143,13 @@ func roomViewOf(r *hospital.Room) RoomView {
 // episodeLineOf copia un registro del historial a una línea para mostrar.
 func episodeLineOf(rec hospital.EpisodeRecord, timeOf func(hospital.EpisodeRecord) string) EpisodeLine {
 	line := EpisodeLine{
-		ID:          rec.ID(),
-		Time:        timeOf(rec),
-		PatientID:   rec.Patient().ID(),
-		PatientName: rec.Patient().Name(),
-		Location:    rec.Location(),
-		AttendedBy:  rec.AttendedBy().Name(),
+		ID:           rec.ID(),
+		Time:         timeOf(rec),
+		PatientID:    rec.Patient().ID(),
+		PatientName:  rec.Patient().Name(),
+		Location:     rec.Location(),
+		AttendedBy:   rec.AttendedBy().Name(),
+		AttendedByID: rec.AttendedBy().ID(),
 	}
 	if r := rec.Room(); r != nil {
 		line.Room = r.Number()

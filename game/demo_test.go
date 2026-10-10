@@ -193,6 +193,44 @@ func TestDemo_FinalReportMatchesTheConsoleScenario(t *testing.T) {
 	}
 }
 
+// Los pasos de los ataques (5–8) dicen quién atendió, dónde se durmió el
+// paciente y a qué habitación fue: la interfaz lo usa para que el personal
+// camine. Quién atendió sale del round-robin REAL del modelo.
+func TestDemo_AttackStepsCarryTheEpisode(t *testing.T) {
+	d := game.NewDemo()
+	want := map[int]struct {
+		patient, attender, location string
+		room                        int
+	}{
+		5: {"P-001", "D-01", "cafetería, después del sancocho", 101},
+		6: {"P-002", "D-02", "fila de radiología", 102},
+		7: {"P-003", "C-01", "pista de champeta del patio", 103},
+		8: {"P-004", "D-01", "pasillo 2, segundo piso", 0}, // sin cama
+	}
+
+	for n := 1; n <= game.DemoSteps; n++ {
+		step, err := d.Next()
+		if err != nil {
+			t.Fatal(err)
+		}
+		w, isAttack := want[n]
+		if !isAttack {
+			if step.Episode != nil {
+				t.Errorf("paso %d: no crea episodio y trae %+v", n, *step.Episode)
+			}
+			continue
+		}
+		e := step.Episode
+		if e == nil {
+			t.Fatalf("paso %d: se esperaba el episodio", n)
+		}
+		if e.PatientID != w.patient || e.AttendedByID != w.attender || e.Location != w.location || e.Room != w.room {
+			t.Errorf("paso %d: episodio = (%s, %s, %q, %d); se esperaba (%s, %s, %q, %d)",
+				n, e.PatientID, e.AttendedByID, e.Location, e.Room, w.patient, w.attender, w.location, w.room)
+		}
+	}
+}
+
 func TestDemo_NextAfterTheEndReturnsErrDemoFinished(t *testing.T) {
 	d := game.NewDemo()
 	runSteps(t, d, game.DemoSteps)
