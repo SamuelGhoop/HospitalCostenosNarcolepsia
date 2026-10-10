@@ -27,6 +27,8 @@ type DemoScene struct {
 	snap     game.DemoSnapshot
 	figures  []figure
 	pos      map[string]vec          // posición dibujada de cada personaje, por ID
+	paths    map[string][]vec        // lo que le falta de ruta a cada personaje (ver routes.go)
+	pathTo   map[string]vec          // el destino para el que se calculó esa ruta
 	anims    map[string]*patientAnim // animación de cada paciente, por ID
 	choreo   *choreography           // coreografía del último paso; nil si no hay o ya terminó
 	carried  string                  // paciente que el último paso pasó del pasillo a una cama
@@ -37,7 +39,8 @@ type DemoScene struct {
 
 // NewDemoScene prepara la escena para una demo recién creada.
 func NewDemoScene(d *game.Demo) *DemoScene {
-	s := &DemoScene{demo: d, pos: map[string]vec{}, anims: map[string]*patientAnim{}, showSubs: true}
+	s := &DemoScene{demo: d, pos: map[string]vec{}, paths: map[string][]vec{}, pathTo: map[string]vec{},
+		anims: map[string]*patientAnim{}, showSubs: true}
 	s.refresh()
 	return s
 }
@@ -92,14 +95,14 @@ func (s *DemoScene) advance() error {
 	return nil
 }
 
-// animate hace un tick de animación: cada personaje se desliza hacia su
-// destino (el de la coreografía si lo hay; si no, su puesto final), la
-// animación de cada paciente avanza según cuánto se movió, y la
-// coreografía pasa a la siguiente fase cuando todos llegaron.
+// animate hace un tick de animación: cada personaje camina hacia su destino
+// (el de la coreografía si lo hay; si no, su puesto final) siguiendo su
+// ruta por las puertas, la animación de cada paciente avanza según cuánto
+// se movió, y la coreografía pasa a la siguiente fase cuando todos llegaron.
 func (s *DemoScene) animate() {
 	for _, f := range s.figures {
 		old := s.pos[f.id]
-		now := moveToward(old, s.destination(f), walkSpeed)
+		now := moveToward(old, s.nextWaypoint(f.id, old, s.destination(f)), walkSpeed)
 		s.pos[f.id] = now
 		if a, ok := s.anims[f.id]; ok {
 			a.step(now.x-old.x, now.y-old.y, s.onBed(f))
@@ -122,6 +125,21 @@ func (s *DemoScene) animate() {
 	if s.choreo.done() {
 		s.choreo = nil
 	}
+}
+
+// nextWaypoint es el próximo punto al que camina id para llegar a dest.
+// Si dest cambió (otra fase de la coreografía, otro puesto), calcula la
+// ruta de nuevo; cuando llega a un punto de paso, sigue con el siguiente.
+func (s *DemoScene) nextWaypoint(id string, from, dest vec) vec {
+	if s.pathTo[id] != dest || len(s.paths[id]) == 0 {
+		s.paths[id], s.pathTo[id] = route(from, dest), dest
+	}
+	path := s.paths[id]
+	for len(path) > 1 && from == path[0] {
+		path = path[1:]
+	}
+	s.paths[id] = path
+	return path[0]
 }
 
 // destination es a dónde tiene que caminar un personaje ahora mismo.
@@ -156,6 +174,7 @@ func (s *DemoScene) finishChoreography() {
 	s.choreo = nil
 	for _, f := range s.figures {
 		s.pos[f.id] = f.target
+		delete(s.paths, f.id) // saltó a su puesto: la ruta vieja ya no sirve
 		if a, ok := s.anims[f.id]; ok {
 			a.settle(s.onBed(f))
 		}
@@ -233,6 +252,7 @@ func (s *DemoScene) refresh() {
 		was := a.state
 		if leftBed := a.observe(p.State, p.Room); leftBed {
 			s.pos[p.ID] = f.target // se levanta y queda de una al lado de la cama, sin deslizarse
+			delete(s.paths, p.ID)
 		}
 		if was == hospital.AsleepInHallway && p.State == hospital.AsleepInBed {
 			s.carried = p.ID // pasó del pasillo a una cama (paso 11)
