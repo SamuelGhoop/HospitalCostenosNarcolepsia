@@ -23,6 +23,15 @@ func newGame(t *testing.T) *game.Game {
 	return g
 }
 
+// newQuietGame es una partida sin llegadas por la calle, para probar el
+// reloj solo (ver StopArrivalsForTest en export_test.go).
+func newQuietGame(t *testing.T) *game.Game {
+	t.Helper()
+	g := newGame(t)
+	g.StopArrivalsForTest()
+	return g
+}
+
 // tickFor avanza el juego d de tiempo real, en ticks de 100 ms (como el motor).
 func tickFor(g *game.Game, d time.Duration) {
 	for elapsed := time.Duration(0); elapsed < d; elapsed += tick {
@@ -52,7 +61,7 @@ func TestNew_StartsDay1At0800WithThreeRooms(t *testing.T) {
 // Pedido por Samuel: el reloj usa aritmética entera, así que nunca redondea
 // hacia arriba (no puede decir "20:00" ni terminar el día antes de tiempo).
 func TestClock_NeverRoundsUp(t *testing.T) {
-	g := newGame(t)
+	g := newQuietGame(t)
 
 	g.Tick(tick)
 	if got := g.Snapshot().Clock; got != "08:00" {
@@ -67,7 +76,7 @@ func TestClock_NeverRoundsUp(t *testing.T) {
 }
 
 func TestTick_ShiftLasts300RealSeconds(t *testing.T) {
-	g := newGame(t)
+	g := newQuietGame(t)
 
 	tickFor(g, 150*time.Second)
 	if snap := g.Snapshot(); snap.Clock != "14:00" || snap.Progress != 0.5 {
@@ -93,7 +102,7 @@ func TestTick_OneRealSecondIsTwoPointFourGameMinutes(t *testing.T) {
 }
 
 func TestTick_ClockStopsAt2000(t *testing.T) {
-	g := newGame(t)
+	g := newQuietGame(t)
 
 	tickFor(g, 400*time.Second)
 	g.Tick(10 * time.Second)
@@ -122,7 +131,7 @@ func TestPause_FreezesTheClock(t *testing.T) {
 }
 
 func TestStartNextDay(t *testing.T) {
-	g := newGame(t)
+	g := newQuietGame(t)
 
 	if err := g.StartNextDay(); !errors.Is(err, game.ErrDayNotOver) {
 		t.Fatalf("antes de las 20:00: err = %v; se esperaba ErrDayNotOver", err)

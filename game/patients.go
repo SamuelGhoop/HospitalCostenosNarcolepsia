@@ -63,6 +63,7 @@ type patient struct {
 	wanderLeft time.Duration // deambulando: cuánto falta para cambiar de zona
 	waited     time.Duration // cronómetro de espera del episodio: del desplome a la revisión
 	sleeps     int           // sueños completos (revisado y despertado solo), para el alta
+	penalties  int           // penalizaciones por espera ya cobradas en este episodio
 	reviewedBy *StaffMember  // el médico que lo revisó; nil si nadie
 	gone       bool          // ya cruzó la puerta de salida: se quita del mapa
 }
@@ -109,10 +110,11 @@ func (g *Game) tickPatientsLocked(dt time.Duration) {
 			}
 		case Drowsy:
 			if pt.countdown(dt) {
-				pt.stage, pt.waited = Collapsed, 0 // arranca el cronómetro de espera
+				pt.stage, pt.waited, pt.penalties = Collapsed, 0, 0 // arranca el cronómetro de espera
 			}
 		case Collapsed, InHallway, AwaitingReview:
 			pt.waited += dt // corre hasta la revisión, sin volver a empezar
+			g.applyWaitPenaltiesLocked(pt)
 			if pt.waited >= angryAfter {
 				g.leaveAngryLocked(pt)
 			}
@@ -158,12 +160,48 @@ func (g *Game) wakeUpLocked(pt *patient) {
 	pt.reviewedBy = nil
 	if pt.sleeps >= sleepsBeforeDischarge(pt.p.Level()) {
 		g.noticeLocked(fmt.Sprintf("%s se fue de alta", pt.p))
+		g.money += dischargeFee
+		g.score += dischargePoints
+		g.changeReputationLocked(+dischargeBonus)
 		g.leaveLocked(pt, "(alta)")
 		return
 	}
+	g.wanderAgainLocked(pt, awakeDuration(g.rng, pt.p.Level()))
+}
+
+// wanderAgainLocked: el paciente se levantó de la cama y vuelve a deambular,
+// desde una zona al azar, con awake de tiempo despierto antes del próximo
+// ataque.
+func (g *Game) wanderAgainLocked(pt *patient, awake time.Duration) {
+	pt.reviewedBy = nil // el que lo revisó ya no cuenta: el próximo episodio es otro
 	pt.stage, pt.zone = Wandering, wanderZones[g.rng.Intn(len(wanderZones))]
-	pt.timer = awakeDuration(g.rng, pt.p.Level())
+	pt.timer = awake
 	pt.wanderLeft = randomDuration(g.rng, wanderMin, wanderMax)
+}
+
+// WakeEarly es la acción DESPERTAR (§5.7): despierta antes de tiempo a un
+// paciente revisado que duerme en cama, para liberar su cama al instante.
+// Cuesta −0,25 ★. No cuenta como sueño completo para el alta, y el paciente
+// vuelve a dormirse en la mitad del tiempo normal.
+func (g *Game) WakeEarly(patientID string) error {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if g.over != NotOver {
+		return fmt.Errorf("%w: %v", ErrGameOver, g.over)
+	}
+	pt, err := g.findPatientLocked(patientID)
+	if err != nil {
+		return err
+	}
+	if pt.stage != InBed { // el sueño solo corre después de la revisión
+		return fmt.Errorf("%w: %s está %v", ErrNotInBed, pt.p, pt.stage)
+	}
+	if err := g.h.WakePatient(pt.p); err != nil { // lo despierta y libera la cama
+		return err
+	}
+	g.changeReputationLocked(-wakeEarlyPenalty)
+	g.wanderAgainLocked(pt, awakeDuration(g.rng, pt.p.Level())/2)
+	return nil
 }
 
 // leaveAngryLocked: pasaron 45 s desde el desplome y nadie lo revisó. Se
@@ -178,6 +216,7 @@ func (g *Game) leaveAngryLocked(pt *patient) {
 		}
 	}
 	g.cancelJobsForLocked(pt)
+	g.changeReputationLocked(-angryPenalty)
 	g.noticeLocked(fmt.Sprintf("%s se fue enojado", pt.p))
 	g.leaveLocked(pt, "(se fue enojado)")
 }

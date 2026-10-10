@@ -54,17 +54,18 @@ func TestArrival_EntersTheLobbyWhenCrossingTheDoor(t *testing.T) {
 // cabeceo llega entre los 4 + 15 y los 4 + 30 s desde que aparece en la calle,
 // y mientras va por la calle nunca se desploma.
 //
-// Se prueban 20 pacientes (2 partidas de 10) para que alguno saque un tiempo
+// Se prueban 20 pacientes (5 partidas de 4) para que alguno saque un tiempo
 // despierto corto: si el reloj corriera en la acera, ese cabecearía antes de
-// los 19 s.
+// los 19 s. Son 4 por partida porque con 5 desplomados a la vez el hospital
+// colapsa (§5.10) y la partida se congela.
 func TestAttack_NeverOnTheStreetAndOnlyAfterTheAwakeTime(t *testing.T) {
-	for seed := int64(1); seed <= 2; seed++ {
+	for seed := int64(1); seed <= 5; seed++ {
 		g, err := game.New(rand.New(rand.NewSource(seed)))
 		if err != nil {
 			t.Fatalf("New: %v", err)
 		}
-		var ids []string // los 10 aparecen en la calle en el instante 0
-		for i := 0; i < 10; i++ {
+		var ids []string // los 4 aparecen en la calle en el instante 0
+		for i := 0; i < 4; i++ {
 			ids = append(ids, g.ArriveForTest("Paciente", hospital.Severe))
 		}
 

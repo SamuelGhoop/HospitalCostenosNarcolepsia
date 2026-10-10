@@ -69,6 +69,43 @@ const (
 	severeSleepsToDischarge   = 3
 )
 
+// Economía (§5.2 y §5.8).
+const (
+	startMoney     = 2000             // plata con la que arranca la partida
+	reviewFeeMax   = 450              // pago de la revisión si esperó hasta reviewFeeGrace…
+	reviewFeeGrace = 15 * time.Second // (la espera, desde el desplome)
+	reviewFeeDrop  = 15               // …después baja esto por cada segundo completo…
+	reviewFeeMin   = 100              // …sin bajar de esto
+	dischargeFee   = 200              // el alta paga aparte
+)
+
+// Reputación (§5.9), en centésimas de estrella: 300 = 3 ★.
+const (
+	startReputation    = 300
+	maxReputation      = 500
+	firstWaitPenaltyAt = 20 * time.Second // esperando: la primera penalización a los 20 s…
+	firstWaitPenalty   = 50               // …de −0,5 ★…
+	waitPenaltyEvery   = 10 * time.Second // …y después una cada 10 s más…
+	nextWaitPenalty    = 25               // …de −0,25 ★
+	angryPenalty       = 50               // se va enojado: −0,5 ★
+	quickPickUpWithin  = 10 * time.Second // recogido en menos de esto desde el desplome…
+	quickPickUpBonus   = 10               // …+0,1 ★
+	dischargeBonus     = 10               // alta: +0,1 ★
+	wakeEarlyPenalty   = 25               // DESPERTAR antes de tiempo: −0,25 ★ (§5.7)
+)
+
+// Puntaje (§5.10).
+const (
+	reviewPoints       = 100 // por cada revisión (la atención completa)
+	dischargePoints    = 250 // por cada alta
+	dayCompletedPoints = 500 // por cada día que llega a las 20:00
+	finalMoneyDivisor  = 10  // al final: + plata ÷ 10…
+	finalStarPoints    = 200 // …+ estrellas × 200
+)
+
+// Derrota (§5.10).
+const collapseLimit = 5 // pacientes desplomados o en el pasillo a la vez para que el hospital colapse
+
 // Apariencia (§7): cuántos valores tiene cada paleta. La interfaz decide qué
 // color es cada índice.
 const (

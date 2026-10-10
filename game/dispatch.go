@@ -26,6 +26,9 @@ type job struct {
 func (g *Game) Dispatch(patientID, staffID string) error {
 	g.mu.Lock()
 	defer g.mu.Unlock()
+	if g.over != NotOver {
+		return fmt.Errorf("%w: %v", ErrGameOver, g.over)
+	}
 
 	pt, err := g.findPatientLocked(patientID)
 	if err != nil {
@@ -138,6 +141,10 @@ func (g *Game) pickUpLocked(s *StaffMember, pt *patient) {
 	history := g.h.History()
 	g.episodeTimes[history[len(history)-1].ID()] = g.clock.String()
 
+	if pt.waited < quickPickUpWithin { // §5.9: recogido rápido
+		g.changeReputationLocked(+quickPickUpBonus)
+	}
+
 	// Sin cama, RegisterEpisode no da error: el modelo lo deja dormido en el
 	// pasillo. No hay a dónde llevarlo, así que s queda libre de una vez.
 	if pt.p.Room() == nil {
@@ -170,12 +177,14 @@ func (g *Game) transferLocked(s *StaffMember, pt *patient) {
 // Es SOLO lógica del juego: no llama nada del modelo. Tampoco
 // DiagnosePatient, porque llena el cupo de 4 pacientes del médico y el
 // modelo no lo libera nunca. Aquí arranca el sueño, que dura según la
-// pericia de s. (F1.4 hace aquí el pago.)
+// pericia de s, y se paga el episodio, según cuánto esperó (§5.8).
 func (g *Game) reviewLocked(s *StaffMember, pt *patient) {
 	s.job = nil
 	pt.stage = InBed
 	pt.reviewedBy = s
 	pt.timer = sleepDuration(pt.p.Level(), s.skill)
+	g.money += reviewFee(pt.waited)
+	g.score += reviewPoints
 }
 
 // registerOnCallLocked es el mecanismo "de guardia" (§3.2). Por un momento s

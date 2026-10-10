@@ -22,4 +22,10 @@ var (
 	ErrStaffBusy         = errors.New("ese miembro del personal está ocupado")
 	ErrAlreadyDispatched = errors.New("ya alguien va en camino hacia ese paciente")
 	ErrNothingToDispatch = errors.New("ese paciente no necesita que le manden a nadie")
+
+	// ErrNotInBed: WakeEarly solo despierta a un paciente revisado que duerme en cama.
+	ErrNotInBed = errors.New("ese paciente no está revisado y durmiendo en cama")
+
+	// ErrGameOver: se pidió una acción con la partida ya perdida.
+	ErrGameOver = errors.New("la partida ya terminó")
 )

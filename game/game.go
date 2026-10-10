@@ -37,6 +37,10 @@ type Game struct {
 	nextArrival               time.Duration     // cuánto falta para que aparezca el paciente siguiente
 	notes                     map[string]string // ID del paciente → cómo sale en el Shift Report: "(alta)"
 	lastAssignErr             string            // último error de AssignRoom (consulta 5.3); "" si no hubo
+	money                     int               // plata del hospital, en pesos
+	reputation                int               // en centésimas de estrella: 300 = 3 ★ (§5.9)
+	over                      GameOver          // NotOver mientras la partida sigue
+	score                     int               // puntaje acumulado (§5.10)
 	episodeTimes              map[string]string // ID del episodio → hora del juego ("14:15"), §3.2
 	notices                   []string          // últimos avisos para la interfaz, del más viejo al más nuevo
 }
@@ -52,7 +56,7 @@ func New(rng *rand.Rand) (*Game, error) {
 			return nil, fmt.Errorf("creando la habitación %d: %w", number, err)
 		}
 	}
-	g := &Game{rng: rng, h: h, clock: newClock(), episodeTimes: map[string]string{}, notes: map[string]string{}}
+	g := &Game{rng: rng, h: h, clock: newClock(), episodeTimes: map[string]string{}, notes: map[string]string{}, money: startMoney, reputation: startReputation}
 
 	// Los helpers ...Locked se pueden llamar sin tomar g.mu porque la
 	// partida todavía no existe para ninguna otra goroutine.
@@ -75,17 +79,22 @@ func (g *Game) Tick(dt time.Duration) {
 	g.tickLocked(dt)
 }
 
-// tickLocked hace el trabajo de Tick con g.mu ya tomado. En pausa o después
-// de las 20:00 no hace nada. (F1.3 y F1.4 le agregan llegadas, pacientes,
-// camas, reputación y derrota.)
+// tickLocked hace el trabajo de Tick con g.mu ya tomado. En pausa, después
+// de las 20:00 o con la partida perdida no hace nada.
 func (g *Game) tickLocked(dt time.Duration) {
-	if g.paused || g.clock.over() {
+	if g.paused || g.over != NotOver || g.clock.over() {
 		return
 	}
 	g.clock.advance(dt)
 	g.tickArrivalsLocked(dt)
 	g.tickPatientsLocked(dt)
 	g.tickStaffLocked(dt)
+	g.checkDefeatLocked()
+	if g.over == NotOver && g.clock.over() {
+		// Este es el tick que llegó a las 20:00: los siguientes ya no
+		// entran aquí (el reloj se detiene), así que suma una sola vez.
+		g.score += dayCompletedPoints
+	}
 }
 
 // Pause congela la partida: reloj, cronómetros y llegadas (todo pasa por Tick).

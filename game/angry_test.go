@@ -88,41 +88,58 @@ func TestAngry_NobodyPickedHimUpSoTheModelNeverKnew(t *testing.T) {
 // §3.4 y §5.4: si estaba en el pasillo o esperando revisión, el juego llama
 // WakePatient: el modelo lo despierta y libera la cama si tenía. En el Shift
 // Report sale marcado "(se fue enojado)".
+//
+// Las camas se llenan con dos pacientes que SÍ se revisan a tiempo (P-001 y
+// P-002) para que solo esperen P-003 y P-004: si esperaran los cuatro, la
+// reputación llegaría a 0 a los 30 s y la partida terminaría antes (§5.10).
 func TestAngry_FromTheHallwayOrAwaitingReviewCallsWakePatient(t *testing.T) {
-	g := fullHospital(t)
-	tickFor(g, 32*time.Second) // 45 s desde el desplome de los cuatro
+	g := newGame(t)
+	for _, id := range []string{"P-001", "P-002", "P-003", "P-004"} {
+		collapse(t, g, id, "Paciente "+id, hospital.Severe, game.Cafeteria)
+	}
+	dispatch(t, g, "P-001", "C-01")
+	dispatch(t, g, "P-002", "D-01") // C-01 ya va ocupado
+	tickFor(g, 7*time.Second)       // los dos en cama; C-01 y D-01 libres
+	dispatch(t, g, "P-003", "C-01") // lo deja en la última cama a los 12 s
+	dispatch(t, g, "P-001", "D-01") // revisado a los 12 s
+	tickFor(g, 5*time.Second)
+	dispatch(t, g, "P-002", "D-01") // revisado a los 17 s
+	tickFor(g, 2*time.Second)
+	dispatch(t, g, "P-004", "C-01") // a los 19 s: ya no hay cama
+	tickFor(g, 5*time.Second)       // 19 s
 
 	snap := g.Snapshot()
-	for _, id := range []string{"P-001", "P-002", "P-003", "P-004"} {
+	p3, p4 := patientByID(t, snap, "P-003"), patientByID(t, snap, "P-004")
+	if p3.Stage != game.AwaitingReview || p4.Stage != game.InHallway {
+		t.Fatalf("preparando: P-003 %v y P-004 %v; se esperaba esperando revisión y en el pasillo", p3.Stage, p4.Stage)
+	}
+	bed := p3.Room
+
+	tickFor(g, 26*time.Second) // 45 s desde el desplome de P-003 y P-004
+	snap = g.Snapshot()
+	for _, id := range []string{"P-003", "P-004"} {
 		if p := patientByID(t, snap, id); p.Stage != game.Leaving || p.State != hospital.Awake || p.Room != 0 {
 			t.Errorf("%s = (%v, %v, hab. %d); se esperaba (saliendo, despierto, sin cama)", id, p.Stage, p.State, p.Room)
 		}
 	}
 	for _, r := range snap.Rooms {
-		if r.State != hospital.Available {
-			t.Errorf("la %d quedó %v; WakePatient debía liberarla", r.Number, r.State)
+		if r.Number == bed && r.State != hospital.Available {
+			t.Errorf("la %d (la de P-003) quedó %v; WakePatient debía liberarla", r.Number, r.State)
 		}
+	}
+	if snap.GameOver != game.NotOver {
+		t.Fatalf("la partida terminó (%v); el test debía seguir", snap.GameOver)
 	}
 
 	rep := g.Report()
 	if len(rep.Hallway) != 0 {
 		t.Errorf("consulta 5.1 = %+v; el del pasillo ya se fue", rep.Hallway)
 	}
-	for _, id := range []string{"P-003", "P-004"} { // los Severe del hospital lleno: 1 episodio cada uno
+	for _, id := range []string{"P-003", "P-004"} {
 		if line, ok := severeLine(rep, id); !ok || line.Episodes != 1 || line.Note != "(se fue enojado)" {
 			t.Errorf("consulta 5.4 de %s = %+v (¿está? %v); se esperaba 1 episodio y \"(se fue enojado)\"", id, line, ok)
 		}
 	}
-}
-
-// severeLine busca la línea de un paciente en la consulta 5.4.
-func severeLine(rep game.Report, id string) (game.SevereLine, bool) {
-	for _, line := range rep.Severe {
-		if line.PatientID == id {
-			return line, true
-		}
-	}
-	return game.SevereLine{}, false
 }
 
 // Si el médico lo revisa a los 44,9 s, el cronómetro de espera se detiene y
@@ -171,4 +188,14 @@ func TestAngry_CancelsWhoeverWasOnTheWay(t *testing.T) {
 	if p, onMap := findPatient(g.Snapshot(), "P-001"); onMap && p.Stage == game.InBed {
 		t.Error("D-01 revisó a P-001 después de que se fue")
 	}
+}
+
+// severeLine busca la línea de un paciente en la consulta 5.4.
+func severeLine(rep game.Report, id string) (game.SevereLine, bool) {
+	for _, line := range rep.Severe {
+		if line.PatientID == id {
+			return line, true
+		}
+	}
+	return game.SevereLine{}, false
 }

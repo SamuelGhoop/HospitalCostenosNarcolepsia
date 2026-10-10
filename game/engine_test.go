@@ -40,7 +40,7 @@ func TestStart_EngineAdvancesTheClockAndStopsWithTheContext(t *testing.T) {
 
 // Varias goroutines tocan la partida a la vez, como en el juego real: el
 // motor (Tick), la interfaz (lee Snapshot sin parar) y el jugador (despacha,
-// pausa y reanuda de vez en cuando). Con -race (en Docker) no debe haber
+// despierta, pausa y reanuda de vez en cuando). Con -race (en Docker) no debe haber
 // carreras.
 //
 // La que lee NO pausa: si una misma goroutine leyera y tomara el candado
@@ -80,6 +80,7 @@ func TestStart_SnapshotsWhileTheEngineRunsAreRaceFree(t *testing.T) {
 			// desapercibido para -race (se comprobó quitándole el candado).
 			_ = g.Dispatch("P-001", "C-01")
 			_ = g.Dispatch("P-002", "D-01")
+			_ = g.WakeEarly("P-001") // todavía no está en cama: ErrNotInBed, pero toca la partida
 			time.Sleep(20 * time.Millisecond)
 		}
 	}()

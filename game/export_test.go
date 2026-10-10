@@ -5,7 +5,22 @@ package game
 // idiomática de Go para que los tests de caja negra (package game_test)
 // preparen situaciones exactas sin esperar al azar.
 
-import "github.com/SamuelGhoop/HospitalCostenosNarcolepsia/hospital"
+import (
+	"math"
+	"time"
+
+	"github.com/SamuelGhoop/HospitalCostenosNarcolepsia/hospital"
+)
+
+// StopArrivalsForTest hace que no llegue nadie por la calle: la próxima
+// llegada queda a la duración más larga posible. Sirve para probar el reloj
+// solo; con llegadas, en un turno entero sin atender a nadie la partida se
+// pierde (por licencia o colapso) y el reloj se congela antes de las 20:00.
+func (g *Game) StopArrivalsForTest() {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	g.nextArrival = time.Duration(math.MaxInt64)
+}
 
 // ArriveForTest pone en la calle a un paciente nuevo, como una llegada real
 // pero sin esperar el intervalo. Devuelve el ID que le puso el juego.
