@@ -7,4 +7,7 @@ import "errors"
 var (
 	// ErrDemoFinished: se pidió otro paso cuando la demo ya mostró los 12.
 	ErrDemoFinished = errors.New("la demostración ya terminó")
+
+	// ErrDayNotOver: se pidió empezar el día siguiente antes de las 20:00.
+	ErrDayNotOver = errors.New("el turno todavía no ha terminado")
 )
