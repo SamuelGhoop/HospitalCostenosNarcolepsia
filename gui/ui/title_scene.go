@@ -31,7 +31,7 @@ var titleHitboxes hitboxes
 // NewTitleScene arma la portada. CONTINUAR va en gris: todavía no hay
 // partidas guardadas (llegan en F6).
 func NewTitleScene() *TitleScene {
-	return &TitleScene{menu: newMenu(false)}
+	return &TitleScene{menu: newTitleMenu(false)}
 }
 
 // Update lee el teclado y el mouse y avanza la portada.

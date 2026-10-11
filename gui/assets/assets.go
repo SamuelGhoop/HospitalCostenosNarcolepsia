@@ -31,3 +31,10 @@ var Title embed.FS
 //
 //go:embed fonts/PressStart2P-Regular.ttf
 var Fonts embed.FS
+
+// Pause tiene el menú de pausa: el portapapeles (una imagen por opción y
+// cuadro del cursor) y sus renglones para el mouse
+// (gui/assets/pause/PAUSE_ASSETS.md).
+//
+//go:embed pause/*.png pause/hitboxes.json
+var Pause embed.FS

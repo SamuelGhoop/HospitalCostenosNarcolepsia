@@ -125,7 +125,7 @@ func TestTitleAssets_AreEmbeddedWithTheirSizes(t *testing.T) {
 	}
 	// El portapapeles: con partida guardada, una imagen por opción; sin
 	// partida, las que dejan CONTINUAR en gris (que no se puede elegir).
-	for _, o := range menuOptions {
+	for _, o := range titleOptions {
 		for frame := 0; frame < 2; frame++ {
 			sizes[clipboardPath(o, true, frame)] = [2]int{425, 447}
 			if o != optContinue {

@@ -84,6 +84,14 @@ func (s *DemoScene) Update() (Scene, error) {
 	return s, nil
 }
 
+// La demo se puede pausar con Esc (cumple pausable). No tiene que hacer
+// nada: mientras está la pausa no recibe Update, así que todo se queda
+// quieto (el avance automático, las animaciones, el taxi y el humo) y al
+// reanudar sigue exactamente donde iba.
+func (s *DemoScene) onPause()  {}
+func (s *DemoScene) onResume() {}
+func (s *DemoScene) onQuit()   {}
+
 // advance da el siguiente paso de la demo y arma su coreografía.
 func (s *DemoScene) advance() error {
 	step, err := s.demo.Next()

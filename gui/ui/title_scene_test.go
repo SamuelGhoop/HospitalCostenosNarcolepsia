@@ -16,7 +16,7 @@ import (
 func choose(t *testing.T, s *TitleScene, o option) (Scene, error) {
 	t.Helper()
 	for i := 0; s.menu.selected != o; i++ {
-		if i > len(menuOptions) {
+		if i > len(titleOptions) {
 			t.Fatalf("no se pudo llegar a %v con ↓", o)
 		}
 		if _, err := s.update(input{down: true}); err != nil {

@@ -119,7 +119,7 @@ func loadTitle() error {
 	for _, n := range names {
 		paths = append(paths, "title/"+n+".png")
 	}
-	for _, o := range menuOptions {
+	for _, o := range titleOptions {
 		for frame := 0; frame < 2; frame++ {
 			paths = append(paths, clipboardPath(o, true, frame))
 			if o != optContinue {

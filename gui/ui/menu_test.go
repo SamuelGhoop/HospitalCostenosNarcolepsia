@@ -11,7 +11,7 @@ func press(up, down, confirm bool) input { return input{up: up, down: down, conf
 // Sin partida guardada (hasta F6) el menú arranca en NUEVA PARTIDA y las
 // flechas dan la vuelta saltándose CONTINUAR, que sale en gris.
 func TestMenu_StartsOnNewGameAndSkipsContinue(t *testing.T) {
-	m := newMenu(false)
+	m := newTitleMenu(false)
 	if m.selected != optNew {
 		t.Fatalf("arranca en %v; se esperaba NUEVA PARTIDA", m.selected)
 	}
@@ -26,7 +26,7 @@ func TestMenu_StartsOnNewGameAndSkipsContinue(t *testing.T) {
 		t.Errorf("↑ desde NUEVA PARTIDA: quedó en %v; se esperaba SALIR (da la vuelta sin pasar por CONTINUAR)", m.selected)
 	}
 
-	saved := newMenu(true) // con partida guardada (F6), CONTINUAR sí se elige
+	saved := newTitleMenu(true) // con partida guardada (F6), CONTINUAR sí se elige
 	if saved.selected != optContinue {
 		t.Errorf("con partida guardada arranca en %v; se esperaba CONTINUAR", saved.selected)
 	}
@@ -34,7 +34,7 @@ func TestMenu_StartsOnNewGameAndSkipsContinue(t *testing.T) {
 
 // El cursor alterna sus 2 cuadros cada 0,35 s (21 ticks).
 func TestMenu_CursorAlternatesEvery21Ticks(t *testing.T) {
-	m := newMenu(false)
+	m := newTitleMenu(false)
 	for tick := 0; tick < 64; tick++ {
 		if want := tick / 21 % 2; m.cursorFrame() != want {
 			t.Fatalf("tick %d: cuadro %d; se esperaba %d", tick, m.cursorFrame(), want)
@@ -46,7 +46,7 @@ func TestMenu_CursorAlternatesEvery21Ticks(t *testing.T) {
 // Al confirmar, el cursor se queda quieto en el cuadro 0 durante 0,45 s
 // (27 ticks) y recién ahí sale la acción. Mientras tanto no se mueve.
 func TestMenu_ConfirmFreezesTheCursorThenActs(t *testing.T) {
-	m := newMenu(false)
+	m := newTitleMenu(false)
 	for i := 0; i < 21; i++ { // que el cursor esté en el cuadro 1
 		m.update(input{}, nil)
 	}
@@ -69,7 +69,7 @@ func TestMenu_ConfirmFreezesTheCursorThenActs(t *testing.T) {
 
 // Sin partida guardada se usan las imágenes con CONTINUAR en gris.
 func TestMenu_ImageForTheSelection(t *testing.T) {
-	m := newMenu(false)
+	m := newTitleMenu(false)
 	if got, want := m.image(), "title/clipboard/clipboard_sincontinuar_nueva_0.png"; got != want {
 		t.Errorf("imagen = %q; se esperaba %q", got, want)
 	}
@@ -85,10 +85,10 @@ func TestHitboxes_PointInsideEachRow(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(boxes) != len(menuOptions) {
-		t.Fatalf("hay %d polígonos; se esperaban %d", len(boxes), len(menuOptions))
+	if len(boxes) != len(titleOptions) {
+		t.Fatalf("hay %d polígonos; se esperaban %d", len(boxes), len(titleOptions))
 	}
-	for _, o := range menuOptions {
+	for _, o := range titleOptions {
 		poly := boxes[o]
 		var c image.Point
 		for _, p := range poly {
@@ -127,7 +127,7 @@ func TestMenu_MouseHoverAndClick(t *testing.T) {
 		return c.Div(len(boxes[o]))
 	}
 
-	m := newMenu(false)
+	m := newTitleMenu(false)
 	m.update(input{mouse: center(optDemo), mouseMoved: true}, boxes)
 	if m.selected != optDemo {
 		t.Errorf("con el mouse sobre DEMO quedó %v", m.selected)
