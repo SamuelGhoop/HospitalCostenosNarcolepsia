@@ -49,6 +49,7 @@ func NewDemoScene(d *game.Demo) *DemoScene {
 //
 //	Espacio o clic: siguiente paso (o adelantar la coreografía en curso)
 //	A: avance automático cada 3 s · S: saltar al final · C: subtítulos
+//	(Esc abre la pausa, pero eso lo atiende la App: ver app.go)
 func (s *DemoScene) Update() (Scene, error) {
 	s.scenery.update()
 	if inpututil.IsKeyJustPressed(ebiten.KeyC) {
@@ -322,7 +323,7 @@ func (s *DemoScene) drawHUD(dst *ebiten.Image) {
 		drawText(dst, "[AUTOMÁTICO]", 24+textWidth(title, boldFace), 10, smallFace, colGreen)
 	}
 
-	hint := "ESPACIO siguiente · A automático · S saltar · C subtítulos"
+	hint := "ESPACIO siguiente · A automático · S saltar · C subtítulos · Esc pausa"
 	drawText(dst, hint, ScreenWidth-12-textWidth(hint, smallFace), 10, smallFace, colLightGray)
 }
 
