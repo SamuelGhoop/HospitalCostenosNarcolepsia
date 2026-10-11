@@ -292,6 +292,14 @@ La demo no cambia: sigue el round-robin real de la Sección 6 (sección 4).
 - Estadísticas de 1 a 5, con más probabilidad de 2–3. Cada ficha: retrato, nombre, rol, barras de **Rapidez** y **Pericia** (solo médicos) y salario diario.
 - Botón deshabilitado si no alcanza la plata. Máximo **6** miembros del personal.
 - Contratar crea el `*hospital.Doctor` o `*hospital.Orderly`, lo envuelve en `StaffMember` y llama `HireStaff`.
+- **Interfaz** (decidida el 2026-10-10; se hace en F4):
+  - En el HUD hay un **portapapeles chiquito** con la miniatura de la cabeza de un candidato, que va cambiando entre los candidatos disponibles. En F3 ya aparece, pero al darle clic muestra "Próximamente".
+  - Al hacerle clic, el portapapeles se anima hasta el centro de la pantalla y se agranda; **el juego se pausa** mientras está abierto.
+  - Se ve **un candidato a la vez**, en su hoja. Se cambia de hoja con ←/→ o con dos flechas en pantalla (con clic).
+  - La hoja tiene, a la izquierda, el **retrato** del candidato (su sprite grande, con su pelo y su piel, en la animación de quieto) y, a la derecha, su **nombre** en grande, su rol y especialidad, sus estadísticas en puntos (**rapidez** y **pericia**, de 1 a 5), el **sueldo por día** y el **costo de contratarlo**.
+  - Abajo, un botón grande **CONTRATAR**, en gris si no alcanza la plata.
+  - **Esc** o clic afuera lo cierra y el portapapeles vuelve a su sitio.
+  - El candidato es el mismo que después camina en el mapa: su apariencia vive en `game/` (`StaffMember` la guarda y `StaffView` la expone, F3b).
 
 ---
 
@@ -332,7 +340,7 @@ La demo no cambia: sigue el round-robin real de la Sección 6 (sección 4).
 | Inicio | `Hospital de los Costeños/Title Screen.dc.html` | Paisaje de playa animado, logo y menú en portapapeles: CONTINUAR, NUEVA PARTIDA, DEMO SECCIÓN 6, AJUSTES, CRÉDITOS, SALIR (sección 9.3) |
 | Hospital | `hospital.html` | Mapa top-down (habitaciones, lobby, pasillos, cafetería, radiología, sala del personal) y calle con paradero |
 | Catálogo de sprites | `sprites.html` | Exportador de spritesheets PNG |
-| Bolsa de empleo | por diseñar | Portapapeles con 3 fichas |
+| Bolsa de empleo | por diseñar (la interfaz está decidida en la sección 6) | Portapapeles que sale del HUD con un candidato por hoja (sección 6) |
 | Pausa | assets en `gui/assets/pause/` | Portapapeles derecho y centrado: REANUDAR, AJUSTES, SALIR AL MENÚ, sobre el mapa oscurecido (sección 9.4) |
 | Ajustes | por diseñar | Pantalla completa, etiquetas siempre visibles, subtítulos de la demo y volumen si hay sonido (sección 9.5) |
 | Shift Report | por diseñar | Las 4 consultas + balance del día; en la demo, botón "¡AHORA TE TOCA!". La 5.4 va rotulada "episodios en esta partida" y los episodios muestran la hora del juego (en la demo, la hora real) |
@@ -392,6 +400,7 @@ type Scene interface {
 
 ### 10.3 Sprites y animaciones
 - Personajes por capas: cuerpo (tono de piel), pelo, camisa y sombrero. La camisa va en escala de grises y se tiñe con `ColorScale`.
+  - **Cómo quedó (F3a, 2026-10-11)**: el paciente se dibuja cuerpo → camisa → pelo → sombrero y el médico con su hoja (`staff_doctor_skin*`, 64 × 120: quieto, caminar abajo, arriba e izquierda, y atender) y el pelo del paciente encima; todas las capas con el mismo cuadro y la misma GeoM (`gui/ui/layers.go`). Camisa y pelo vienen en gris y se tiñen: camisas con los 6 colores del catálogo de sprites (azul, rojo, verde, amarillo, turquesa y naranja) y pelo con negro #2e2a28, castaño oscuro #5b3a24, castaño claro #9c6b3f y canoso #d9d6d0. Calvo y "sin sombrero" no tienen capa. Un tono de piel sin hoja (hoy la piel 2) usa la 1. En el médico el pelo usa el mismo cuadro al estar quieto y caminar, y el cuadro 1 de quieto al atender (la cabeza no se mueve). El sombrero no se dibuja dormido: se cae al desplomarse y vuelve al despertarse (así vienen las hojas). En la demo la apariencia sale de `game.RandomAppearance` con una semilla sacada del ID, y el médico que atiende un episodio hace la animación de atender a su lado antes de llevárselo. El camillero sigue como rectángulo hasta que tenga sprite.
 - Spritesheet PNG: **una fila por animación, una columna por cuadro**, cuadros de 16 × 24 px. La animación hacia la derecha es la de la izquierda volteada con `GeoM.Scale(-1, 1)`.
 - Primer sprite: `gui/assets/sprites/patient_body_skin1.png` (cuerpo base), de 64 × 240 px = 4 columnas × 10 filas. Las filas van en el orden de la tabla: quieto, caminar abajo, caminar arriba, caminar izquierda, aviso de sueño, desplomarse, dormido en el piso, dormido en cama, despertarse y alta. Las animaciones de 2 cuadros dejan vacías las columnas 3 y 4.
 
