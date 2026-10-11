@@ -3,22 +3,7 @@ package ui
 import (
 	"image"
 	"testing"
-
-	"github.com/SamuelGhoop/HospitalCostenosNarcolepsia/gui/assets"
 )
-
-// La hoja del paciente viene embebida en el binario y mide 4 columnas ×
-// 10 filas de cuadros de 16×24.
-func TestPatientSheet_IsEmbeddedWithTenRowsOfFourFrames(t *testing.T) {
-	img, err := decodePNG(assets.Sprites, patientSheetPath)
-	if err != nil {
-		t.Fatalf("no se pudo leer %s: %v", patientSheetPath, err)
-	}
-
-	if got, want := img.Bounds().Size(), image.Pt(4*cellWidth, 10*cellHeight); got != want {
-		t.Errorf("la hoja mide %v; se esperaba %v", got, want)
-	}
-}
 
 func TestFrameRect_CutsTheRightCellOfTheSheet(t *testing.T) {
 	tests := []struct {

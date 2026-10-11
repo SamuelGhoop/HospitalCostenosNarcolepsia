@@ -12,12 +12,6 @@ import (
 	"github.com/SamuelGhoop/HospitalCostenosNarcolepsia/gui/assets"
 )
 
-// patientSheetPath: la hoja del cuerpo base del paciente (GAME_DESIGN §10.3).
-const patientSheetPath = "sprites/patient_body_skin1.png"
-
-// patientSheet es la hoja ya cargada como imagen de Ebitengine.
-var patientSheet *ebiten.Image
-
 // animation es una fila de la hoja de sprites: una animación.
 type animation int
 
@@ -33,6 +27,7 @@ const (
 	animSleepBed                    // dormido en cama
 	animWakeUp                      // despertarse
 	animWave                        // alta (saluda)
+	animAttend                      // atender (solo el personal: fila 5 de su hoja, ver staffRect)
 )
 
 // animSpec dice cuántos cuadros tiene una animación, cuántos ticks dura
@@ -57,12 +52,27 @@ var animSpecs = [...]animSpec{
 	animSleepBed:   {2, 36, true},
 	animWakeUp:     {4, 9, false},
 	animWave:       {4, 9, false}, // en la demo saluda una sola vez
+	animAttend:     {4, 9, false}, // atiende una vez al llegar junto al paciente
 }
+
+// attendTicks: lo que dura atender (4 cuadros × 9 ticks).
+const attendTicks = 36
 
 // frameRect es el recorte de la hoja para el cuadro i de una animación:
 // columna i, fila de la animación, de 16×24.
 func frameRect(a animation, i int) image.Rectangle {
 	x, y := i*cellWidth, int(a)*cellHeight
+	return image.Rect(x, y, x+cellWidth, y+cellHeight)
+}
+
+// staffRect es el recorte en una hoja del personal: las 4 primeras filas
+// son las mismas del paciente (quieto y caminar) y la 5 es atender.
+func staffRect(a animation, i int) image.Rectangle {
+	row := int(a)
+	if a == animAttend {
+		row = 4
+	}
+	x, y := i*cellWidth, row*cellHeight
 	return image.Rect(x, y, x+cellWidth, y+cellHeight)
 }
 
@@ -109,8 +119,8 @@ func walkAnimation(dx, dy float64) (anim animation, flip bool) {
 //   - En cualquier otro caso se dibuja tal cual en at, sin rotar (en el
 //     piso el cuerpo horizontal va así). Si flip, se voltea en su cuadro.
 //
-// Cuando lleguen las capas de camisa, pelo y sombrero, se dibujan con esta
-// misma GeoM, así rotan, se voltean y se escalan junto con el cuerpo.
+// Las capas de camisa, pelo y sombrero se dibujan con esta misma GeoM, así
+// rotan, se voltean y se escalan junto con el cuerpo (ver layers.go).
 func spritePlacement(a animation, frame int, bedAt vec, hasBed bool, at vec, flip bool) (ebiten.GeoM, bool) {
 	var g ebiten.GeoM
 	inBedFrame := a == animSleepBed || (a == animWakeUp && frame == 0)
@@ -144,12 +154,28 @@ func decodePNG(fsys fs.FS, path string) (image.Image, error) {
 	return img, nil
 }
 
-// loadSprites carga las hojas embebidas como imágenes de Ebitengine.
+// loadSprites carga como imágenes de Ebitengine todas las hojas de las
+// capas (las de piel repetidas se cargan una vez).
 func loadSprites() error {
-	img, err := decodePNG(assets.Sprites, patientSheetPath)
-	if err != nil {
-		return err
+	paths := append(bodySheets[:], doctorSheets[:]...) // el arreglo está lleno: append copia
+	for _, p := range shirtSheets {
+		paths = append(paths, p)
 	}
-	patientSheet = ebiten.NewImageFromImage(img)
+	for _, p := range hairSheets {
+		paths = append(paths, p)
+	}
+	for _, p := range hatSheets {
+		paths = append(paths, p)
+	}
+	for _, p := range paths {
+		if _, done := sheetImgs[p]; done {
+			continue
+		}
+		img, err := decodePNG(assets.Sprites, p)
+		if err != nil {
+			return err
+		}
+		sheetImgs[p] = ebiten.NewImageFromImage(img)
+	}
 	return nil
 }

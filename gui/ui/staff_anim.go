@@ -1,0 +1,45 @@
+package ui
+
+// staffAnim recuerda la animación de un médico: quieto, caminando o
+// atendiendo. Como la del paciente, avanza tick a tick según cuánto se
+// movió (step).
+type staffAnim struct {
+	anim     animation
+	ticks    int  // ticks desde que empezó la animación actual
+	flip     bool // caminando hacia la derecha
+	attended bool // ya atendió en esta parada (se borra al volver a caminar)
+}
+
+// set arranca una animación desde su primer cuadro.
+func (a *staffAnim) set(an animation) { a.anim, a.ticks = an, 0 }
+
+// keep pone una animación que se repite, sin reiniciarla si ya iba en ella.
+func (a *staffAnim) keep(an animation) {
+	if a.anim != an {
+		a.set(an)
+	}
+}
+
+// step avanza un tick. dx, dy es cuánto se movió en este tick; attending
+// dice si la coreografía lo tiene atendiendo a un paciente. Al parar ahí
+// hace atender una vez y después queda quieto.
+func (a *staffAnim) step(dx, dy float64, attending bool) {
+	a.ticks++
+	moving := dx != 0 || dy != 0
+	switch {
+	case moving:
+		a.attended = false // en la próxima parada puede volver a atender
+		an, flip := walkAnimation(dx, dy)
+		a.keep(an)
+		a.flip = flip
+	case attending && !a.attended:
+		a.attended = true
+		a.flip = false
+		a.set(animAttend)
+	case a.anim == animAttend && !finished(animAttend, a.ticks):
+		// que termine de atender
+	default:
+		a.flip = false
+		a.keep(animIdle)
+	}
+}

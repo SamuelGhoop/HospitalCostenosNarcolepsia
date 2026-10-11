@@ -22,7 +22,7 @@ func runChoreo(c *choreography, pos map[string]vec, lying map[string]bool, maxTi
 // hasta él; lo llevan a la cama; el que atendió vuelve a su sala.
 func TestAttendChoreography_WithBedFollowsTheFourPhases(t *testing.T) {
 	attack, home := vec{30, 160}, vec{480, 145}
-	c := attendChoreography("P-001", "D-01", attack, home, zoneRoom101, true)
+	c := attendChoreography("P-001", "D-01", attack, home, zoneRoom101, true, 0)
 
 	// Fase 1: solo se mueve el paciente; el médico espera en su sala.
 	if to, ok := c.target("P-001"); !ok || to != attack {
@@ -68,7 +68,7 @@ func TestAttendChoreography_WithBedFollowsTheFourPhases(t *testing.T) {
 // Paso 8: sin cama, el que atiende se queda a su lado un rato y vuelve.
 func TestAttendChoreography_WithoutBedStaysBesideThenGoesBack(t *testing.T) {
 	attack, home := vec{420, 210}, vec{480, 145}
-	c := attendChoreography("P-004", "D-01", attack, home, 0, false)
+	c := attendChoreography("P-004", "D-01", attack, home, 0, false, 0)
 	pos := map[string]vec{"P-004": {200, 140}, "D-01": home}
 
 	runChoreo(c, pos, map[string]bool{"P-004": true}, 1000)
@@ -83,7 +83,7 @@ func TestAttendChoreography_WithoutBedStaysBesideThenGoesBack(t *testing.T) {
 
 func TestAttendChoreography_WithoutBedWaitsBesideThePatient(t *testing.T) {
 	attack := vec{420, 210}
-	c := attendChoreography("P-004", "D-01", attack, vec{480, 145}, 0, false)
+	c := attendChoreography("P-004", "D-01", attack, vec{480, 145}, 0, false, 0)
 	yes := func(string) bool { return true }
 	c.step(yes, yes) // fase 1 terminada
 	c.step(yes, yes) // fase 2 terminada: el médico llegó a su lado

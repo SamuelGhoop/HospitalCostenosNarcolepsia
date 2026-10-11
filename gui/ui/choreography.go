@@ -11,6 +11,7 @@ const helperHold = 60
 type phase struct {
 	moves     map[string]vec // a dónde camina cada personaje, por ID
 	waitLying string         // ID del paciente que debe terminar de desplomarse ("" = no esperar)
+	attend    string         // ID del médico que atiende al paciente en esta fase ("" = nadie)
 	hold      int            // ticks de espera al terminar
 }
 
@@ -70,7 +71,9 @@ func (c *choreography) step(arrived, lying func(id string) bool) {
 //
 //  1. el paciente camina hasta donde le dio el ataque y se desploma;
 //  2. quien lo atendió (el que eligió el round-robin del modelo) camina
-//     desde la sala del personal hasta él;
+//     desde la sala del personal hasta él y lo atiende: attendHold ticks
+//     a su lado (los de la animación de atender si es médico; 0 si es el
+//     camillero, que todavía no tiene sprite);
 //  3. con cama: lo lleva a la habitación (el paciente va acostado);
 //     sin cama: se queda a su lado un momento;
 //  4. vuelve a la sala del personal.
@@ -78,10 +81,10 @@ func (c *choreography) step(arrived, lying func(id string) bool) {
 // La fase 1 fija a TODOS los que participan: si no, la escena mandaría a
 // cada uno directo a su puesto final del modelo (por ejemplo, el paciente
 // a su cama antes de que lo atiendan).
-func attendChoreography(patient, attender string, attackAt, staffHome vec, room zone, hasBed bool) *choreography {
+func attendChoreography(patient, attender string, attackAt, staffHome vec, room zone, hasBed bool, attendHold int) *choreography {
 	phases := []phase{
 		{moves: map[string]vec{patient: attackAt, attender: staffHome}, waitLying: patient},
-		{moves: map[string]vec{attender: helperSpot(attackAt)}},
+		{moves: map[string]vec{attender: helperSpot(attackAt)}, attend: attender, hold: attendHold},
 	}
 	if hasBed {
 		phases = append(phases, phase{moves: map[string]vec{
@@ -105,4 +108,13 @@ func carryChoreography(patient, carrier string, patientAt, carrierHome vec, room
 		{moves: map[string]vec{patient: bedCell(room), carrier: toVec(carrySpot(room))}},
 		{moves: map[string]vec{carrier: carrierHome}},
 	}}
+}
+
+// attending es el ID de quien atiende a un paciente en la fase actual ("" si
+// nadie): al parar a su lado hace la animación de atender.
+func (c *choreography) attending() string {
+	if c.done() {
+		return ""
+	}
+	return c.phases[c.i].attend
 }

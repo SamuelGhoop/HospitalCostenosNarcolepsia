@@ -30,6 +30,7 @@ type DemoScene struct {
 	paths    map[string][]vec        // lo que le falta de ruta a cada personaje (ver routes.go)
 	pathTo   map[string]vec          // el destino para el que se calculó esa ruta
 	anims    map[string]*patientAnim // animación de cada paciente, por ID
+	staff    map[string]*staffAnim   // animación de cada médico, por ID
 	choreo   *choreography           // coreografía del último paso; nil si no hay o ya terminó
 	carried  string                  // paciente que el último paso pasó del pasillo a una cama
 	auto     autoAdvance
@@ -40,7 +41,7 @@ type DemoScene struct {
 // NewDemoScene prepara la escena para una demo recién creada.
 func NewDemoScene(d *game.Demo) *DemoScene {
 	s := &DemoScene{demo: d, pos: map[string]vec{}, paths: map[string][]vec{}, pathTo: map[string]vec{},
-		anims: map[string]*patientAnim{}, showSubs: true}
+		anims: map[string]*patientAnim{}, staff: map[string]*staffAnim{}, showSubs: true}
 	s.refresh()
 	return s
 }
@@ -115,6 +116,9 @@ func (s *DemoScene) animate() {
 		s.pos[f.id] = now
 		if a, ok := s.anims[f.id]; ok {
 			a.step(now.x-old.x, now.y-old.y, s.onBed(f))
+		}
+		if a, ok := s.staff[f.id]; ok {
+			a.step(now.x-old.x, now.y-old.y, s.choreo != nil && s.choreo.attending() == f.id)
 		}
 	}
 
@@ -206,7 +210,11 @@ func (s *DemoScene) choreographyFor(step game.DemoStep) *choreography {
 		if e.Room != 0 {
 			attackAt = toVec(floorSpot(zoneFor(e.Location), 0)) // con cama: se desploma donde le dio el ataque
 		}
-		return attendChoreography(patient.id, attender.id, attackAt, attender.target, roomZone(e.Room), e.Room != 0)
+		hold := 0
+		if attender.doctor {
+			hold = attendTicks // el médico atiende antes de llevárselo
+		}
+		return attendChoreography(patient.id, attender.id, attackAt, attender.target, roomZone(e.Room), e.Room != 0, hold)
 	}
 
 	if s.carried != "" {
@@ -235,7 +243,7 @@ func (s *DemoScene) refresh() {
 	lying := map[zone]int{}    // puestos de piso usados en cada zona
 
 	for _, p := range s.snap.Patients {
-		f := figure{id: p.ID, patient: true, state: p.State, level: p.Level, room: p.Room}
+		f := figure{id: p.ID, patient: true, state: p.State, level: p.Level, room: p.Room, look: demoLook(p.ID)}
 		z := zoneFor(p.Location)
 		_, inRoomZone := roomMockupX[z] // ¿la zona es una habitación?
 		switch {
@@ -270,9 +278,12 @@ func (s *DemoScene) refresh() {
 	}
 
 	for i, st := range s.snap.Staff {
-		f := figure{id: st.ID, doctor: st.IsDoctor, target: toVec(slot(zoneStaffRoom, i))}
+		f := figure{id: st.ID, doctor: st.IsDoctor, target: toVec(slot(zoneStaffRoom, i)), look: demoLook(st.ID)}
 		if _, seen := s.pos[st.ID]; !seen {
 			s.pos[st.ID] = f.target // el personal aparece directo en su sala
+			if st.IsDoctor {
+				s.staff[st.ID] = &staffAnim{}
+			}
 		}
 		s.figures = append(s.figures, f)
 	}
@@ -287,7 +298,7 @@ func (s *DemoScene) Draw(screen *ebiten.Image) {
 
 	lyingIn := map[int]bool{} // habitaciones con alguien ya acostado en la cama
 	for _, f := range s.figures {
-		drawFigureBody(screen, f, s.pos[f.id], s.anims[f.id]) // anims[id] es nil para el personal
+		drawFigureBody(screen, f, s.pos[f.id], s.anims[f.id], s.staff[f.id]) // nil si no es paciente o médico
 		if f.patient && s.onBed(f) {
 			lyingIn[f.room] = true
 		}
