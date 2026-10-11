@@ -349,7 +349,7 @@ La demo no cambia: sigue el round-robin real de la Sección 6 (sección 4).
 - Inicio → Hospital: el portapapeles se voltea + pixel dissolve.
 - Fin del día → Shift Report: las fichas caen y se clavan en un tablero de corcho.
 
-### 9.3 Pantalla de inicio (pendiente: junto con el mapa de fondo, 10.7, antes de F3)
+### 9.3 Pantalla de inicio (hecha, 2026-10-10)
 - Escena `Title`. Capas, animaciones y portapapeles en `gui/assets/title/`, explicados en `gui/assets/title/TITLE_ASSETS.md`:
   - el paisaje va a **320 × 180** y se dibuja **×4** (escalado entero, *nearest*);
   - el portapapeles va como **imagen ya inclinada**: una por opción seleccionada, 2 cuadros del cursor, la variante con CONTINUAR en gris (`sincontinuar`) y `hitboxes.json` para el mouse.
@@ -357,6 +357,7 @@ La demo no cambia: sigue el round-robin real de la Sección 6 (sección 4).
 - **Menú**: CONTINUAR, NUEVA PARTIDA, DEMO SECCIÓN 6, AJUSTES, CRÉDITOS y SALIR. CONTINUAR sale en gris si no hay partida guardada (5.11); hasta F6 siempre sale en gris.
 - Se navega con **↑/↓** (o **W/S**), **Enter** y el mouse.
 - Todo se anima por ticks de `Update`, nunca con `time.Sleep`.
+- **Cómo quedó**: NUEVA PARTIDA (hasta F3) y AJUSTES (hasta F6) muestran el aviso "Próximamente" durante 1,5 s en el lugar de "PRESIONA ENTER"; DEMO SECCIÓN 6 abre la demo, y su Shift Report vuelve a la portada con Espacio o clic; CRÉDITOS abre una pantalla con el mismo paisaje (Enter o Esc vuelven); SALIR cierra limpio (`ebiten.Termination`). "HOSPITAL DE LOS" va a 40 px y "COSTEÑOS" a 72; la virgulilla de la Ñ va limpia, con contorno negro y relleno amarillo, sin el relieve rojo (decisión de Samuel). Press Start 2P se usa solo en la portada, los créditos y el aviso; el resto de la interfaz sigue en Go Mono.
 
 ### 9.4 Menú de pausa (pendiente: junto con la pantalla de inicio)
 - Capa encima de la escena (10.2). Assets y medidas en `gui/assets/pause/PAUSE_ASSETS.md`: portapapeles derecho y centrado con REANUDAR, AJUSTES y SALIR AL MENÚ, sobre el mapa oscurecido.
@@ -423,7 +424,7 @@ type Scene interface {
 
 ### 10.5 Texto
 - Fuente **Press Start 2P** (OFL) en `assets/fonts/`, con `text/v2`. Llega con la pantalla de inicio (9.3); mientras tanto la interfaz usa Go Mono a 16/14/20 px.
-- ⚠️ **Tildes**: en Press Start 2P la Ó, É, Í, Ú y Ñ vienen encogidas (para que la tilde quepa en el cuadro de 8 × 8) y parecen minúsculas. Donde se use esa fuente, la tilde se dibuja **a mano encima de la letra normal**, como la virgulilla de COSTEÑOS en la maqueta. Lo hace solo un helper de texto.
+- ⚠️ **Tildes**: en Press Start 2P la Ó, É, Í, Ú y Ñ vienen encogidas (para que la tilde quepa en el cuadro de 8 × 8) y parecen minúsculas. Donde se use esa fuente, la tilde se dibuja **a mano encima de la letra normal**, como la virgulilla de COSTEÑOS en la maqueta. Lo hace solo un helper de texto (`accentMarks` en `gui/ui/pixelfont.go`, con su test): cambia Á, É, Í, Ó, Ú y Ñ mayúsculas por la letra normal y dibuja la tilde encima, por arriba de la línea, porque las mayúsculas la llenan entera.
 
 ### 10.6 Comunicación con `game/`
 - Cada `Draw` usa `game.Snapshot()`: una copia de solo lectura construida con el mutex de `Game` tomado. `Snapshot()` y `Report()` contienen **solo valores** (textos, números y estados), nunca punteros del modelo como `*hospital.Patient`: la interfaz no puede leer el hospital sin pasar por `Game`.
