@@ -59,6 +59,13 @@ func drawPatientSprite(dst *ebiten.Image, f figure, at vec, a *patientAnim) {
 	drawLayers(dst, patientLayers(f.look, a.anim, frame), g)
 }
 
+// drawRider dibuja al paciente acostado sobre la camilla fp (yendo en d),
+// con sus capas y la animación de dormido en el piso.
+func drawRider(dst *ebiten.Image, f figure, a *patientAnim, fp image.Rectangle, d dir) {
+	frame := frameAt(a.anim, a.ticks)
+	drawLayers(dst, patientLayers(f.look, a.anim, frame), riderPlacement(fp, d))
+}
+
 // drawDoctorSprite dibuja al médico (su hoja y el pelo encima) en el cuadro
 // actual de su animación. Nunca va en una cama: solo se voltea si camina a
 // la derecha.

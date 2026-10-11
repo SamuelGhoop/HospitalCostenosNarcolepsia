@@ -40,12 +40,13 @@ type animSpec struct {
 
 // animSpecs sale de la tabla de GAME_DESIGN §10.3:
 // 500 ms = 30 ticks · 150 ms = 9 · 250 ms = 15 · 120 ms = 7 · 600 ms = 36.
+// Caminar va a 8 ticks por cuadro (unos 133 ms), acorde con la velocidad.
 // Es un arreglo indexado por animation: animSpecs[animIdle] es la de quieto.
 var animSpecs = [...]animSpec{
 	animIdle:       {2, 30, true},
-	animWalkDown:   {4, 9, true},
-	animWalkUp:     {4, 9, true},
-	animWalkLeft:   {4, 9, true},
+	animWalkDown:   {4, 8, true}, // unos 8 cuadros por segundo, acorde con el paso
+	animWalkUp:     {4, 8, true},
+	animWalkLeft:   {4, 8, true},
 	animDrowsy:     {4, 15, true},
 	animCollapse:   {4, 7, false},
 	animSleepFloor: {2, 36, true},

@@ -34,13 +34,13 @@ var obstacles = buildObstacles()
 
 func buildObstacles() []image.Rectangle {
 	var out []image.Rectangle
-	for _, x0 := range roomMockupX { // las 3 habitaciones, iguales
+	for room, x0 := range roomMockupX { // las 3 habitaciones, iguales
 		out = append(out,
 			sprite(x0+1, 18, 3, 5), sprite(x0+21, 18, 3, 5), // cortinas
-			sprite(x0+28, 19, 6, 6),   // mesita de noche
-			sprite(x0+39, 19, 12, 20), // cama
-			sprite(x0+60, 19, 5, 9),   // suero
-			sprite(x0+83, 55, 7, 7),   // silla de visitas
+			sprite(x0+28, 19, 6, 6), // mesita de noche
+			bedObstacle(room),       // cama
+			sprite(x0+60, 19, 5, 9), // suero
+			sprite(x0+83, 55, 7, 7), // silla de visitas
 		)
 	}
 	out = append(out,
@@ -58,8 +58,14 @@ func buildObstacles() []image.Rectangle {
 			out = append(out, sprite(x, y, 6, 6))
 		}
 	}
-	return append(out, sprite(351, 100, 35, 12), sprite(432, 104, 14, 40), sprite(406, 122, 14, 22), staffConsole) // sala del personal
+	out = append(out, sprite(351, 100, 35, 12), sprite(432, 104, 14, 40), sprite(406, 122, 14, 22), staffConsole) // sala del personal
+	// La acera: el paradero, su poste y la base de las 2 palmas (la copa no:
+	// vista desde arriba, se camina por debajo).
+	return append(out, sprite(120, 188, 38, 13), sprite(181, 188, 2, 12), sprite(292.5, 191.5, 10, 6), sprite(392.5, 191.5, 10, 6))
 }
+
+// bedObstacle es la cama de una habitación como mueble.
+func bedObstacle(room zone) image.Rectangle { return sprite(roomMockupX[room]+39, 19, 12, 20) }
 
 // onFurniture dice si r toca algún mueble.
 func onFurniture(r image.Rectangle) bool {
@@ -87,22 +93,49 @@ var (
 )
 
 // helperSpots: dónde puede pararse quien atiende a un paciente en el piso,
-// en orden de preferencia: a su lado (a 60 px, más que una etiqueta), y si
-// ahí no cabe, en diagonal arriba o abajo (90 px: lo que ocupa uno de pie
-// con su punto y su etiqueta).
-var helperSpots = []image.Point{{60, 0}, {-60, 0}, {44, -90}, {-44, -90}, {44, 90}, {-44, 90}}
+// en orden de preferencia: a su lado (un cuadro y media etiqueta más allá)
+// y, si ahí no cabe, en diagonal arriba o abajo (lo que ocupa uno de pie
+// con su punto y su etiqueta). Si tampoco, en el pasillo 1, debajo de la
+// puerta de la zona (ver doorHelperSpots).
+var helperSpots = []image.Point{
+	{figWidth + 24, 0}, {-figWidth - 24, 0},
+	{figWidth, -figHeight - 40}, {-figWidth, -figHeight - 40},
+	{figWidth, figHeight}, {-figWidth, figHeight},
+}
+
+// doorHelperSpots son los puestos en el pasillo 1 junto a cada puerta de
+// la zona z que da al pasillo (con los pies cerca del borde de abajo del
+// pasillo): debajo de la puerta y a sus lados. De ahí se ve al paciente
+// por la puerta.
+func doorHelperSpots(z zone) []image.Point {
+	r, h := zones[z].rect, zones[zoneHallway1].rect
+	var out []image.Point
+	for _, d := range doorways {
+		if d.gap.Max.Y < r.Max.Y-navCell || d.gap.Min.Y > r.Max.Y+navCell || d.gap.Min.X < r.Min.X || d.gap.Max.X > r.Max.X {
+			continue // no es una puerta de abajo de esta zona
+		}
+		for _, dx := range []int{0, figWidth + figWidth/2, -figWidth - figWidth/2, 2*figWidth + figWidth/2, -2*figWidth - figWidth/2} {
+			feet := image.Pt(d.gap.Min.X+d.gap.Dx()/2+dx, h.Max.Y-navCell)
+			out = append(out, feet.Sub(feetOffsetPt))
+		}
+	}
+	return out
+}
 
 // shape es lo que ocupa un personaje en un puesto: el cuadro del cuerpo y,
 // por separado, cada uno de sus rótulos (burbuja, rayitos, punto, etiqueta).
 // Por separado y no en un solo rectángulo: la burbuja con sus rayitos es
 // más ancha que el cuerpo, pero va arriba, así que al lado cabe alguien.
 type shape struct {
-	cell   image.Rectangle
-	labels []image.Rectangle
+	cell     image.Rectangle
+	labels   []image.Rectangle // etiqueta y punto
+	floating []image.Rectangle // burbuja y rayitos: flotan sobre el acostado
 }
 
 // rects son todos los rectángulos de la forma.
-func (sh shape) rects() []image.Rectangle { return append([]image.Rectangle{sh.cell}, sh.labels...) }
+func (sh shape) rects() []image.Rectangle {
+	return append(append([]image.Rectangle{sh.cell}, sh.labels...), sh.floating...)
+}
 
 // overlaps dice si dos formas se tocan en algún rectángulo.
 func (sh shape) overlaps(other shape) bool {
@@ -125,19 +158,27 @@ var (
 )
 
 // shapeAt arma la forma de los personajes de muestra en at, con los mismos
-// rótulos que dibuja figureOverlays.
-func shapeAt(at image.Point, figs []figure, bubble bool) shape {
-	sh := shape{cell: image.Rectangle{at, at.Add(image.Pt(figWidth, figHeight))}}
+// rótulos que dibuja figureOverlays. body es lo que ocupa el cuerpo: el
+// cuadro entero de pie; acostado, solo lo que se ve (arriba del cuadro
+// queda vacío, y ahí va la burbuja).
+func shapeAt(at image.Point, figs []figure, bubble bool, body image.Rectangle) shape {
+	sh := shape{cell: body.Add(at)}
 	for _, f := range figs {
 		for _, o := range figureOverlays(f, toVec(at), bubble) {
-			sh.labels = append(sh.labels, o.rect)
+			if o.floating {
+				sh.floating = append(sh.floating, o.rect)
+			} else {
+				sh.labels = append(sh.labels, o.rect)
+			}
 		}
 	}
 	return sh
 }
 
-func standingShape(at image.Point) shape { return shapeAt(at, sampleStanding, false) }
-func lyingShape(at image.Point) shape    { return shapeAt(at, []figure{sampleLying}, true) }
+func standingShape(at image.Point) shape {
+	return shapeAt(at, sampleStanding, false, image.Rect(0, 0, figWidth, figHeight))
+}
+func lyingShape(at image.Point) shape { return shapeAt(at, []figure{sampleLying}, true, floorBody) }
 
 // ─── Puestos ───────────────────────────────────────────────────────────
 
@@ -159,105 +200,125 @@ type zoneSpots struct {
 
 var spotCache = map[zone]*zoneSpots{}
 
+// standingClearOfFloor: cuántos puestos de pie (los primeros) dejan libre
+// el primer puesto de piso de la zona. Los demás solo se usan cuando hay
+// mucha gente de pie: en la demo, los 5 pacientes recién llegados a la
+// recepción (pasos 3 y 4); cuando Ludys se desploma ahí (paso 7) ya solo
+// quedan 2 de pie. A ×3 la recepción no da para más.
+const standingClearOfFloor = 2
+
 // lyingZones son las zonas donde un paciente se puede desplomar en el piso:
 // por donde deambula (GAME_DESIGN §5.4) y el pasillo 1. En las habitaciones
 // se acuesta en la cama y a la sala del personal no entra.
 var lyingZones = map[zone]bool{zoneLobby: true, zoneCafeteria: true, zoneRadiology: true, zoneHallway1: true, zoneHallway2: true}
 
-// spotsOf calcula los puestos de una zona. Necesita las fuentes cargadas:
-// los rótulos se miden con su fuente.
-//
-// Se recorre la zona en una cuadrícula de 2 px. Un puesto sirve si:
+// spotFree dice si un personaje cabe en at, con los pies en la zona z.
+// body es lo que se ve de su cuerpo y sh su forma con los rótulos; taken,
+// las formas de los puestos ya elegidos. Un puesto sirve si:
+//   - se llega caminando desde la puerta principal (standable): ningún
+//     puesto queda en un rincón encerrado por los muebles;
+//   - no queda frente a la puerta principal (por ahí entran todos, y la
+//     puerta se cierra sola cuando no hay nadie cerca);
 //   - el cuerpo visible queda dentro de la zona y no toca ningún mueble;
 //   - el cuadro y los rótulos quedan dentro de la zona, sin tapar el rótulo
 //     de la zona ni a los puestos que ya se eligieron.
 //
-// Si así no cabe (o no caben todos), hay un segundo intento en el que los
-// rótulos pueden salirse unos píxeles de la zona, siempre que no tapen
-// otro rótulo de zona, un letrero de habitación ni un mueble (decisión de
-// Samuel, 2026-10-10).
+// En el pasillo 1, más bajito que un personaje, "dentro de la zona" vale
+// para los pies: lo de arriba (la cabeza, el punto) se monta sobre la pared
+// (vista 3/4; decisión de Samuel, 2026-10-11).
 //
-// Los puestos de piso se buscan desde abajo (lejos de los que están de pie)
-// y llevan cerca el de quien atiende (ver helperSpots).
-// Los de pie se buscan desde arriba y no se montan sobre los dos primeros
-// de piso.
+// Si no es strict (el segundo intento), los rótulos pueden salirse de la
+// zona, siempre que no tapen otro rótulo de zona, un letrero de habitación
+// ni un mueble (decisión de Samuel, 2026-10-10). La burbuja y los rayitos
+// de un acostado sí pueden quedar sobre un mueble: flotan encima de él (a
+// ×3, en radiología no cabe de otra forma; pendiente del OK de Samuel).
+func spotFree(z zone, at image.Point, body image.Rectangle, sh shape, strict bool, taken []shape) bool {
+	r := zones[z].rect
+	inside := func(x image.Rectangle) bool {
+		if z == zoneHallway1 {
+			x.Min.Y = max(x.Min.Y, r.Min.Y) // la cabeza puede quedar sobre la pared de arriba
+		}
+		return x.In(r)
+	}
+	if !inside(body) || onFurniture(body) || !standable(at.Add(feetOffsetPt)) {
+		return false
+	}
+	if distToRect(toVec(at.Add(feetOffsetPt)), doorways[len(doorways)-1].gap) <= doorReach {
+		return false // frente a la puerta principal no se para nadie: por ahí entran y la puerta se cierra sola
+	}
+
+	for _, rr := range sh.rects() {
+		if coversALabel(rr) || (strict && !inside(rr)) { // ni el rótulo de una zona ni el letrero de una habitación
+			return false
+		}
+	}
+	if !strict {
+		for _, l := range sh.labels {
+			if onFurniture(l) || coversALabel(l) {
+				return false
+			}
+		}
+		for _, l := range sh.floating {
+			if coversALabel(l) {
+				return false
+			}
+		}
+	}
+	for _, t := range taken {
+		if sh.overlaps(t) {
+			return false
+		}
+	}
+	return true
+}
+
+// zoneOfFeet es la zona donde están los pies de alguien parado en at.
+func zoneOfFeet(at image.Point) zone {
+	z, _ := zoneAt(toVec(at.Add(feetOffsetPt)))
+	return z
+}
+
+// spotsOf calcula los puestos de una zona. Necesita las fuentes cargadas:
+// los rótulos se miden con su fuente.
+//
+// Se recorre la zona en una cuadrícula de 2 px y se toman los puestos que
+// cumplen spotFree, primero con todo dentro de la zona y, si no caben (o
+// no caben todos), en un segundo intento en el que los rótulos se pueden
+// salir.
+//
+// Los puestos de piso (floorOf) van primero. Los de pie se buscan desde
+// arriba, y los primeros standingClearOfFloor no se montan sobre el primer
+// puesto de piso (con su ayudante).
 func spotsOf(z zone) *zoneSpots {
 	if s, ok := spotCache[z]; ok {
 		return s
 	}
 	r := zones[z].rect
-	label := zoneLabelBox(z)
-	s := &zoneSpots{}
-	var taken []shape // formas ya ocupadas
-
+	s := &zoneSpots{floor: floorOf(z)}
+	var floorShapes, standingShapes []shape
+	if len(s.floor) > 0 {
+		f := s.floor[0]
+		floorShapes = []shape{lyingShape(f.patient), standingShape(f.helper)}
+	}
 	strict := true // el primer intento exige todo dentro de la zona
-	free := func(body image.Rectangle, sh shape) bool {
-		if !body.In(r) || onFurniture(body) {
-			return false
-		}
-		for _, rr := range sh.rects() {
-			if rr.Overlaps(label) || (strict && !rr.In(r)) {
-				return false
-			}
-		}
-		if !strict {
-			for _, l := range sh.labels {
-				if onFurniture(l) || coversALabel(l) {
-					return false
-				}
-			}
-		}
-		for _, t := range taken {
-			if sh.overlaps(t) {
-				return false
-			}
-		}
-		return true
-	}
-
-	const step = 2
-	findFloor := func() {
-		for y := r.Max.Y - figHeight; y >= r.Min.Y; y -= step { // de piso: desde abajo
-			for x := r.Min.X; x+figWidth <= r.Max.X; x += step {
-				at := image.Pt(x, y)
-				sh := lyingShape(at)
-				if !free(floorBody.Add(at), sh) {
-					continue
-				}
-				for _, d := range helperSpots {
-					h := at.Add(d)
-					hs := standingShape(h)
-					if !hs.overlaps(sh) && free(standingBody.Add(h), hs) {
-						s.floor = append(s.floor, floorPlace{at, h, !strict})
-						taken = append(taken, sh, hs)
-						break
-					}
-				}
-			}
-		}
-	}
 	findStanding := func() {
-		for y := r.Min.Y; y+figHeight <= r.Max.Y; y += step { // de pie: desde arriba
-			for x := r.Min.X; x+figWidth <= r.Max.X; x += step {
+		top := r.Min.Y
+		if z == zoneHallway1 {
+			top = r.Max.Y - figHeight - 20 // los pies dentro; la cabeza puede quedar sobre la pared
+		}
+		for y := top; y+figHeight <= r.Max.Y; y += spotStep { // de pie: desde arriba
+			for x := r.Min.X; x+figWidth <= r.Max.X; x += spotStep {
 				at := image.Pt(x, y)
-				if sh := standingShape(at); free(standingBody.Add(at), sh) {
+				avoid := standingShapes
+				if len(s.standing) < standingClearOfFloor {
+					avoid = append(append([]shape(nil), standingShapes...), floorShapes...)
+				}
+				if sh := standingShape(at); spotFree(z, at, standingBody.Add(at), sh, strict, avoid) {
 					s.standing = append(s.standing, at)
-					taken = append(taken, sh)
+					standingShapes = append(standingShapes, sh)
 				}
 			}
 		}
-	}
-
-	if lyingZones[z] {
-		findFloor()
-		if len(s.floor) == 0 { // no cupo con todo dentro: se deja que los rótulos se salgan
-			strict = false
-			findFloor()
-			strict = true
-		}
-	}
-	if len(taken) > 4 {
-		taken = taken[:4] // de pie se respetan solo los 2 primeros puestos de piso (con su ayudante)
 	}
 	findStanding()
 	s.strictStanding = len(s.standing)
@@ -265,6 +326,56 @@ func spotsOf(z zone) *zoneSpots {
 	findStanding()
 	spotCache[z] = s
 	return s
+}
+
+// spotStep: el paso de la búsqueda de puestos, en px.
+const spotStep = 2
+
+// floorCache guarda los puestos de piso de cada zona (ver floorOf).
+var floorCache = map[zone][]floorPlace{}
+
+// floorOf calcula los puestos de piso de una zona: el paciente acostado y
+// quien lo atiende cerca, a su lado, en diagonal (helperSpots) o en el
+// pasillo 1 junto a la puerta (doorHelperSpots). Se buscan desde abajo
+// (lejos de los que están de pie). Solo en lyingZones.
+func floorOf(z zone) []floorPlace {
+	if f, ok := floorCache[z]; ok {
+		return f
+	}
+	var out []floorPlace
+	if lyingZones[z] {
+		r := zones[z].rect
+		var taken []shape
+		find := func(strict bool) {
+			for y := r.Max.Y - figHeight; y >= r.Min.Y-floorBody.Min.Y; y -= spotStep {
+				for x := r.Min.X; x+figWidth <= r.Max.X; x += spotStep {
+					at := image.Pt(x, y)
+					sh := lyingShape(at)
+					if !spotFree(z, at, floorBody.Add(at), sh, strict, taken) {
+						continue
+					}
+					var helpers []image.Point
+					for _, d := range helperSpots {
+						helpers = append(helpers, at.Add(d))
+					}
+					for _, h := range append(helpers, doorHelperSpots(z)...) {
+						hs := standingShape(h)
+						if !hs.overlaps(sh) && spotFree(zoneOfFeet(h), h, standingBody.Add(h), hs, strict, append(taken, sh)) {
+							out = append(out, floorPlace{at, h, !strict})
+							taken = append(taken, sh, hs)
+							break
+						}
+					}
+				}
+			}
+		}
+		find(true)
+		if len(out) == 0 { // no cupo con todo dentro: se deja que los rótulos se salgan
+			find(false)
+		}
+	}
+	floorCache[z] = out
+	return out
 }
 
 // coversALabel dice si r tapa el rótulo de alguna zona o el letrero de
@@ -287,6 +398,9 @@ func coversALabel(r image.Rectangle) bool {
 // relaxedSpot dice si el puesto at (de pie o de piso, o el ayudante de uno
 // de piso) de la zona z salió del segundo intento del buscador.
 func relaxedSpot(z zone, at image.Point) bool {
+	if wakeRelaxed[at] {
+		return true
+	}
 	s := spotsOf(z)
 	for i, p := range s.standing {
 		if p == at {

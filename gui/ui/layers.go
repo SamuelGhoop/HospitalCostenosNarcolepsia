@@ -137,8 +137,17 @@ func drawLayers(dst *ebiten.Image, ls []layer, g ebiten.GeoM) {
 // demoLook es la apariencia de un personaje de la demo, que no la trae de
 // game: sale de game.RandomAppearance con una semilla fija sacada del ID,
 // así el mismo personaje siempre se ve igual.
-func demoLook(id string) game.Appearance {
+func demoLook(id string) game.Appearance { return saltedLook(id, demoSeedSalt) }
+
+// demoSeedSalt se mezcla con el ID en la semilla. Con esta, los 2 médicos
+// de la demo salen con piel distinta y no hay dos pacientes con el mismo
+// sombrero y el mismo color de camisa (las dos reglas las fija un test).
+// De las que cumplen, es la primera en la que además los médicos tienen
+// pelo distinto y los pacientes llevan 3 pieles y los 3 sombreros.
+const demoSeedSalt = 83
+
+func saltedLook(id string, salt uint64) game.Appearance {
 	h := fnv.New64a()
 	h.Write([]byte(id))
-	return game.RandomAppearance(rand.New(rand.NewSource(int64(h.Sum64()))))
+	return game.RandomAppearance(rand.New(rand.NewSource(int64(h.Sum64() ^ salt))))
 }

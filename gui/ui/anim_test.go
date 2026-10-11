@@ -86,3 +86,23 @@ func TestBubbleFor_DependsOnWhereThePatientSleeps(t *testing.T) {
 		t.Error("un paciente despierto no lleva burbuja")
 	}
 }
+
+// Velocidad (pedido de Samuel, 2026-10-11): el personal camina a 2 px por
+// tick y los pacientes a 1,5; la animación de caminar va a unos 8 cuadros
+// por segundo (8 ticks por cuadro).
+func TestWalking_SpeedAndAnimation(t *testing.T) {
+	if got := speedOf(figure{id: "D-01", doctor: true}); got != 2 {
+		t.Errorf("médico: %v px por tick; se esperaba 2", got)
+	}
+	if got := speedOf(figure{id: "C-01"}); got != 2 {
+		t.Errorf("camillero: %v px por tick; se esperaba 2", got)
+	}
+	if got := speedOf(figure{id: "P-001", patient: true}); got != 1.5 {
+		t.Errorf("paciente: %v px por tick; se esperaba 1,5", got)
+	}
+	for _, a := range []animation{animWalkDown, animWalkUp, animWalkLeft} {
+		if got := animSpecs[a].ticksPerFrame; got != 8 {
+			t.Errorf("caminar (%v): %d ticks por cuadro; se esperaban 8", a, got)
+		}
+	}
+}

@@ -62,7 +62,7 @@ func TestStaffAnim_AttendsOnceWhenItStopsBesideThePatient(t *testing.T) {
 // termine de atender antes de llevarlo a la cama.
 func TestAttendChoreography_TheDoctorAttendsBeforeCarrying(t *testing.T) {
 	attack := vec{30, 160}
-	c := attendChoreography("P-001", "D-01", attack, vec{480, 145}, zoneRoom101, true, attendTicks)
+	c := attendChoreography("P-001", "D-01", attack, vec{480, 145}, zoneRoom101, true, attendTicks, nil)
 	yes := func(string) bool { return true }
 	if c.attending() != "" {
 		t.Errorf("en la fase 1 ya atiende %q", c.attending())

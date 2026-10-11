@@ -6,6 +6,8 @@ import (
 	"image/color"
 	"math"
 	"strings"
+
+	"github.com/SamuelGhoop/HospitalCostenosNarcolepsia/hospital"
 )
 
 // Tamaños de pantalla (GAME_DESIGN §10.7): resolución lógica de 1280×720,
@@ -24,15 +26,17 @@ const (
 )
 
 // Cada personaje es un cuadro de 16×24 px en su hoja de sprites y se
-// dibuja ×2 (escalado entero, sin suavizar): en la pantalla mide 32×48.
-// (Se probó ×3 y se descartó: los personajes quedaban más altos que el
-// pasillo 1 y más anchos que el hueco de las puertas.)
+// dibuja ×3 (escalado entero, sin suavizar): en la pantalla mide 48×72
+// (decisión de Samuel, 2026-10-11). Es más alto que el pasillo 1 y más ancho
+// que el hueco de las puertas, así que las reglas valen para los pies: en
+// el pasillo 1 la cabeza se monta sobre la pared de arriba (vista 3/4) y al
+// cruzar una puerta el cuerpo roza el marco.
 const (
 	cellWidth   = 16
 	cellHeight  = 24
-	spriteScale = 2
-	figWidth    = cellWidth * spriteScale  // 32
-	figHeight   = cellHeight * spriteScale // 48
+	spriteScale = 3
+	figWidth    = cellWidth * spriteScale  // 48
+	figHeight   = cellHeight * spriteScale // 72
 )
 
 // fromMockup convierte un rectángulo de la maqueta (x, y, ancho, alto) a
@@ -93,9 +97,6 @@ var (
 	buildingRect = fromMockup(4, 14, 456, 168)
 	sidewalkRect = fromMockup(0, 182, 464, 28)
 	streetRect   = fromMockup(0, 213, 464, 46)
-	// entrance: en la acera, frente a la puerta de la recepción. Ahí
-	// aparece cada paciente nuevo antes de caminar hacia adentro.
-	entrance = fromMockup(208, 186, 0, 0).Min
 )
 
 // roomMockupX es la x de cada habitación en la maqueta, para ubicar su cama.
@@ -136,6 +137,16 @@ func zoneFor(location string) zone {
 	return zoneLobby
 }
 
+// roomNumber es el número de la habitación de una zona (0 si no es una).
+func roomNumber(z zone) int {
+	for _, n := range []int{101, 102, 103} {
+		if roomZone(n) == z {
+			return n
+		}
+	}
+	return 0
+}
+
 // roomZone es la zona de la habitación con ese número.
 func roomZone(number int) zone {
 	return zoneFor(fmt.Sprintf("habitación %d", number))
@@ -162,14 +173,67 @@ func bedCell(room zone) vec {
 // idLabelHalfWidth: la mitad de la etiqueta "P-001" (unos 50 px), con aire.
 const idLabelHalfWidth = 27
 
-// wakeSpot: donde queda de pie el que se despierta, a la IZQUIERDA de la
-// cama (la derecha es para los rótulos del que esté acostado): con el
-// cuerpo justo debajo de la mesita de noche y su etiqueta sin tocar la cama.
+// wakeSpot: donde queda de pie el que se despierta, al lado de su cama. Se
+// busca el puesto libre (spotFree) más cercano al costado DERECHO de la
+// cama, donde se para quien trae a un paciente, y si no, al IZQUIERDO,
+// debajo de la mesita de noche: primero con todo dentro de la habitación y,
+// solo si así no cabe en ningún lado, con los rótulos afuera (el segundo
+// intento). A ×3, a la derecha no queda sitio con todo dentro (el suero, la
+// silla de visitas y el letrero de la habitación), así que queda a la
+// izquierda. Se calcula una vez por habitación.
 func wakeSpot(room zone) image.Point {
-	bed := bedRect(room)
+	if p, ok := wakeCache[room]; ok {
+		return p
+	}
+	bed, r := bedRect(room), zones[room].rect
 	nightstand := sprite(roomMockupX[room]+28, 19, 6, 6)
-	return image.Pt(bed.Min.X-figWidth/2-idLabelHalfWidth, nightstand.Max.Y-standingBody.Min.Y)
+	right := carrySpot(room)
+	left := image.Pt(bed.Min.X-figWidth/2-idLabelHalfWidth, nightstand.Max.Y-standingBody.Min.Y)
+	// Lo que ocupa un paciente acostado en esa cama (el cuerpo y sus rótulos,
+	// a la derecha de la cama): puede llegar otro mientras este sigue ahí.
+	sleeper := figure{id: "P-000", patient: true, state: hospital.AsleepInBed, level: hospital.Severe, room: roomNumber(room)}
+	sh := shape{cell: bedBody.Add(image.Pt(int(bedCell(room).x), int(bedCell(room).y)))}
+	for _, o := range figureOverlays(sleeper, bedCell(room), true) {
+		sh.labels = append(sh.labels, o.rect)
+	}
+	inBed := []shape{sh}
+	for _, strict := range []bool{true, false} {
+		best := map[bool]image.Point{}
+		bestD := map[bool]float64{true: math.Inf(1), false: math.Inf(1)}
+		for y := r.Min.Y; y+figHeight <= r.Max.Y+figHeight; y += 2 {
+			for x := r.Min.X; x+figWidth <= r.Max.X; x += 2 {
+				at := image.Pt(x, y)
+				body := standingBody.Add(at)
+				isRight := body.Min.X >= bed.Max.X
+				if !isRight && body.Max.X > bed.Min.X {
+					continue // ni a un lado ni al otro: encima de la cama
+				}
+				anchor := left
+				if isRight {
+					anchor = right
+				}
+				d := math.Hypot(float64(x-anchor.X), float64(y-anchor.Y))
+				if d < bestD[isRight] && spotFree(room, at, body, standingShape(at), strict, inBed) {
+					best[isRight], bestD[isRight] = at, d
+				}
+			}
+		}
+		for _, side := range []bool{true, false} {
+			if !math.IsInf(bestD[side], 1) {
+				wakeCache[room] = best[side]
+				wakeRelaxed[best[side]] = !strict
+				return best[side]
+			}
+		}
+	}
+	wakeCache[room] = left
+	return left
 }
+
+// wakeRelaxed dice qué puestos de despertar salieron del segundo intento.
+var wakeRelaxed = map[image.Point]bool{}
+
+var wakeCache = map[zone]image.Point{}
 
 // carrySpot: donde se para, a la DERECHA de la cama, quien trae a un
 // paciente: con el cuerpo justo debajo del suero. Es de paso: después

@@ -22,7 +22,7 @@ func runChoreo(c *choreography, pos map[string]vec, lying map[string]bool, maxTi
 // hasta él; lo llevan a la cama; el que atendió vuelve a su sala.
 func TestAttendChoreography_WithBedFollowsTheFourPhases(t *testing.T) {
 	attack, home := vec{30, 160}, vec{480, 145}
-	c := attendChoreography("P-001", "D-01", attack, home, zoneRoom101, true, 0)
+	c := attendChoreography("P-001", "D-01", attack, home, zoneRoom101, true, 0, nil)
 
 	// Fase 1: solo se mueve el paciente; el médico espera en su sala.
 	if to, ok := c.target("P-001"); !ok || to != attack {
@@ -47,13 +47,19 @@ func TestAttendChoreography_WithBedFollowsTheFourPhases(t *testing.T) {
 		t.Error("en la fase 2 el paciente sigue donde se desplomó")
 	}
 
-	// Fase 3: los dos van a la habitación; fase 4: el médico vuelve.
+	// Fase 3: lo lleva en camilla a la habitación (el cómo lo hace la
+	// escena); el médico termina donde dice el plan de la camilla, junto a
+	// la cama. Fase 4: el médico vuelve.
 	c.step(func(string) bool { return true }, func(string) bool { return true })
 	if to, _ := c.target("P-001"); to != bedCell(zoneRoom101) {
 		t.Errorf("fase 3: el paciente va a %v; se esperaba la cama de la 101", to)
 	}
-	if to, _ := c.target("D-01"); to != toVec(carrySpot(zoneRoom101)) {
-		t.Errorf("fase 3: el médico va a %v; se esperaba al lado de la cama", to)
+	order := c.carrying()
+	if order == nil || order.pusher != "D-01" || order.patient != "P-001" {
+		t.Fatalf("fase 3: el traslado es %+v; se esperaba en camilla, D-01 empujando a P-001", order)
+	}
+	if to, _ := c.target("D-01"); to != order.plan.anchor() {
+		t.Errorf("fase 3: el médico va a %v; se esperaba el final del plan de la camilla %v", to, order.plan.anchor())
 	}
 	c.step(func(string) bool { return true }, func(string) bool { return true })
 	if to, _ := c.target("D-01"); to != home {
@@ -68,7 +74,7 @@ func TestAttendChoreography_WithBedFollowsTheFourPhases(t *testing.T) {
 // Paso 8: sin cama, el que atiende se queda a su lado un rato y vuelve.
 func TestAttendChoreography_WithoutBedStaysBesideThenGoesBack(t *testing.T) {
 	attack, home := vec{420, 210}, vec{480, 145}
-	c := attendChoreography("P-004", "D-01", attack, home, 0, false, 0)
+	c := attendChoreography("P-004", "D-01", attack, home, 0, false, 0, nil)
 	pos := map[string]vec{"P-004": {200, 140}, "D-01": home}
 
 	runChoreo(c, pos, map[string]bool{"P-004": true}, 1000)
@@ -83,7 +89,7 @@ func TestAttendChoreography_WithoutBedStaysBesideThenGoesBack(t *testing.T) {
 
 func TestAttendChoreography_WithoutBedWaitsBesideThePatient(t *testing.T) {
 	attack := vec{420, 210}
-	c := attendChoreography("P-004", "D-01", attack, vec{480, 145}, 0, false, 0)
+	c := attendChoreography("P-004", "D-01", attack, vec{480, 145}, 0, false, 0, nil)
 	yes := func(string) bool { return true }
 	c.step(yes, yes) // fase 1 terminada
 	c.step(yes, yes) // fase 2 terminada: el médico llegó a su lado
@@ -99,7 +105,7 @@ func TestAttendChoreography_WithoutBedWaitsBesideThePatient(t *testing.T) {
 // Paso 11: el camillero va hasta Wilfrido, lo lleva a su cama y vuelve.
 func TestCarryChoreography_TheOrderlyTakesThePatientToBed(t *testing.T) {
 	hallway, home := vec{420, 210}, vec{536, 145}
-	c := carryChoreography("P-004", "C-01", hallway, home, zoneRoom101)
+	c := carryChoreography("P-004", "C-01", hallway, home, zoneRoom101, nil)
 
 	// El paciente debe quedarse QUIETO en el pasillo hasta que llegue el
 	// camillero (si la coreografía no lo fija, la escena lo mandaría solo a

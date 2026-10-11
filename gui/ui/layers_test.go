@@ -238,3 +238,25 @@ func TestDemoLook_FixedByIDAndVaried(t *testing.T) {
 		t.Errorf("los %d personajes de la demo tienen solo %d apariencias distintas", len(ids), len(distinct))
 	}
 }
+
+// Variedad en la demo (pedido de Samuel, 2026-10-11): los 2 médicos se ven
+// con piel distinta (hoja distinta: la piel 2 todavía se dibuja con la 1) y
+// no hay dos pacientes con el mismo sombrero y el mismo color de camisa.
+func TestDemoLook_DoctorsDifferAndNoTwinPatients(t *testing.T) {
+	if a, b := demoLook("D-01"), demoLook("D-02"); doctorSheets[a.SkinTone] == doctorSheets[b.SkinTone] {
+		t.Errorf("D-01 y D-02 se dibujan con la misma piel (%s)", doctorSheets[a.SkinTone])
+	}
+	type key struct {
+		hat   game.Hat
+		shirt int
+	}
+	seen := map[key]string{}
+	for _, id := range []string{"P-001", "P-002", "P-003", "P-004", "P-005"} {
+		l := demoLook(id)
+		k := key{l.Hat, l.ShirtColor}
+		if other, dup := seen[k]; dup {
+			t.Errorf("%s y %s tienen el mismo sombrero (%v) y el mismo color de camisa (%d)", other, id, l.Hat, l.ShirtColor)
+		}
+		seen[k] = id
+	}
+}

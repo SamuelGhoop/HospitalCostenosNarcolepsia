@@ -13,7 +13,12 @@ type patientAnim struct {
 	state           hospital.PatientState // estado en la última foto
 	room            int                   // última cama en la que durmió (para el cuadro 1 de despertarse)
 	pendingCollapse bool                  // se durmió fuera de la cama: primero camina hasta el sitio
+	waveOnArrival   bool                  // se acaba de despertar: saluda cuando llegue a su sitio
 }
+
+// holdsStill dice si el paciente no se puede mover todavía: mientras se
+// despierta (en la cama, se sienta y se para) se queda donde estaba.
+func (a *patientAnim) holdsStill() bool { return a.anim == animWakeUp }
 
 // showsBubble dice si toca dibujar la burbuja Zzz: solo cuando ya está
 // acostado. El modelo lo marca dormido desde que le da el ataque, pero en
@@ -35,9 +40,8 @@ func (a *patientAnim) keep(an animation) {
 }
 
 // observe compara el estado nuevo del modelo con el anterior y arranca la
-// animación de transición que toque. Devuelve true si el paciente se acaba
-// de levantar de la cama: la escena lo pone de una vez al lado de la cama.
-func (a *patientAnim) observe(state hospital.PatientState, room int) (leftBed bool) {
+// animación de transición que toque.
+func (a *patientAnim) observe(state hospital.PatientState, room int) {
 	was := a.state
 	a.state = state
 	if room != 0 {
@@ -50,10 +54,8 @@ func (a *patientAnim) observe(state hospital.PatientState, room int) (leftBed bo
 		// cama, después lo llevan cargado (lo dirige la coreografía).
 		a.pendingCollapse = true
 	case was != hospital.Awake && state == hospital.Awake:
-		a.set(animWakeUp)
-		leftBed = was == hospital.AsleepInBed
+		a.set(animWakeUp) // se despierta donde está; después camina a su sitio
 	}
-	return leftBed
 }
 
 // settle deja al paciente de una vez en la animación de reposo de su estado.
@@ -85,7 +87,8 @@ func (a *patientAnim) step(dx, dy float64, inBed bool) {
 	switch a.anim {
 	case animWakeUp:
 		if finished(a.anim, a.ticks) {
-			a.set(animWave) // en la demo: se despierta y saluda una vez
+			a.set(animIdle) // ya de pie: camina a su sitio (el costado de la cama)
+			a.waveOnArrival = true
 		}
 		return
 	case animWave:
@@ -119,6 +122,10 @@ func (a *patientAnim) step(dx, dy float64, inBed bool) {
 		an, flip := walkAnimation(dx, dy)
 		a.keep(an)
 		a.flip = flip
+	case a.waveOnArrival:
+		a.waveOnArrival = false
+		a.flip = false
+		a.set(animWave) // en la demo: al llegar a su sitio saluda una vez
 	default:
 		a.flip = false
 		a.keep(animIdle)

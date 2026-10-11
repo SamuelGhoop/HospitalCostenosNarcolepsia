@@ -1,111 +1,37 @@
 package ui
 
 import (
-	"fmt"
 	"image"
+	"maps"
+	"math"
 	"testing"
 
 	"github.com/SamuelGhoop/HospitalCostenosNarcolepsia/game"
 	"github.com/SamuelGhoop/HospitalCostenosNarcolepsia/hospital"
 )
 
-// Pedido por Samuel: ningún tramo entre dos puntos de paso conectados cruza
-// una pared. Las paredes salen de los mismos rectángulos de la maqueta: lo
-// caminable es el piso de las zonas, los huecos de las puertas y lo de
-// afuera del edificio.
-func TestRoutes_NoSegmentCrossesAWall(t *testing.T) {
-	nodes := waypoints()
-	for i, a := range nodes {
-		for _, j := range neighbors(nodes, i) {
-			if b := nodes[j]; !walkableSegment(a, b) {
-				t.Errorf("el tramo %v → %v cruza una pared", a, b)
-			}
-		}
-	}
-}
-
-// El detector de paredes funciona: el tramo directo de la 101 a la 102 (lo
-// que hacía el camillero en la captura s11c) atraviesa la pared entre las dos.
-func TestWalkableSegment_SeesTheWallBetweenTwoRooms(t *testing.T) {
-	a := toVec(slot(zoneRoom101, 0)).add(feetOffset)
-	b := toVec(slot(zoneRoom102, 0)).add(feetOffset)
-	if walkableSegment(a, b) {
-		t.Error("el tramo directo de la 101 a la 102 no debería ser caminable: hay una pared")
-	}
-}
-
-// Una ruta (en coordenadas de cuadro) recorre tramos caminables por los pies
-// y termina en el destino.
-func checkRoute(t *testing.T, what string, from, to vec) []vec {
-	t.Helper()
-	path := route(from, to)
-	if len(path) == 0 || path[len(path)-1] != to {
-		t.Fatalf("%s: la ruta %v no termina en %v", what, path, to)
-	}
-	prev := from
-	for _, p := range path {
-		if !walkableSegment(prev.add(feetOffset), p.add(feetOffset)) {
-			t.Errorf("%s: el tramo %v → %v cruza una pared", what, prev, p)
-		}
-		prev = p
-	}
-	return path
-}
-
-// El caso de la captura s11c: de la 101 a la 102 se sale al pasillo 1.
-func TestRoute_FromRoom101ToRoom102GoesThroughHallway1(t *testing.T) {
-	path := checkRoute(t, "101 → 102", toVec(slot(zoneRoom101, 0)), toVec(slot(zoneRoom102, 0)))
-	for _, p := range path {
-		if z, ok := zoneAt(p.add(feetOffset)); ok && z == zoneHallway1 {
-			return
-		}
-	}
-	t.Errorf("la ruta de la 101 a la 102 (%v) no pasa por el pasillo 1", path)
-}
-
-// De la acera a la sala del personal se entra por la puerta principal: la
-// ruta pasa por el lado de afuera de la puerta y enseguida por el de adentro.
-func TestRoute_FromTheSidewalkEntersThroughTheMainDoor(t *testing.T) {
-	path := checkRoute(t, "acera → sala del personal", toVec(entrance), toVec(slot(zoneStaffRoom, 0)))
-	main := doorways[len(doorways)-1] // la puerta principal es la última de la lista
-	out, in := main.sides[1].add(vec{-feetOffset.x, -feetOffset.y}), main.sides[0].add(vec{-feetOffset.x, -feetOffset.y})
-	for i := 0; i+1 < len(path); i++ {
-		if path[i] == out && path[i+1] == in {
-			return
-		}
-	}
-	t.Errorf("la ruta desde la acera (%v) no cruza la puerta principal (%v → %v)", path, out, in)
-}
-
-// Todas las zonas quedan conectadas entre sí, y con la acera. Se usa el
-// centro de cada zona (con los pies ahí), no un puesto de pie: en el
-// pasillo 1 nadie se para.
-func TestRoute_ConnectsEveryPairOfZones(t *testing.T) {
-	spots := map[string]vec{"acera": toVec(entrance)}
-	for _, z := range zoneOrder {
-		c := zones[z].rect.Min.Add(zones[z].rect.Max).Div(2)
-		spots[zones[z].label] = vec{float64(c.X) - feetOffset.x, float64(c.Y) - feetOffset.y}
-	}
-	for a, from := range spots {
-		for b, to := range spots {
-			checkRoute(t, fmt.Sprintf("%s → %s", a, b), from, to)
-		}
-	}
-}
-
-// En toda la demo, en cada tick: los pies de cada personaje están sobre algo
-// caminable (nadie atraviesa una pared), y los que están quietos no quedan
-// uno encima del otro ni sobre un mueble del fondo.
-func TestDemo_NobodyWalksThroughWallsOrStandsOnSomeoneElse(t *testing.T) {
-	if err := loadFonts(); err != nil {
-		t.Fatal(err)
-	}
+// Pedido por Samuel (2026-10-11): en toda la demo, tick a tick, nadie
+// atraviesa paredes ni muebles. Lo que pisa el suelo no los toca:
+//   - de pie o caminando, los pies (la huella feetBox);
+//   - acostado en el piso, lo que se ve del cuerpo;
+//   - la camilla, su huella (con el paciente encima).
+//
+// No cuentan el que está en su cama (la cama es un mueble, pero ahí sí va)
+// ni el paciente mientras pasa del piso a la camilla o de la camilla a la
+// cama. Y los que están quietos no quedan uno encima del otro.
+//
+// Los muebles son los de la maqueta (obstacles) y las paredes, lo que no
+// es piso: la cuadrícula de las rutas se arma con ellos, pero el test los
+// mira directo, así que si a la cuadrícula le faltara un mueble, el test
+// lo nota.
+func TestDemo_NobodyWalksThroughWallsOrFurniture(t *testing.T) {
+	needFonts(t)
 	s := NewDemoScene(game.NewDemo())
 	for step := 1; step <= game.DemoSteps; step++ {
 		if err := s.advance(); err != nil {
 			t.Fatal(err)
 		}
-		for tick := 0; tick < 3000; tick++ {
+		for tick := 0; tick < 8000; tick++ {
 			s.animate()
 			checkTick(t, s, step, tick)
 			if s.choreo == nil && s.everyoneArrived() {
@@ -115,20 +41,21 @@ func TestDemo_NobodyWalksThroughWallsOrStandsOnSomeoneElse(t *testing.T) {
 	}
 }
 
-// visibleBody es lo que se ve del cuerpo de un personaje en su puesto. ok
-// es false para el que duerme en su cama: la cama es un mueble, pero ahí sí
-// va.
-func visibleBody(s *DemoScene, f figure) (image.Rectangle, bool) {
-	at := s.pos[f.id]
-	p := image.Pt(int(at.x), int(at.y))
-	switch {
-	case f.patient && s.onBed(f):
-		return image.Rectangle{}, false
-	case f.patient && f.state != hospital.Awake:
-		return floorBody.Add(p), true // acostado en el piso
-	default:
-		return standingBody.Add(p), true
+// onFurnitureBut dice si r toca un mueble de la maqueta que no sea except.
+func onFurnitureBut(r, except image.Rectangle) bool {
+	for _, o := range obstacles {
+		if o != except && r.Overlaps(o) {
+			return true
+		}
 	}
+	return false
+}
+
+// touchesWallOrFurniture dice si r toca una pared (lo que no es piso) o un
+// mueble de la maqueta.
+func touchesWallOrFurniture(r image.Rectangle) bool {
+	navMaps()
+	return count(wallSum, r) > 0 || onFurniture(r)
 }
 
 // everyoneArrived dice si todos los personajes ya llegaron a su destino.
@@ -143,19 +70,34 @@ func (s *DemoScene) everyoneArrived() bool {
 
 func checkTick(t *testing.T, s *DemoScene, step, tick int) {
 	t.Helper()
+	if s.carry != nil && s.carry.visible() && touchesWallOrFurniture(s.carry.fp) {
+		t.Fatalf("paso %d, tick %d: la camilla (%v) toca una pared o un mueble", step, tick, s.carry.fp)
+	}
 	var still []figure
 	for _, f := range s.figures {
 		at := s.pos[f.id]
-		if !walkable(at.add(feetOffset)) {
-			t.Fatalf("paso %d, tick %d: %s tiene los pies en una pared, en %v", step, tick, f.id, at)
+		p := image.Pt(int(math.Round(at.x)), int(math.Round(at.y)))
+		hopping := s.inCarry(f.id) && f.id == s.carry.order.patient && s.carry.stage >= carryHopOn && s.carry.stage <= carryHopOff
+		a := s.anims[f.id]
+		switch {
+		case f.patient && s.onBed(f), hopping:
+			// en su cama, o pasando del piso a la camilla y de la camilla a la cama
+		case a != nil && a.state == hospital.Awake && a.room != 0 && feetBox.Add(p.Add(feetOffsetPt)).Overlaps(bedObstacle(roomZone(a.room))):
+			// se levantó de su cama y se baja: sus pies pueden ir sobre ella, no sobre nada más
+			if feet := feetBox.Add(p.Add(feetOffsetPt)); count(wallSum, feet) > 0 || onFurnitureBut(feet, bedObstacle(roomZone(a.room))) {
+				t.Fatalf("paso %d, tick %d: al bajarse de la cama, los pies de %s (%v) tocan una pared u otro mueble", step, tick, f.id, feet)
+			}
+		case a != nil && (a.showsBubble() || a.anim == animCollapse):
+			if body := floorBody.Add(p); touchesWallOrFurniture(body) {
+				t.Fatalf("paso %d, tick %d: %s está acostado sobre una pared o un mueble (%v)", step, tick, f.id, body)
+			}
+		default:
+			if feet := feetBox.Add(p.Add(feetOffsetPt)); touchesWallOrFurniture(feet) {
+				t.Fatalf("paso %d, tick %d: los pies de %s (%v) tocan una pared o un mueble", step, tick, f.id, feet)
+			}
 		}
-		if at == s.destination(f) {
+		if at == s.destination(f) && !hopping && p.X < ScreenWidth { // fuera de la pantalla esperan los que van a llegar
 			still = append(still, f)
-		}
-	}
-	for _, f := range still {
-		if body, ok := visibleBody(s, f); ok && onFurniture(body) {
-			t.Fatalf("paso %d, tick %d: %s está quieto sobre un mueble (%v)", step, tick, f.id, body)
 		}
 	}
 	for i, a := range still {
@@ -163,6 +105,67 @@ func checkTick(t *testing.T, s *DemoScene, step, tick int) {
 			if figureBody(a, s.pos[a.id]).Overlaps(figureBody(b, s.pos[b.id])) {
 				t.Fatalf("paso %d, tick %d: %s y %s están quietos uno encima del otro (%v, %v)",
 					step, tick, a.id, b.id, s.pos[a.id], s.pos[b.id])
+			}
+		}
+	}
+}
+
+// Pedido por Samuel (2026-10-11): nada de teletransporte. En toda la demo,
+// tick a tick, nadie se mueve en un tick más que su velocidad, más un píxel
+// de redondeo (la camilla y el paciente encima van al píxel). La excepción
+// es aparecer: los pacientes nuevos aparecen fuera de la pantalla. Al
+// paciente que llevan en camilla lo mueve quien la empuja: va a la
+// velocidad del personal.
+//
+// ⚠️ Pendiente de Samuel: al girar, la camilla cambia de dirección de golpe
+// y el paciente que va encima pasa de un lado de quien empuja al otro (55 a
+// 72 px). Girarla de a poco no cabe: en el pasillo 1, de 66 px de alto, la
+// camilla de 54 px choca con la pared a los 10° de girar alrededor de quien
+// empuja. Mientras Samuel decide, ese tick es la única otra excepción, y en
+// él el paciente sigue sobre la camilla y quien empuja no se mueve de más.
+func TestDemo_NobodyJumps(t *testing.T) {
+	needFonts(t)
+	s := NewDemoScene(game.NewDemo())
+	const rounding = 1.0
+	before := maps.Clone(s.pos)
+	for step := 1; step <= game.DemoSteps; step++ {
+		if err := s.advance(); err != nil {
+			t.Fatal(err)
+		}
+		for _, f := range s.figures {
+			if _, seen := before[f.id]; !seen {
+				if f.patient && s.pos[f.id].x < ScreenWidth {
+					t.Errorf("paso %d: %s aparece dentro de la pantalla, en %v", step, f.id, s.pos[f.id])
+				}
+				before[f.id] = s.pos[f.id]
+			}
+		}
+		for tick := 0; tick < 8000; tick++ {
+			prev, prevDir := s.carry, dir(-1)
+			if prev != nil {
+				prevDir = prev.dir
+			}
+			s.animate()
+			c := s.carry
+			for _, f := range s.figures {
+				was, now := before[f.id], s.pos[f.id]
+				limit := speedOf(f)
+				if c != nil && c.visible() && f.id == c.order.patient {
+					limit = staffSpeed
+					if c == prev && c.riding() && c.dir != prevDir {
+						if now != riderPos(c.fp) {
+							t.Errorf("paso %d, tick %d: al girar la camilla, %s no va sobre ella", step, tick, f.id)
+						}
+						continue // el giro de golpe (pendiente de Samuel)
+					}
+				}
+				if d := math.Hypot(now.x-was.x, now.y-was.y); d > limit+rounding {
+					t.Errorf("paso %d, tick %d: %s se movió %.1f px en un tick (de %v a %v); su velocidad es %.1f", step, tick, f.id, d, was, now, limit)
+				}
+			}
+			before = maps.Clone(s.pos)
+			if s.choreo == nil && s.everyoneArrived() {
+				break
 			}
 		}
 	}

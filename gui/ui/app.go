@@ -17,7 +17,7 @@ var _ ebiten.Game = (*App)(nil)
 // NewApp carga las fuentes, los sprites, el mapa, la portada y la pausa, y
 // arranca en la portada.
 func NewApp() (*App, error) {
-	for _, load := range []func() error{loadFonts, loadPixelFont, loadSprites, loadMap, loadTitle, loadPause} {
+	for _, load := range []func() error{loadFonts, loadPixelFont, loadSprites, loadStretcher, loadMap, loadTitle, loadPause} {
 		if err := load(); err != nil {
 			return nil, err
 		}

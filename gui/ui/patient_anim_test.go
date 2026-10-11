@@ -113,21 +113,31 @@ func TestPatientAnim_BubbleOnlyWhileLyingAsleep(t *testing.T) {
 }
 
 // Pedido por Samuel: en la demo, al despertarse sigue "alta" (saluda) una
-// sola vez y luego queda quieto. Nadie se va del hospital en la demo.
+// sola vez y luego queda quieto. Nadie se va del hospital en la demo. Y nada
+// de teletransporte (2026-10-11): se despierta en la cama, camina hasta el
+// costado y ahí saluda.
 func TestPatientAnim_WakesUpThenWavesOnceThenStandsStill(t *testing.T) {
 	a := &patientAnim{state: hospital.AsleepInBed, room: 101, anim: animSleepBed}
 
-	leftBed := a.observe(hospital.Awake, 0)
-	if !leftBed || a.anim != animWakeUp {
-		t.Fatalf("al despertarse: (salió de la cama %v, animación %d); se esperaba (true, despertarse)", leftBed, a.anim)
+	a.observe(hospital.Awake, 0)
+	if a.anim != animWakeUp || !a.holdsStill() {
+		t.Fatalf("al despertarse: animación %d, quieto=%v; se esperaba despertarse, quieto", a.anim, a.holdsStill())
 	}
 	if a.room != 101 {
 		t.Errorf("debe recordar la cama 101 para dibujar ahí el cuadro 1; recuerda %d", a.room)
 	}
 
 	stepN(a, ticksOf(animWakeUp), 0, 0, false)
+	if a.anim == animWave || a.holdsStill() {
+		t.Errorf("recién de pie: animación %d, quieto=%v; todavía no saluda: primero camina al costado de la cama", a.anim, a.holdsStill())
+	}
+	stepN(a, 40, patientSpeed, 0, false)
+	if a.anim != animWalkLeft {
+		t.Errorf("caminando al costado de la cama: animación %d; se esperaba caminar", a.anim)
+	}
+	stepN(a, 1, 0, 0, false) // llegó
 	if a.anim != animWave {
-		t.Errorf("después de despertarse: animación %d; se esperaba alta (saluda)", a.anim)
+		t.Errorf("al llegar al costado de la cama: animación %d; se esperaba alta (saluda)", a.anim)
 	}
 
 	stepN(a, ticksOf(animWave), 0, 0, false)

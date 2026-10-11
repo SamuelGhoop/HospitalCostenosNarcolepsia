@@ -3,6 +3,8 @@ package ui
 import (
 	"image"
 	"testing"
+
+	"github.com/SamuelGhoop/HospitalCostenosNarcolepsia/game"
 )
 
 func TestFrameRect_CutsTheRightCellOfTheSheet(t *testing.T) {
@@ -116,6 +118,7 @@ func TestSpritePlacement_InBedTheHeadPointsToTheHeadboard(t *testing.T) {
 // Pedido por Samuel: al despertarse, el cuadro 1 va dentro de la cama
 // (rotado) y desde el cuadro 2 (sentado) va de pie al lado, sin rotar.
 func TestSpritePlacement_WakeUpStartsInBedThenStandsBesideIt(t *testing.T) {
+	needFonts(t) // el puesto al lado de la cama se busca con los rótulos
 	bed := bedRect(zoneRoom101)
 	beside := toVec(wakeSpot(zoneRoom101))
 
@@ -133,19 +136,21 @@ func TestSpritePlacement_WakeUpStartsInBedThenStandsBesideIt(t *testing.T) {
 		}
 	}
 
-	// "Al lado" de verdad: el cuadro de pie no se monta sobre la cama, y
-	// queda a la IZQUIERDA (la derecha es para la etiqueta del que esté en cama).
+	// "Al lado" de verdad: lo que se ve del cuerpo no se monta sobre la cama,
+	// y queda a la DERECHA si cabe (pedido de Samuel, 2026-10-11): ahí cabe a
+	// ×3 sin tapar el letrero de la habitación ni los rótulos del que llegue
+	// a esa cama (eso lo revisa el test de rótulos de la demo).
 	p := wakeSpot(zoneRoom101)
-	if image.Rect(p.X, p.Y, p.X+figWidth, p.Y+figHeight).Overlaps(bed) {
-		t.Errorf("el puesto al lado de la cama %v se monta sobre la cama %v", p, bed)
+	if body := standingBody.Add(p); body.Overlaps(bed) {
+		t.Errorf("el que se despierta (%v) se monta sobre la cama %v", body, bed)
 	}
-	if p.X+figWidth > bed.Min.X {
-		t.Errorf("el que se despierta debe quedar a la izquierda de la cama: x=%d, cama desde x=%d", p.X, bed.Min.X)
+	if standingBody.Add(p).Min.X < bed.Max.X {
+		t.Errorf("el que se despierta queda en x=%d; se esperaba a la derecha de la cama (desde x=%d)", standingBody.Add(p).Min.X, bed.Max.X)
 	}
 }
 
 // Caminar a la derecha: la animación de la izquierda volteada, sin moverla
-// de su cuadro (que en pantalla mide 32×48: el sprite va ×2).
+// de su cuadro (que en pantalla mide 48×72: el sprite va ×3).
 func TestSpritePlacement_FlipKeepsTheSpriteInItsCell(t *testing.T) {
 	at := vec{100, 50}
 
@@ -185,5 +190,40 @@ func TestSpritePlacement_DrawsTheFigureAtSpriteScale(t *testing.T) {
 	box := image.Rect(int(min(x0, x1)), int(min(y0, y1)), int(max(x0, x1)), int(max(y0, y1)))
 	if box.Dx() != 15*spriteScale || box.Dy() != 16*spriteScale || !box.In(bed) {
 		t.Errorf("acostado, el cuerpo ocupa %v (%d×%d); se esperaba %d×%d dentro de la cama %v", box, box.Dx(), box.Dy(), 15*spriteScale, 16*spriteScale, bed)
+	}
+}
+
+// Nada de teletransporte al despertarse (pedido de Samuel, 2026-10-11): en
+// la demo, Yeimy se despierta en la cama (paso 10), se sienta y se para ahí
+// mismo, camina hasta el costado de la cama y ahí saluda.
+func TestDemo_WakesUpInBedThenWalksBesideIt(t *testing.T) {
+	needFonts(t)
+	s := NewDemoScene(game.NewDemo())
+	for step := 1; step <= 10; step++ {
+		if err := s.advance(); err != nil {
+			t.Fatal(err)
+		}
+		if step < 10 {
+			s.finishChoreography()
+		}
+	}
+	bed, beside := bedCell(zoneRoom101), toVec(wakeSpot(zoneRoom101))
+	a := s.anims["P-001"]
+	walked, wavedAt := false, vec{-1, -1}
+	for tick := 0; tick < 2000; tick++ {
+		s.animate()
+		at := s.pos["P-001"]
+		if a.anim == animWakeUp && at != bed {
+			t.Fatalf("tick %d: despertándose en %v; se esperaba en la cama (%v)", tick, at, bed)
+		}
+		if a.anim == animWalkLeft || a.anim == animWalkDown || a.anim == animWalkUp {
+			walked = true
+		}
+		if a.anim == animWave && wavedAt.x < 0 {
+			wavedAt = at
+		}
+	}
+	if !walked || wavedAt != beside {
+		t.Errorf("caminó=%v, saludó en %v; se esperaba que caminara de la cama a su costado (%v) y saludara ahí", walked, wavedAt, beside)
 	}
 }

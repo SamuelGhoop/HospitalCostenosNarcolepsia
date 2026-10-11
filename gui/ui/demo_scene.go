@@ -3,6 +3,9 @@ package ui
 import (
 	"fmt"
 	"image"
+	"math"
+	"slices"
+	"sort"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
@@ -11,10 +14,21 @@ import (
 	"github.com/SamuelGhoop/HospitalCostenosNarcolepsia/hospital"
 )
 
-// walkSpeed: cuántos píxeles avanza por tick un personaje que cambia de
-// puesto (a 60 ticks por segundo, unos 360 px por segundo en la pantalla
-// de 1280×720: la misma rapidez que se veía a 640×360).
-const walkSpeed = 6.0
+// Cuántos píxeles avanza por tick un personaje que camina (a 60 ticks por
+// segundo): el personal a 120 px/s y los pacientes a 90 px/s (decisión de
+// Samuel, 2026-10-11). La posición es float y se redondea al dibujar.
+const (
+	staffSpeed   = 2.0
+	patientSpeed = 1.5
+)
+
+// speedOf es la velocidad a la que camina un personaje.
+func speedOf(f figure) float64 {
+	if f.patient {
+		return patientSpeed
+	}
+	return staffSpeed
+}
 
 // DemoScene muestra la demostración de la Sección 6 paso a paso.
 //
@@ -32,7 +46,10 @@ type DemoScene struct {
 	anims    map[string]*patientAnim // animación de cada paciente, por ID
 	staff    map[string]*staffAnim   // animación de cada médico, por ID
 	choreo   *choreography           // coreografía del último paso; nil si no hay o ya terminó
+	carry    *carrying               // traslado en camilla en curso (nil si no hay)
+	dodge    map[string]vec          // los que se hicieron a un lado para dejar pasar la camilla
 	carried  string                  // paciente que el último paso pasó del pasillo a una cama
+	arrivals []string                // pacientes que llegaron en el último paso, en orden
 	auto     autoAdvance
 	showSubs bool
 	scenery  scenery // el taxi y el humo de la olla
@@ -110,11 +127,34 @@ func (s *DemoScene) advance() error {
 // ruta por las puertas, la animación de cada paciente avanza según cuánto
 // se movió, y la coreografía pasa a la siguiente fase cuando todos llegaron.
 func (s *DemoScene) animate() {
+	// El traslado en camilla de la fase actual, si hay: lo mueve stepCarry.
+	var order *carryOrder
+	if s.choreo != nil {
+		order = s.choreo.carrying()
+	}
+	switch {
+	case order == nil:
+		s.carry, s.dodge = nil, nil // la camilla ya pasó: vuelven a su puesto
+	case s.carry == nil || s.carry.order != order:
+		s.carry = &carrying{order: order}
+		s.dodge = s.dodgesFor(order)
+	}
+	before := map[string]vec{}
+	for id, p := range s.pos {
+		before[id] = p
+	}
+	if s.carry != nil {
+		s.stepCarry()
+	}
+
 	for _, f := range s.figures {
-		old := s.pos[f.id]
-		now := moveToward(old, s.nextWaypoint(f.id, old, s.destination(f)), walkSpeed)
-		s.pos[f.id] = now
-		if a, ok := s.anims[f.id]; ok {
+		old := before[f.id]
+		a, isPatient := s.anims[f.id]
+		if !s.inCarry(f.id) && !(isPatient && a.holdsStill()) { // despertándose se queda donde está
+			s.pos[f.id] = moveToward(old, s.nextWaypoint(f.id, old, s.destination(f)), speedOf(f))
+		}
+		now := s.pos[f.id]
+		if isPatient {
 			a.step(now.x-old.x, now.y-old.y, s.onBed(f))
 		}
 		if a, ok := s.staff[f.id]; ok {
@@ -144,8 +184,11 @@ func (s *DemoScene) animate() {
 // Si dest cambió (otra fase de la coreografía, otro puesto), calcula la
 // ruta de nuevo; cuando llega a un punto de paso, sigue con el siguiente.
 func (s *DemoScene) nextWaypoint(id string, from, dest vec) vec {
+	if from == dest {
+		return dest // ya llegó (por ejemplo, acostado en su cama: ahí no hay piso libre)
+	}
 	if s.pathTo[id] != dest || len(s.paths[id]) == 0 {
-		s.paths[id], s.pathTo[id] = route(from, dest), dest
+		s.paths[id], s.pathTo[id] = routeAvoiding(from, dest, s.avoidFor(id)), dest
 	}
 	path := s.paths[id]
 	for len(path) > 1 && from == path[0] {
@@ -157,6 +200,9 @@ func (s *DemoScene) nextWaypoint(id string, from, dest vec) vec {
 
 // destination es a dónde tiene que caminar un personaje ahora mismo.
 func (s *DemoScene) destination(f figure) vec {
+	if to, ok := s.dodge[f.id]; ok {
+		return to // se hizo a un lado para dejar pasar la camilla
+	}
 	if s.choreo != nil {
 		if to, ok := s.choreo.target(f.id); ok {
 			return to
@@ -184,7 +230,7 @@ func (s *DemoScene) figure(id string) (figure, bool) {
 // finishChoreography adelanta la coreografía en curso: cada personaje
 // queda de una vez en su puesto final, con su animación de reposo.
 func (s *DemoScene) finishChoreography() {
-	s.choreo = nil
+	s.choreo, s.carry, s.dodge = nil, nil, nil
 	for _, f := range s.figures {
 		s.pos[f.id] = f.target
 		delete(s.paths, f.id) // saltó a su puesto: la ruta vieja ya no sirve
@@ -214,18 +260,42 @@ func (s *DemoScene) choreographyFor(step game.DemoStep) *choreography {
 		if attender.doctor {
 			hold = attendTicks // el médico atiende antes de llevárselo
 		}
-		return attendChoreography(patient.id, attender.id, attackAt, attender.target, roomZone(e.Room), e.Room != 0, hold)
+		return attendChoreography(patient.id, attender.id, attackAt, attender.target, roomZone(e.Room), e.Room != 0, hold, s.stillFeet(patient.id, attender.id))
+	}
+
+	if len(s.arrivals) > 0 { // paso 3: entran desde la acera, uno cada 1,5 s
+		targets := map[string]vec{}
+		for _, id := range s.arrivals {
+			f, _ := s.figure(id)
+			targets[id] = f.target
+		}
+		return arrivalChoreography(s.arrivals, targets, arrivalSpawn())
 	}
 
 	if s.carried != "" {
 		patient, _ := s.figure(s.carried)
 		for _, f := range s.figures {
 			if !f.patient && !f.doctor { // el camillero
-				return carryChoreography(patient.id, f.id, s.pos[patient.id], f.target, roomZone(patient.room))
+				return carryChoreography(patient.id, f.id, s.pos[patient.id], f.target, roomZone(patient.room), s.stillFeet(patient.id, f.id))
 			}
 		}
 	}
 	return nil
+}
+
+// stillFeet son las huellas de los pies de los que se quedan quietos en su
+// puesto mientras se hace un traslado (todos menos except): la camilla no
+// los pisa. Los que duermen en su cama no cuentan.
+func (s *DemoScene) stillFeet(except ...string) []image.Rectangle {
+	var out []image.Rectangle
+	for _, f := range s.figures {
+		if slices.Contains(except, f.id) || (f.patient && f.room != 0 && f.target == bedCell(roomZone(f.room))) {
+			continue
+		}
+		feet := f.target.add(feetOffset)
+		out = append(out, feetBox.Add(image.Pt(int(math.Round(feet.x)), int(math.Round(feet.y)))))
+	}
+	return out
 }
 
 // refresh pide una foto nueva a la demo y recalcula el puesto FINAL de
@@ -238,7 +308,7 @@ func (s *DemoScene) choreographyFor(step game.DemoStep) *choreography {
 func (s *DemoScene) refresh() {
 	s.snap = s.demo.Snapshot()
 	s.figures = s.figures[:0]
-	s.carried = ""
+	s.carried, s.arrivals = "", nil
 	standing := map[zone]int{} // puestos de pie usados en cada zona
 	lying := map[zone]int{}    // puestos de piso usados en cada zona
 
@@ -264,13 +334,11 @@ func (s *DemoScene) refresh() {
 		if !seen {
 			a = &patientAnim{state: p.State, room: p.Room}
 			s.anims[p.ID] = a
-			s.pos[p.ID] = toVec(entrance) // los pacientes nuevos entran desde la acera
+			s.pos[p.ID] = arrivalSpawn() // los pacientes nuevos llegan por la acera, desde fuera de la pantalla
+			s.arrivals = append(s.arrivals, p.ID)
 		}
 		was := a.state
-		if leftBed := a.observe(p.State, p.Room); leftBed {
-			s.pos[p.ID] = f.target // se levanta y queda de una al lado de la cama, sin deslizarse
-			delete(s.paths, p.ID)
-		}
+		a.observe(p.State, p.Room) // si se despertó en la cama, se levanta ahí y camina al costado
 		if was == hospital.AsleepInHallway && p.State == hospital.AsleepInBed {
 			s.carried = p.ID // pasó del pasillo a una cama (paso 11)
 		}
@@ -294,14 +362,46 @@ func (s *DemoScene) refresh() {
 // subtítulos.
 func (s *DemoScene) Draw(screen *ebiten.Image) {
 	drawMap(screen)
+	drawMainDoor(screen, s.doorOpen())
 	s.scenery.draw(screen)
 
+	// Los personajes y la camilla, de atrás para adelante: el que tiene los
+	// pies más abajo se dibuja encima (así quien empuja queda detrás de la
+	// camilla al subir y delante al bajar).
+	type drawable struct {
+		y    float64
+		draw func()
+	}
+	var items []drawable
 	lyingIn := map[int]bool{} // habitaciones con alguien ya acostado en la cama
+	c := s.carry
 	for _, f := range s.figures {
-		drawFigureBody(screen, f, s.pos[f.id], s.anims[f.id], s.staff[f.id]) // nil si no es paciente o médico
 		if f.patient && s.onBed(f) {
 			lyingIn[f.room] = true
 		}
+		y := s.pos[f.id].y + figHeight
+		if c != nil && c.visible() && f.id == c.order.patient {
+			if c.riding() {
+				continue // va sobre la camilla: se dibuja con ella
+			}
+			y = float64(c.fp.Max.Y) + 0.5 // pasándose a la camilla o a la cama: encima de la camilla
+		}
+		items = append(items, drawable{y, func() {
+			drawFigureBody(screen, f, s.pos[f.id], s.anims[f.id], s.staff[f.id]) // nil si no es paciente o médico
+		}})
+	}
+	if c != nil && c.visible() {
+		items = append(items, drawable{float64(c.fp.Max.Y), func() {
+			drawStretcher(screen, c.fp, c.dir)
+			if c.riding() {
+				p, _ := s.figure(c.order.patient)
+				drawRider(screen, p, s.anims[p.id], c.fp, c.dir)
+			}
+		}})
+	}
+	sort.SliceStable(items, func(i, j int) bool { return items[i].y < items[j].y })
+	for _, it := range items {
+		it.draw()
 	}
 	drawBlankets(screen, s.snap.Rooms, lyingIn)
 

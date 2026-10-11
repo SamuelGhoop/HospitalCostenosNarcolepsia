@@ -89,10 +89,15 @@ func figureBody(f figure, at vec) image.Rectangle {
 	return image.Rect(x, y, x+figWidth, y+figHeight)
 }
 
-// figureBox es todo lo que ocupa un personaje: su cuadro y sus rótulos.
+// figureBox es todo lo que ocupa un personaje: su cuadro (acostado en el
+// piso, solo lo que se ve del cuerpo) y sus rótulos, menos los que flotan
+// (burbuja y rayitos), que se revisan aparte.
 func figureBox(f figure, at vec) image.Rectangle {
 	x, y := int(at.x), int(at.y)
 	box := image.Rect(x, y, x+figWidth, y+figHeight)
+	if f.patient && f.state != hospital.Awake && f.room == 0 {
+		box = floorBody.Add(image.Pt(x, y))
+	}
 	for _, o := range figureOverlays(f, at, true) {
 		box = box.Union(o.rect)
 	}
@@ -111,18 +116,24 @@ func TestSpots_FigureAndItsLabelsStayInsideTheZone(t *testing.T) {
 
 	check := func(what string, f figure, at vec, z zone) {
 		t.Helper()
-		box := figureBox(f, at)
-		if box.In(zones[z].rect) {
+		box, r := figureBox(f, at), zones[z].rect
+		feetZone := zoneOfFeet(image.Pt(int(at.x), int(at.y)))
+		if feetZone == zoneHallway1 { // en el pasillo 1, la regla de "dentro" vale para los pies
+			r = zones[zoneHallway1].rect
+			box.Min.Y = max(box.Min.Y, r.Min.Y)
+		}
+		if box.In(r) {
 			return
 		}
 		// Se sale: solo vale si es un puesto del segundo intento del
-		// buscador y sus rótulos no tapan otro rótulo, un letrero ni un mueble.
+		// buscador y sus rótulos no tapan otro rótulo, un letrero ni un
+		// mueble (la burbuja y los rayitos sí pueden flotar sobre un mueble).
 		if !relaxedSpot(z, image.Pt(int(at.x), int(at.y))) {
-			t.Errorf("%s: %v se sale de %s %v (y no es un puesto del segundo intento)", what, box, zones[z].label, zones[z].rect)
+			t.Errorf("%s: %v se sale de %s %v (y no es un puesto del segundo intento)", what, box, zones[z].label, r)
 			return
 		}
 		for _, o := range figureOverlays(f, at, true) {
-			if onFurniture(o.rect) || coversALabel(o.rect) {
+			if (!o.floating && onFurniture(o.rect)) || coversALabel(o.rect) {
 				t.Errorf("%s: el rótulo %q (%v) se sale de %s y tapa un mueble o un rótulo", what, o.text, o.rect, zones[z].label)
 			}
 		}

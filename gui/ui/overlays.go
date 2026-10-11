@@ -20,9 +20,10 @@ import (
 // Las posiciones se calculan aquí UNA sola vez: las usan el dibujo y el
 // test que comprueba que ningún rótulo se monta sobre otro.
 type overlay struct {
-	rect   image.Rectangle
-	text   string // "" para rayitos y puntos
-	fg, bg color.Color
+	rect     image.Rectangle
+	text     string // "" para rayitos y puntos
+	fg, bg   color.Color
+	floating bool // burbuja o rayito: flota sobre el acostado (ver spotFree)
 }
 
 // textBox es la caja de un rótulo de texto con su esquina en (left, top).
@@ -70,11 +71,11 @@ func figureOverlays(f figure, at vec, showBubble bool) []overlay {
 // bubbleOverlays: la burbuja Zzz en box y, a su derecha, los rayitos de
 // nivel (1 amarillo leve, 2 naranja moderada, 3 rojos severa).
 func bubbleOverlays(txt string, bg color.RGBA, level hospital.NarcolepsyLevel, box image.Rectangle) []overlay {
-	out := []overlay{{rect: box, text: txt, fg: colWhite, bg: bg}}
+	out := []overlay{{rect: box, text: txt, fg: colWhite, bg: bg, floating: true}}
 	c, n := levelStyle(level)
 	for i := 0; i < n; i++ {
 		bolt := image.Rect(box.Max.X+4+i*8, box.Min.Y+4, box.Max.X+10+i*8, box.Max.Y-4)
-		out = append(out, overlay{rect: bolt, bg: c})
+		out = append(out, overlay{rect: bolt, bg: c, floating: true})
 	}
 	return out
 }
