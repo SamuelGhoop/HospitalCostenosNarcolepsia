@@ -359,12 +359,13 @@ La demo no cambia: sigue el round-robin real de la Sección 6 (sección 4).
 - Todo se anima por ticks de `Update`, nunca con `time.Sleep`.
 - **Cómo quedó**: NUEVA PARTIDA (hasta F3) y AJUSTES (hasta F6) muestran el aviso "Próximamente" durante 1,5 s en el lugar de "PRESIONA ENTER"; DEMO SECCIÓN 6 abre la demo, y su Shift Report vuelve a la portada con Espacio o clic; CRÉDITOS abre una pantalla con el mismo paisaje (Enter o Esc vuelven); SALIR cierra limpio (`ebiten.Termination`). "HOSPITAL DE LOS" va a 40 px y "COSTEÑOS" a 72; la virgulilla de la Ñ lleva las mismas pasadas que las letras, como en la maqueta: contorno negro, relieve rojo y sombra. Press Start 2P se usa solo en la portada, los créditos y el aviso; el resto de la interfaz sigue en Go Mono.
 
-### 9.4 Menú de pausa (pendiente: junto con la pantalla de inicio)
+### 9.4 Menú de pausa (hecho, 2026-10-10)
 - Capa encima de la escena (10.2). Assets y medidas en `gui/assets/pause/PAUSE_ASSETS.md`: portapapeles derecho y centrado con REANUDAR, AJUSTES y SALIR AL MENÚ, sobre el mapa oscurecido.
 - **Esc** abre la pausa y, con la pausa abierta, la cierra.
 - En el modo juego llama `Game.Pause()` y `Game.Resume()`; en la demo detiene el avance automático.
 - **SALIR AL MENÚ** cancela el `context` de la partida y vuelve a la portada. En el modo juego se pierde el día en curso: lo guardado es el final del día anterior (5.11).
 - **AJUSTES** abre la pantalla de ajustes (9.5); mientras no exista, muestra el aviso "Próximamente".
+- **Cómo quedó**: la pausa es su propia escena (`PauseScene`), que envuelve a la escena pausada: la dibuja quieta, encima pone el negro con alfa 140 y el portapapeles en (442, 213). La abre la App con Esc sobre las escenas que cumplen la interfaz `pausable` (la demo; el juego en F3); la portada, los créditos y el reporte no se pausan. Mientras está abierta, la escena de abajo no recibe `Update`: en la demo se congela todo (avance automático, animaciones, taxi y humo) y al reanudar sigue donde iba. `pausable` trae `onPause`, `onResume` y `onQuit` para lo que corre por fuera de la escena: en F3, `Game.Pause()`, `Game.Resume()` y cancelar el `context`. Esc cierra al instante; REANUDAR con Enter o clic espera los 0,45 s del cursor, y mientras se confirma una opción Esc no hace nada. AJUSTES muestra "Próximamente" 1,5 s debajo del portapapeles. El menú (selección, cursor, confirmación y mouse) es el mismo de la portada, generalizado; los rectángulos de `pause/hitboxes.json` se pasan a 4 vértices para usar la misma prueba de punto.
 
 ### 9.5 Ajustes (pendiente: F6)
 - Se guardan en un **JSON aparte** de la partida y se abren desde la portada y desde la pausa.
