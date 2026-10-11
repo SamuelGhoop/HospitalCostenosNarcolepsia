@@ -85,9 +85,9 @@ func (s *TitleScene) Draw(screen *ebiten.Image) {
 	}
 	if show {
 		x := ScreenWidth*61/100/2 - pixelTextWidth(msg, 16)/2
-		drawPixelText(screen, msg, x, 664, 16, append(outlined(4, colInk), textLayer{0, 0, colWhite, false}), 1)
+		drawPixelText(screen, msg, x, 664, 16, append(outlined(4, colInk), textLayer{0, 0, colWhite}), 1)
 	}
-	drawPixelText(screen, versionText, ScreenWidth-32-pixelTextWidth(versionText, 8), 687, 8, []textLayer{{0, 0, colInk, false}}, 1)
+	drawPixelText(screen, versionText, ScreenWidth-32-pixelTextWidth(versionText, 8), 687, 8, []textLayer{{0, 0, colInk}}, 1)
 }
 
 // drawLogo dibuja "HOSPITAL DE LOS", "COSTEÑOS", la banda azul con la
@@ -96,12 +96,12 @@ func drawLogo(dst *ebiten.Image, ticks int) {
 	center := func(s string, size float64) int { return ScreenWidth/2 - pixelTextWidth(s, size)/2 }
 
 	// HOSPITAL DE LOS: blanco, contorno negro, un borde negro abajo y sombra.
-	top := []textLayer{{5, 13, colDrop, false}}
+	top := []textLayer{{5, 13, colDrop}}
 	for _, dx := range []int{-4, 0, 4} {
-		top = append(top, textLayer{dx, 8, colInk, false})
+		top = append(top, textLayer{dx, 8, colInk})
 	}
 	top = append(top, outlined(4, colInk)...)
-	drawPixelText(dst, logoTop, center(logoTop, 40), 14, 40, append(top, textLayer{0, 0, colWhite, false}), 1)
+	drawPixelText(dst, logoTop, center(logoTop, 40), 14, 40, append(top, textLayer{0, 0, colWhite}), 1)
 
 	drawPixelText(dst, logoMain, center(logoMain, 72), 104, 72, logoMainLayers(), 1)
 
@@ -114,7 +114,7 @@ func drawLogo(dst *ebiten.Image, ticks int) {
 	fillRect(dst, inner, colBlue)
 	fillRect(dst, image.Rect(inner.Min.X, inner.Max.Y-6, inner.Max.X, inner.Max.Y), colBandShade)
 	drawPillow(dst, image.Pt(inner.Min.X+23, inner.Min.Y+12))
-	drawPixelText(dst, logoBand, inner.Min.X+23+36+15, inner.Min.Y+16, 16, []textLayer{{0, 0, colWhite, false}}, 1)
+	drawPixelText(dst, logoBand, inner.Min.X+23+36+15, inner.Min.Y+16, 16, []textLayer{{0, 0, colWhite}}, 1)
 
 	// Las Zzz: z, Z, Z, cada una sube y se desvanece en un ciclo de 2,4 s de
 	// 6 pasos, desfasadas 0,8 s.
@@ -127,7 +127,7 @@ func drawLogo(dst *ebiten.Image, ticks int) {
 		step := (ticks + k*48) % 144 / 24
 		dy := int(l.size * (0.4 - float64(step)/6))
 		x, y := band.Max.X+l.dx, bandY-l.bottom-int(l.size)+dy
-		drawPixelText(dst, l.s, x, y, l.size, append(outlined(3, colInk), textLayer{0, 0, colWhite, false}), stepFade(step))
+		drawPixelText(dst, l.s, x, y, l.size, append(outlined(3, colInk), textLayer{0, 0, colWhite}), stepFade(step))
 	}
 }
 
@@ -135,16 +135,16 @@ func drawLogo(dst *ebiten.Image, ticks int) {
 const logoOutline = 6
 
 // logoMainLayers son las pasadas de "COSTEÑOS": sombra, relieve rojo con
-// borde negro, contorno negro y el relleno amarillo. La virgulilla de la Ñ
-// va limpia (pedido de Samuel): solo el contorno y el relleno la dibujan.
+// borde negro, contorno negro y el relleno amarillo. Como en la maqueta, la
+// virgulilla de la Ñ lleva las mismas pasadas que las letras.
 func logoMainLayers() []textLayer {
-	layers := []textLayer{{8, 28, colDrop, true}}
+	layers := []textLayer{{8, 28, colDrop}}
 	for _, dx := range []int{-logoOutline, 0, logoOutline} {
-		layers = append(layers, textLayer{dx, 20, colInk, true}, textLayer{dx, 14, colInk, true})
+		layers = append(layers, textLayer{dx, 20, colInk}, textLayer{dx, 14, colInk})
 	}
-	layers = append(layers, textLayer{0, 14, colLogoRed, true}, textLayer{0, 10, colLogoRed, true})
+	layers = append(layers, textLayer{0, 14, colLogoRed}, textLayer{0, 10, colLogoRed})
 	layers = append(layers, outlined(logoOutline, colInk)...)
-	return append(layers, textLayer{0, 0, colLogoYellow, false})
+	return append(layers, textLayer{0, 0, colLogoYellow})
 }
 
 // colBandShade: el azul oscuro de abajo de la banda.

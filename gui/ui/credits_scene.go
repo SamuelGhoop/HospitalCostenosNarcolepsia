@@ -36,9 +36,9 @@ func (s *CreditsScene) Draw(screen *ebiten.Image) {
 	fillRect(screen, paper.Inset(6), colPaper)
 
 	center := func(t string, size float64) int { return ScreenWidth/2 - pixelTextWidth(t, size)/2 }
-	drawPixelText(screen, creditsTitle, center(creditsTitle, 24), 200, 24, []textLayer{{0, 0, colBlue, false}}, 1)
+	drawPixelText(screen, creditsTitle, center(creditsTitle, 24), 200, 24, []textLayer{{0, 0, colBlue}}, 1)
 	for i, line := range creditsLines {
-		drawPixelText(screen, line, center(line, 16), 268+i*44, 16, []textLayer{{0, 0, colInk, false}}, 1)
+		drawPixelText(screen, line, center(line, 16), 268+i*44, 16, []textLayer{{0, 0, colInk}}, 1)
 	}
-	drawPixelText(screen, creditsHint, center(creditsHint, 8), 528, 8, []textLayer{{0, 0, colMuted, false}}, 1)
+	drawPixelText(screen, creditsHint, center(creditsHint, 8), 528, 8, []textLayer{{0, 0, colMuted}}, 1)
 }

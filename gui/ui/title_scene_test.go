@@ -106,25 +106,3 @@ func TestReport_GoesBackToTheTitle(t *testing.T) {
 		}
 	}
 }
-
-// Pedido por Samuel: la virgulilla de "COSTEÑOS" va limpia, solo con el
-// contorno negro y el relleno amarillo; las capas de relieve (sombra, rojo y
-// negro de abajo) dibujan las letras pero no la tilde.
-func TestLogo_TheTildeOfCostenosIsOnlyOutlineAndFill(t *testing.T) {
-	marked := 0
-	for _, l := range logoMainLayers() {
-		relief := l.dy > logoOutline || l.c == colDrop || l.c == colLogoRed
-		if relief && !l.noMarks {
-			t.Errorf("la capa %+v es de relieve y dibuja la tilde", l)
-		}
-		if !relief && l.noMarks {
-			t.Errorf("la capa %+v es contorno o relleno y no dibuja la tilde", l)
-		}
-		if !l.noMarks {
-			marked++
-		}
-	}
-	if marked != 9 { // 8 direcciones del contorno + el relleno
-		t.Errorf("la tilde se dibuja en %d capas; se esperaban 9 (contorno y relleno)", marked)
-	}
-}

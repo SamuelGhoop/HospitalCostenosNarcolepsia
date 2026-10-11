@@ -108,19 +108,17 @@ func accentMarks(s string, size float64) (plain string, marks []image.Rectangle)
 
 // textLayer es una pasada del texto: un color corrido (dx, dy). El logo se
 // arma con varias: sombra, contorno en 8 direcciones y el relleno encima.
-// noMarks: la pasada dibuja las letras pero no las tildes (el relieve del
-// logo, para que la virgulilla quede limpia y separada de la letra).
+// Cada pasada dibuja las letras y sus tildes.
 type textLayer struct {
-	dx, dy  int
-	c       color.Color
-	noMarks bool
+	dx, dy int
+	c      color.Color
 }
 
 // outlined devuelve las 8 capas de un contorno de w px alrededor del texto.
 func outlined(w int, c color.Color) []textLayer {
 	var out []textLayer
 	for _, d := range []image.Point{{-1, -1}, {0, -1}, {1, -1}, {-1, 0}, {1, 0}, {-1, 1}, {0, 1}, {1, 1}} {
-		out = append(out, textLayer{d.X * w, d.Y * w, c, false})
+		out = append(out, textLayer{d.X * w, d.Y * w, c})
 	}
 	return out
 }
@@ -135,9 +133,6 @@ func drawPixelText(dst *ebiten.Image, s string, x, y int, size float64, layers [
 		op.ColorScale.ScaleWithColor(l.c)
 		op.ColorScale.ScaleAlpha(alpha)
 		text.Draw(dst, plain, pixelFace(size), op)
-		if l.noMarks {
-			continue
-		}
 		for _, m := range marks {
 			r := m.Add(image.Pt(x+l.dx, y+l.dy))
 			cr, cg, cb, ca := l.c.RGBA()
