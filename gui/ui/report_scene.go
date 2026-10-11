@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/hajimehoshi/ebiten/v2"
-	"github.com/hajimehoshi/ebiten/v2/inpututil"
 	"github.com/hajimehoshi/ebiten/v2/text/v2"
 
 	"github.com/SamuelGhoop/HospitalCostenosNarcolepsia/game"
@@ -24,11 +23,13 @@ func NewReportScene(r game.Report) *ReportScene {
 	return &ReportScene{report: r}
 }
 
-// Update: Espacio o clic vuelve a empezar la demostración, con un hospital
-// nuevo. (El botón "¡AHORA TE TOCA!" se activa cuando exista el modo juego.)
-func (s *ReportScene) Update() (Scene, error) {
-	if inpututil.IsKeyJustPressed(ebiten.KeySpace) || inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft) {
-		return NewDemoScene(game.NewDemo()), nil
+// Update: Espacio o clic vuelven a la portada. (El botón "¡AHORA TE
+// TOCA!" se activa cuando exista el modo juego.)
+func (s *ReportScene) Update() (Scene, error) { return s.update(readInput()) }
+
+func (s *ReportScene) update(in input) (Scene, error) {
+	if in.space || in.click {
+		return NewTitleScene(), nil
 	}
 	return s, nil
 }
@@ -99,7 +100,7 @@ func (s *ReportScene) Draw(screen *ebiten.Image) {
 	panel(screen, button, colLightGray)
 	drawText(screen, "¡AHORA TE TOCA!", float64(button.Min.X+16), float64(button.Min.Y+6), boldFace, colMuted)
 	drawText(screen, "(modo juego: próximamente)", float64(button.Max.X+16), float64(button.Min.Y+10), textFace, colMuted)
-	hint := "ESPACIO o clic: ver la demostración otra vez"
+	hint := "ESPACIO o clic: volver a la portada"
 	drawText(screen, hint, float64(paper.Max.X-20)-textWidth(hint, smallFace), 656, smallFace, colMuted)
 }
 

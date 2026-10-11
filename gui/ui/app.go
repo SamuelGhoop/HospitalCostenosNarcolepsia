@@ -2,8 +2,6 @@ package ui
 
 import (
 	"github.com/hajimehoshi/ebiten/v2"
-
-	"github.com/SamuelGhoop/HospitalCostenosNarcolepsia/game"
 )
 
 // App es el juego para Ebitengine: cumple la interfaz ebiten.Game
@@ -15,19 +13,20 @@ type App struct {
 // Chequeo en compilación: si App dejara de cumplir ebiten.Game, no compila.
 var _ ebiten.Game = (*App)(nil)
 
-// NewApp carga las fuentes, los sprites y el mapa, y arranca en la
-// demostración de la Sección 6.
+// NewApp carga las fuentes, los sprites, el mapa y la portada, y arranca
+// en la portada.
 func NewApp() (*App, error) {
-	if err := loadFonts(); err != nil {
+	for _, load := range []func() error{loadFonts, loadPixelFont, loadSprites, loadMap, loadTitle} {
+		if err := load(); err != nil {
+			return nil, err
+		}
+	}
+	boxes, err := loadHitboxes()
+	if err != nil {
 		return nil, err
 	}
-	if err := loadSprites(); err != nil {
-		return nil, err
-	}
-	if err := loadMap(); err != nil {
-		return nil, err
-	}
-	return &App{scene: NewDemoScene(game.NewDemo())}, nil
+	titleHitboxes = boxes
+	return &App{scene: NewTitleScene()}, nil
 }
 
 // Update lo llama Ebitengine 60 veces por segundo. La escena devuelve cuál

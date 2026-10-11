@@ -19,3 +19,15 @@ var Sprites embed.FS
 //
 //go:embed map/*.png
 var Map embed.FS
+
+// Title tiene la portada: las capas del paisaje, el portapapeles del menú
+// (una imagen por opción y cuadro del cursor) y sus zonas para el mouse
+// (gui/assets/title/TITLE_ASSETS.md).
+//
+//go:embed title/*.png title/clipboard
+var Title embed.FS
+
+// Fonts tiene Press Start 2P (licencia OFL, en fonts/OFL.txt).
+//
+//go:embed fonts/PressStart2P-Regular.ttf
+var Fonts embed.FS
