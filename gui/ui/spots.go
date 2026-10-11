@@ -2,6 +2,8 @@ package ui
 
 import (
 	"image"
+	"math"
+	"sort"
 
 	"github.com/SamuelGhoop/HospitalCostenosNarcolepsia/hospital"
 )
@@ -44,16 +46,19 @@ func buildObstacles() []image.Rectangle {
 		)
 	}
 	out = append(out,
-		sprite(338, 37, 56, 8), sprite(359, 22, 28, 28), sprite(309, 48, 9, 9), // radiología: camilla, escáner, letrero
+		// Radiología: la camilla y el escáner. El letrero amarillo de radiación
+		// es piso: la maqueta lo dibuja plano, sin sombra, como los tapetes (y
+		// si fuera mueble, en radiología no cabría un acostado con su ayudante).
+		sprite(338, 37, 56, 8), sprite(359, 22, 28, 28),
 		image.Rect(1215, 197, 1255, 245), // pasillo 1: el extintor (parche, ya en píxeles de pantalla)
-		sprite(12, 101, 48, 14),          // cafetería: mostrador
+		sprite(12, 101, 37, 14),          // cafetería: mostrador
 	)
 	for _, x := range []float64{18, 76} { // cafetería: mesas con sus 4 sillas
 		out = append(out, sprite(x, 136, 16, 10),
 			sprite(x+3, 127, 5, 5), sprite(x+13.5, 127, 5, 5), sprite(x+3, 152.5, 5, 5), sprite(x+13.5, 152.5, 5, 5))
 	}
-	out = append(out, sprite(267, 111, 10, 36), sprite(286.5, 120, 6, 6), spriteSc(132, 99, 30, 30, 2)) // recepción: mostrador, silla, matera
-	for _, x := range []float64{164, 174, 228, 238} {                                                   // recepción: sillas de espera
+	out = append(out, sprite(248, 108, 32, 10), sprite(267, 99.5, 6, 6), spriteSc(132, 99, 30, 30, 2)) // recepción: mostrador, silla, matera
+	for _, x := range []float64{164, 174, 228, 238} {                                                  // recepción: sillas de espera
 		for _, y := range []float64{106, 116, 126, 136} {
 			out = append(out, sprite(x, y, 6, 6))
 		}
@@ -61,8 +66,12 @@ func buildObstacles() []image.Rectangle {
 	out = append(out, sprite(351, 100, 35, 12), sprite(432, 104, 14, 40), sprite(406, 122, 14, 22), staffConsole) // sala del personal
 	// La acera: el paradero, su poste y la base de las 2 palmas (la copa no:
 	// vista desde arriba, se camina por debajo).
-	return append(out, sprite(120, 188, 38, 13), sprite(181, 188, 2, 12), sprite(292.5, 191.5, 10, 6), sprite(392.5, 191.5, 10, 6))
+	return append(out, sprite(120, 184, 38, 13), sprite(181, 184, 2, 12), sprite(292.5, 186, 10, 6), sprite(392.5, 186, 10, 6))
 }
+
+// radiationSign es el letrero amarillo de radiación: se pisa (es piso),
+// pero ningún rótulo de zona lo tapa.
+var radiationSign = sprite(309, 48, 9, 9)
 
 // bedObstacle es la cama de una habitación como mueble.
 func bedObstacle(room zone) image.Rectangle { return sprite(roomMockupX[room]+39, 19, 12, 20) }
@@ -95,30 +104,42 @@ var (
 // helperSpots: dónde puede pararse quien atiende a un paciente en el piso,
 // en orden de preferencia: a su lado (un cuadro y media etiqueta más allá)
 // y, si ahí no cabe, en diagonal arriba o abajo (lo que ocupa uno de pie
-// con su punto y su etiqueta). Si tampoco, en el pasillo 1, debajo de la
-// puerta de la zona (ver doorHelperSpots).
+// con su punto y su etiqueta). Siempre adentro de la zona del paciente,
+// nunca desde el pasillo ni desde la zona de al lado (pedido de Samuel,
+// 2026-10-11): si en un sitio no cabe, el paciente se acuesta en otro. En
+// una zona donde así no cabe nadie (radiología, con el escáner), el
+// ayudante va en el sitio libre más cercano, a menos de helperReach.
 var helperSpots = []image.Point{
 	{figWidth + 24, 0}, {-figWidth - 24, 0},
 	{figWidth, -figHeight - 40}, {-figWidth, -figHeight - 40},
 	{figWidth, figHeight}, {-figWidth, figHeight},
 }
 
-// doorHelperSpots son los puestos en el pasillo 1 junto a cada puerta de
-// la zona z que da al pasillo (con los pies cerca del borde de abajo del
-// pasillo): debajo de la puerta y a sus lados. De ahí se ve al paciente
-// por la puerta.
-func doorHelperSpots(z zone) []image.Point {
-	r, h := zones[z].rect, zones[zoneHallway1].rect
+// helperReach: lo más lejos que puede estar quien atiende, entre el centro
+// de lo que se ve de su cuerpo y el del acostado: lo que mide la diagonal de
+// arriba de helperSpots (133 px), con un margen.
+const helperReach = 140
+
+// helperDistance es la distancia entre el acostado en p y quien lo atiende
+// en h, de centro a centro de lo que se ve de sus cuerpos.
+func helperDistance(p, h image.Point) float64 {
+	pc := floorBody.Add(p).Min.Add(floorBody.Add(p).Max).Div(2)
+	hc := standingBody.Add(h).Min.Add(standingBody.Add(h).Max).Div(2)
+	return math.Hypot(float64(pc.X-hc.X), float64(pc.Y-hc.Y))
+}
+
+// nearbyHelpers son los sitios a menos de helperReach del acostado en p,
+// cada 4 px, del más cercano al más lejano.
+func nearbyHelpers(p image.Point) []image.Point {
 	var out []image.Point
-	for _, d := range doorways {
-		if d.gap.Max.Y < r.Max.Y-navCell || d.gap.Min.Y > r.Max.Y+navCell || d.gap.Min.X < r.Min.X || d.gap.Max.X > r.Max.X {
-			continue // no es una puerta de abajo de esta zona
-		}
-		for _, dx := range []int{0, figWidth + figWidth/2, -figWidth - figWidth/2, 2*figWidth + figWidth/2, -2*figWidth - figWidth/2} {
-			feet := image.Pt(d.gap.Min.X+d.gap.Dx()/2+dx, h.Max.Y-navCell)
-			out = append(out, feet.Sub(feetOffsetPt))
+	for dy := -2 * figHeight; dy <= 2*figHeight; dy += 4 {
+		for dx := -2*figWidth - 24; dx <= 2*figWidth+24; dx += 4 {
+			if h := p.Add(image.Pt(dx, dy)); helperDistance(p, h) <= helperReach {
+				out = append(out, h)
+			}
 		}
 	}
+	sort.Slice(out, func(i, j int) bool { return helperDistance(p, out[i]) < helperDistance(p, out[j]) })
 	return out
 }
 
@@ -335,9 +356,12 @@ const spotStep = 2
 var floorCache = map[zone][]floorPlace{}
 
 // floorOf calcula los puestos de piso de una zona: el paciente acostado y
-// quien lo atiende cerca, a su lado, en diagonal (helperSpots) o en el
-// pasillo 1 junto a la puerta (doorHelperSpots). Se buscan desde abajo
-// (lejos de los que están de pie). Solo en lyingZones.
+// quien lo atiende, a su lado o en diagonal (helperSpots), los dos en la
+// misma zona; si así no cabe ninguno, el ayudante va en el sitio libre más
+// cercano (nearbyHelpers). Además la camilla lo tiene que poder recoger
+// junto a él y sacarlo al pasillo 1 por la puerta de la zona
+// (carryCanLeave). Se buscan desde abajo (lejos de los que están de pie).
+// Solo en lyingZones.
 func floorOf(z zone) []floorPlace {
 	if f, ok := floorCache[z]; ok {
 		return f
@@ -346,7 +370,24 @@ func floorOf(z zone) []floorPlace {
 	if lyingZones[z] {
 		r := zones[z].rect
 		var taken []shape
-		find := func(strict bool) {
+		// Si la camilla saca al paciente depende solo de la celda del centro de
+		// su cuerpo (de ahí se buscan los sitios donde aparece la camilla), así
+		// que se calcula una vez por celda.
+		leaves := map[cell]bool{}
+		canLeave := func(at image.Point) bool {
+			if z == zoneHallway1 {
+				return true
+			}
+			body := floorBody.Add(at)
+			k := feetCellOf(toVec(body.Min.Add(body.Max).Div(2)))
+			ok, seen := leaves[k]
+			if !seen {
+				ok = carryCanLeave(toVec(at), z)
+				leaves[k] = ok
+			}
+			return ok
+		}
+		find := func(strict, nearby bool) {
 			for y := r.Max.Y - figHeight; y >= r.Min.Y-floorBody.Min.Y; y -= spotStep {
 				for x := r.Min.X; x+figWidth <= r.Max.X; x += spotStep {
 					at := image.Pt(x, y)
@@ -358,9 +399,15 @@ func floorOf(z zone) []floorPlace {
 					for _, d := range helperSpots {
 						helpers = append(helpers, at.Add(d))
 					}
-					for _, h := range append(helpers, doorHelperSpots(z)...) {
+					if nearby {
+						helpers = nearbyHelpers(at)
+					}
+					for _, h := range helpers {
 						hs := standingShape(h)
-						if !hs.overlaps(sh) && spotFree(zoneOfFeet(h), h, standingBody.Add(h), hs, strict, append(taken, sh)) {
+						if zoneOfFeet(h) == z && !hs.overlaps(sh) && spotFree(z, h, standingBody.Add(h), hs, strict, append(taken, sh)) {
+							if !canLeave(at) {
+								break // la camilla no lo podría recoger ahí y salir por la puerta de la zona
+							}
 							out = append(out, floorPlace{at, h, !strict})
 							taken = append(taken, sh, hs)
 							break
@@ -369,9 +416,11 @@ func floorOf(z zone) []floorPlace {
 				}
 			}
 		}
-		find(true)
-		if len(out) == 0 { // no cupo con todo dentro: se deja que los rótulos se salgan
-			find(false)
+		for _, try := range []struct{ strict, nearby bool }{{true, false}, {false, false}, {true, true}, {false, true}} {
+			if len(out) > 0 {
+				break
+			}
+			find(try.strict, try.nearby) // primero con todo dentro; si no cabe, los rótulos se pueden salir
 		}
 	}
 	floorCache[z] = out

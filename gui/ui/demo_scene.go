@@ -4,8 +4,10 @@ import (
 	"fmt"
 	"image"
 	"math"
+	"math/rand"
 	"slices"
 	"sort"
+	"time"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
@@ -52,13 +54,15 @@ type DemoScene struct {
 	arrivals []string                // pacientes que llegaron en el último paso, en orden
 	auto     autoAdvance
 	showSubs bool
-	scenery  scenery // el taxi y el humo de la olla
+	scenery  scenery  // los carros de la calle y el humo de la olla
+	door     mainDoor // la puerta principal, que se abre y se cierra suave
 }
 
 // NewDemoScene prepara la escena para una demo recién creada.
 func NewDemoScene(d *game.Demo) *DemoScene {
 	s := &DemoScene{demo: d, pos: map[string]vec{}, paths: map[string][]vec{}, pathTo: map[string]vec{},
-		anims: map[string]*patientAnim{}, staff: map[string]*staffAnim{}, showSubs: true}
+		anims: map[string]*patientAnim{}, staff: map[string]*staffAnim{}, showSubs: true,
+		scenery: newScenery(rand.New(rand.NewSource(time.Now().UnixNano())))} // el tráfico es decorado: cada vez distinto
 	s.refresh()
 	return s
 }
@@ -105,7 +109,7 @@ func (s *DemoScene) Update() (Scene, error) {
 
 // La demo se puede pausar con Esc (cumple pausable). No tiene que hacer
 // nada: mientras está la pausa no recibe Update, así que todo se queda
-// quieto (el avance automático, las animaciones, el taxi y el humo) y al
+// quieto (el avance automático, las animaciones, los carros y el humo) y al
 // reanudar sigue exactamente donde iba.
 func (s *DemoScene) onPause()  {}
 func (s *DemoScene) onResume() {}
@@ -161,6 +165,8 @@ func (s *DemoScene) animate() {
 			a.step(now.x-old.x, now.y-old.y, s.choreo != nil && s.choreo.attending() == f.id)
 		}
 	}
+
+	s.door.step(s.someoneNearDoor())
 
 	if s.choreo == nil {
 		return
@@ -357,12 +363,12 @@ func (s *DemoScene) refresh() {
 	}
 }
 
-// Draw dibuja por capas: mapa (con las camas libres) → taxi y humo →
-// personajes → cobijas → rótulos (letreros, burbujas, etiquetas) → HUD y
-// subtítulos.
+// Draw dibuja por capas: mapa (con las camas libres) → carros y humo →
+// personajes → copas de las palmeras → cobijas → rótulos (letreros,
+// burbujas, etiquetas) → HUD y subtítulos.
 func (s *DemoScene) Draw(screen *ebiten.Image) {
 	drawMap(screen)
-	drawMainDoor(screen, s.doorOpen())
+	drawMainDoor(screen, s.door.open)
 	s.scenery.draw(screen)
 
 	// Los personajes y la camilla, de atrás para adelante: el que tiene los
@@ -392,9 +398,13 @@ func (s *DemoScene) Draw(screen *ebiten.Image) {
 	}
 	if c != nil && c.visible() {
 		items = append(items, drawable{float64(c.fp.Max.Y), func() {
+			p, _ := s.figure(c.order.patient)
+			if c.swing != nil { // girando, con el paciente encima
+				drawSwing(screen, c.swing, func(g ebiten.GeoM) { drawRiderWith(screen, p, s.anims[p.id], g) })
+				return
+			}
 			drawStretcher(screen, c.fp, c.dir)
 			if c.riding() {
-				p, _ := s.figure(c.order.patient)
 				drawRider(screen, p, s.anims[p.id], c.fp, c.dir)
 			}
 		}})
@@ -403,6 +413,7 @@ func (s *DemoScene) Draw(screen *ebiten.Image) {
 	for _, it := range items {
 		it.draw()
 	}
+	drawPalmCrowns(screen)
 	drawBlankets(screen, s.snap.Rooms, lyingIn)
 
 	for _, o := range roomBadges(s.snap.Rooms) {

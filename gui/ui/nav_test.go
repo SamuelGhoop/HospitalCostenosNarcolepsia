@@ -57,8 +57,20 @@ func TestNavGrid_BlocksWallsAndFurniture(t *testing.T) {
 		{"el hueco de la puerta principal", image.Pt(door.Min.X+door.Dx()/2, door.Max.Y-1), false},
 		{"la calle", image.Pt(400, streetRect.Min.Y+20), true},
 		{"la cama de la 101", bedRect(zoneRoom101).Min.Add(bedRect(zoneRoom101).Max).Div(2), true},
-		{"el paradero de la acera", sprite(120, 188, 38, 13).Min.Add(sprite(120, 188, 38, 13).Max).Div(2), true},
-		{"la base de una palma", sprite(292.5, 191.5, 10, 6).Min.Add(sprite(292.5, 191.5, 10, 6).Max).Div(2), true},
+		// La ronda de mapa del 2026-10-11: acera más ancha, un carril y la playa;
+		// el mostrador de la cafetería más corto y el de la recepción horizontal.
+		{"la parte nueva de la acera", fromMockup(100, 212, 0, 0).Min, false},
+		{"el carril", fromMockup(100, 230, 0, 0).Min, true},
+		{"la playa", fromMockup(100, 252, 0, 0).Min, true},
+		{"donde estaba la bandeja del mostrador de la cafetería", fromMockup(78, 109, 0, 0).Min, false},
+		{"el mostrador nuevo de la recepción", fromMockup(272, 115, 0, 0).Min, true},
+		{"donde estaba el mostrador vertical de la recepción", fromMockup(274, 158, 0, 0).Min, false},
+		{"el paradero de la acera", sprite(120, 184, 38, 13).Min.Add(sprite(120, 184, 38, 13).Max).Div(2), true},
+		{"la base de una palma", sprite(292.5, 186, 10, 6).Min.Add(sprite(292.5, 186, 10, 6).Max).Div(2), true},
+		// Desde el 2026-10-11 el paradero y las palmas están 4 y 5,5 px más arriba:
+		// debajo, donde llegaban antes, ya es acera libre.
+		{"debajo del paradero (donde llegaba antes)", fromMockup(139, 209, 0, 0).Min, false},
+		{"debajo de la base de una palma (donde llegaba antes)", fromMockup(297.5, 201, 0, 0).Min, false},
 	} {
 		if got := feetBlocked(c.feet); got != c.blocked {
 			t.Errorf("%s (%v): bloqueado = %v; se esperaba %v", c.what, c.feet, got, c.blocked)
@@ -290,5 +302,32 @@ func TestRoute_FromTheCafeteriaToRoom101GoesUpThroughTheCafeteriaDoor(t *testing
 				t.Errorf("de %v a %v: pasa por la puerta de arriba de la cafetería=%v, por la recepción=%v; se esperaba (true, false)", from, to, through, lobby)
 			}
 		}
+	}
+}
+
+// La puerta nueva entre la recepción y el pasillo 2 (2026-10-11): quien va
+// de la recepción al pasillo 2 pasa por ella, sin subir al pasillo 1.
+func TestRoute_FromTheLobbyToHallway2UsesTheSideDoor(t *testing.T) {
+	needFonts(t)
+	side := doorways[len(doorways)-2].gap // recepción ↔ pasillo 2
+	from := toVec(slot(zoneLobby, 0))
+	to := toVec(slot(zoneHallway2, 0))
+	through, hallway1 := false, false
+	prev := from
+	for _, p := range route(from, to) {
+		steps := int(math.Ceil(math.Hypot(p.x-prev.x, p.y-prev.y) / 2))
+		for k := 0; k <= steps; k++ {
+			f := 1.0
+			if steps > 0 {
+				f = float64(k) / float64(steps)
+			}
+			feet := image.Pt(int(math.Round(prev.x+(p.x-prev.x)*f+feetOffset.x)), int(math.Round(prev.y+(p.y-prev.y)*f+feetOffset.y)))
+			through = through || feet.In(side)
+			hallway1 = hallway1 || feet.In(zones[zoneHallway1].rect)
+		}
+		prev = p
+	}
+	if !through || hallway1 {
+		t.Errorf("de la recepción al pasillo 2: pasa por la puerta del costado=%v, por el pasillo 1=%v; se esperaba (true, false)", through, hallway1)
 	}
 }

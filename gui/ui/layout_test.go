@@ -101,14 +101,15 @@ func TestSpots_EnoughFreePlacesWhereTheDemoNeedsThem(t *testing.T) {
 	}
 }
 
-// Pedido por Samuel: los rótulos de zona tampoco van sobre muebles.
+// Pedido por Samuel: los rótulos de zona tampoco van sobre muebles. Ni
+// sobre el letrero de radiación, que es piso pero se tiene que ver.
 func TestZoneLabels_AreNotOverFurniture(t *testing.T) {
 	if err := loadFonts(); err != nil {
 		t.Fatal(err)
 	}
 	for _, z := range zoneOrder {
-		if box := zoneLabelBox(z); onFurniture(box) {
-			t.Errorf("el rótulo %q (%v) queda sobre un mueble", zones[z].label, box)
+		if box := zoneLabelBox(z); onFurniture(box) || box.Overlaps(radiationSign) {
+			t.Errorf("el rótulo %q (%v) queda sobre un mueble o el letrero de radiación", zones[z].label, box)
 		}
 	}
 }

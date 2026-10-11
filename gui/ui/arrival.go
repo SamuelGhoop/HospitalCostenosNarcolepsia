@@ -25,13 +25,42 @@ func arrivalChoreography(ids []string, targets map[string]vec, spawn vec) *chore
 	return &choreography{phases: []phase{ph}}
 }
 
-// doorReach: la puerta principal está abierta mientras haya pies a menos de
-// esto de su hueco (alguien entrando o saliendo); si no, se cierra sola.
+// doorReach: la puerta principal se abre cuando hay pies a menos de esto de
+// su hueco (alguien entrando o saliendo).
 const doorReach = 48
 
-// doorOpen dice si la puerta principal está abierta. En el modo juego lo
-// dirá Snapshot.DoorOpen (F3b).
-func (s *DemoScene) doorOpen() bool {
+// La puerta principal se abre y se cierra suave (pedido de Samuel,
+// 2026-10-11): las hojas se corren en doorSlideTicks y se cierra
+// doorCloseDelay ticks (0,5 s) después de que no haya nadie cerca.
+const (
+	doorSlideTicks = 12
+	doorCloseDelay = 30
+)
+
+// mainDoor es la puerta principal: lo abierta que está (de 0, cerrada, a 1)
+// y cuántos ticks más se queda abierta aunque ya no haya nadie cerca.
+type mainDoor struct {
+	open float64
+	hold int
+}
+
+// step avanza la puerta un tick. someoneNear dice si hay alguien cerca: en
+// la demo lo mira la escena; en el modo juego lo dirá Snapshot.DoorOpen.
+func (d *mainDoor) step(someoneNear bool) {
+	if someoneNear {
+		d.hold = doorCloseDelay
+	} else if d.hold > 0 {
+		d.hold--
+	}
+	if d.hold > 0 {
+		d.open = math.Min(1, d.open+1.0/doorSlideTicks)
+	} else {
+		d.open = math.Max(0, d.open-1.0/doorSlideTicks)
+	}
+}
+
+// someoneNearDoor dice si hay pies a menos de doorReach de la puerta principal.
+func (s *DemoScene) someoneNearDoor() bool {
 	door := doorways[len(doorways)-1].gap
 	for _, f := range s.figures {
 		if distToRect(s.pos[f.id].add(feetOffset), door) <= doorReach {
@@ -55,19 +84,28 @@ var (
 	colDoorLeaf  = color.RGBA{0x5a, 0x61, 0x6b, 0xff}
 )
 
-// drawMainDoor dibuja la puerta principal abierta encima del fondo (que la
-// trae cerrada): el umbral despejado y las dos hojas corridas hacia el
-// marco.
-func drawMainDoor(dst *ebiten.Image, open bool) {
-	if !open {
+// drawMainDoor dibuja la puerta principal encima del fondo (que la trae
+// cerrada), abierta en la fracción open: el umbral y las dos hojas del
+// fondo corridas hacia el marco (se meten en la pared: lo que sale del
+// hueco no se dibuja). Abierta del todo, de cada hoja se ve una sexta parte.
+func drawMainDoor(dst *ebiten.Image, open float64) {
+	if open <= 0 {
 		return
 	}
 	g := doorways[len(doorways)-1].gap
-	fillRect(dst, g, colDoorFloor)
-	w := g.Dx() / 6
-	for _, x := range []int{g.Min.X, g.Max.X - w} {
-		leaf := image.Rect(x, g.Min.Y, x+w, g.Max.Y)
-		fillRect(dst, leaf, colInk)
-		fillRect(dst, leaf.Inset(1), colDoorLeaf)
+	half := g.Dx() / 2
+	shift := open * float64(half-g.Dx()/6)
+	inGap := dst.SubImage(g).(*ebiten.Image) // lo que se dibuja fuera del hueco no se ve
+	fillRect(inGap, g, colDoorFloor)
+	for _, leaf := range []struct {
+		r  image.Rectangle
+		dx float64
+	}{
+		{image.Rect(g.Min.X, g.Min.Y, g.Min.X+half, g.Max.Y), -shift}, // la de la izquierda, hacia la izquierda
+		{image.Rect(g.Min.X+half, g.Min.Y, g.Max.X, g.Max.Y), shift},
+	} {
+		op := &ebiten.DrawImageOptions{}
+		op.GeoM.Translate(float64(leaf.r.Min.X)+math.Round(leaf.dx), float64(leaf.r.Min.Y))
+		inGap.DrawImage(backgroundImg.SubImage(leaf.r).(*ebiten.Image), op)
 	}
 }

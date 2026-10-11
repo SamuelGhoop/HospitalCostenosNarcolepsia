@@ -117,12 +117,9 @@ func checkTick(t *testing.T, s *DemoScene, step, tick int) {
 // paciente que llevan en camilla lo mueve quien la empuja: va a la
 // velocidad del personal.
 //
-// ⚠️ Pendiente de Samuel: al girar, la camilla cambia de dirección de golpe
-// y el paciente que va encima pasa de un lado de quien empuja al otro (55 a
-// 72 px). Girarla de a poco no cabe: en el pasillo 1, de 66 px de alto, la
-// camilla de 54 px choca con la pared a los 10° de girar alrededor de quien
-// empuja. Mientras Samuel decide, ese tick es la única otra excepción, y en
-// él el paciente sigue sobre la camilla y quien empuja no se mueve de más.
+// Cuando la camilla gira (de a poco, en turnTicks ticks; decisión de Samuel
+// del 2026-10-11), el paciente encima va a la velocidad del giro: recorre
+// lo mismo en cada tick, lo que sale de repartir el arco en esos ticks.
 func TestDemo_NobodyJumps(t *testing.T) {
 	needFonts(t)
 	s := NewDemoScene(game.NewDemo())
@@ -141,22 +138,22 @@ func TestDemo_NobodyJumps(t *testing.T) {
 			}
 		}
 		for tick := 0; tick < 8000; tick++ {
-			prev, prevDir := s.carry, dir(-1)
-			if prev != nil {
-				prevDir = prev.dir
+			var turning *swing // el giro de este tick, si lo hay (puede terminar en este tick)
+			if s.carry != nil {
+				turning = s.carry.swing
 			}
 			s.animate()
 			c := s.carry
+			if c != nil && c.swing != nil {
+				turning = c.swing
+			}
 			for _, f := range s.figures {
 				was, now := before[f.id], s.pos[f.id]
 				limit := speedOf(f)
 				if c != nil && c.visible() && f.id == c.order.patient {
 					limit = staffSpeed
-					if c == prev && c.riding() && c.dir != prevDir {
-						if now != riderPos(c.fp) {
-							t.Errorf("paso %d, tick %d: al girar la camilla, %s no va sobre ella", step, tick, f.id)
-						}
-						continue // el giro de golpe (pendiente de Samuel)
+					if turning != nil {
+						limit = math.Max(limit, turning.riderStep())
 					}
 				}
 				if d := math.Hypot(now.x-was.x, now.y-was.y); d > limit+rounding {

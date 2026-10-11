@@ -15,12 +15,19 @@ const (
 	// blanketPath: la cobija subida (56×48, con transparencia), que va
 	// ENCIMA del paciente acostado.
 	blanketPath = "map/bed_blanket.png"
-	taxiPath    = "map/taxi.png"
 	steamPath   = "map/steam_pot.png"
+	// palmCrownPath: la copa de una palmera (104×104), que va ENCIMA de los
+	// personajes: quien pasa cerca queda debajo de las hojas.
+	palmCrownPath = "map/palm_crown.png"
+	// Las 3 capas de los carros (132×72, en el mismo punto): detalles sin
+	// teñir, carrocería en gris que se tiñe y el letrero de los taxis.
+	carDetailsPath = "map/car_details.png"
+	carBodyPath    = "map/car_body.png"
+	carSignPath    = "map/car_taxi_sign.png"
 )
 
 // Las imágenes ya cargadas para Ebitengine (ver loadMap).
-var backgroundImg, blanketImg, taxiImg, steamImg *ebiten.Image
+var backgroundImg, blanketImg, steamImg, palmCrownImg, carDetailsImg, carBodyImg, carSignImg *ebiten.Image
 
 // loadMap carga las imágenes embebidas del mapa.
 func loadMap() error {
@@ -30,8 +37,11 @@ func loadMap() error {
 	}{
 		{backgroundPath, &backgroundImg},
 		{blanketPath, &blanketImg},
-		{taxiPath, &taxiImg},
 		{steamPath, &steamImg},
+		{palmCrownPath, &palmCrownImg},
+		{carDetailsPath, &carDetailsImg},
+		{carBodyPath, &carBodyImg},
+		{carSignPath, &carSignImg},
 	} {
 		decoded, err := decodePNG(assets.Map, img.path)
 		if err != nil {

@@ -28,18 +28,19 @@ func door(x, y, w, h float64) doorway { return doorway{gap: fromMockup(x, y, w, 
 
 // doorways son las puertas de hospital.dc.html: hDoor(x, y, w) es un hueco
 // de w×3 en una pared horizontal y vDoor(x, y, h), uno de 3×h en una
-// vertical. La puerta principal es el rectángulo (199, 178, 30, 4). Las
-// puertas de ancho 20 son las del mapa ensanchado (Samuel, 2026-10-11).
+// vertical. La puerta principal es el rectángulo (199, 178, 30, 4) y va
+// de última. Las medidas son las del mapa de Samuel del 2026-10-11.
 var doorways = []doorway{
 	door(70, 68, 20, 3),   // habitación 101 ↔ pasillo 1
 	door(169, 68, 20, 3),  // habitación 102 ↔ pasillo 1
 	door(268, 68, 20, 3),  // habitación 103 ↔ pasillo 1
 	door(318, 68, 20, 3),  // radiología ↔ pasillo 1
-	door(87, 95, 20, 3),   // pasillo 1 ↔ cafetería
+	door(68, 95, 30, 3),   // pasillo 1 ↔ cafetería (alineada con la de la 101)
 	door(184, 95, 60, 3),  // pasillo 1 ↔ recepción
 	door(300, 95, 44, 3),  // pasillo 1 ↔ pasillo 2
 	door(128, 147, 3, 20), // cafetería ↔ recepción
 	door(344, 147, 3, 20), // pasillo 2 ↔ sala del personal
+	door(297, 147, 3, 20), // recepción ↔ pasillo 2
 	door(199, 178, 30, 4), // recepción ↔ acera (puerta principal)
 }
 

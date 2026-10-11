@@ -160,3 +160,24 @@ func TestSpots_FigureAndItsLabelsStayInsideTheZone(t *testing.T) {
 		check(fmt.Sprintf("despierto al lado de la cama %d", number), standing, toVec(wakeSpot(room)), room)
 	}
 }
+
+// Quien atiende a un paciente en el piso lo hace ADENTRO de su zona, junto a
+// él (a menos de helperReach), nunca desde el pasillo ni desde la zona de
+// al lado (pedido de Samuel, 2026-10-11). Vale para todas las zonas.
+func TestSpots_TheHelperStandsBesideThePatientInsideItsZone(t *testing.T) {
+	needFonts(t)
+	for z := range lyingZones {
+		places := floorOf(z)
+		if len(places) == 0 {
+			t.Errorf("%s: no hay ningún puesto de piso", zones[z].label)
+		}
+		for _, f := range places {
+			if got := zoneOfFeet(f.helper); got != z {
+				t.Errorf("%s: el que atiende al de %v se para en %s; se esperaba adentro de %s", zones[z].label, f.patient, zones[got].label, zones[z].label)
+			}
+			if d := helperDistance(f.patient, f.helper); d > helperReach {
+				t.Errorf("%s: el que atiende al de %v está en %v, a %.0f px; se esperaba junto a él (a menos de %d)", zones[z].label, f.patient, f.helper, d, helperReach)
+			}
+		}
+	}
+}

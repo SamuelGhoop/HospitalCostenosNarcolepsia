@@ -52,7 +52,7 @@ func TestDemo_TransfersGoOnAStretcher(t *testing.T) {
 				}
 				cs.appearedNear = true
 			}
-			if c.riding() {
+			if c.riding() && c.swing == nil { // girando lo revisa TestStretcherSwing_TurnsGraduallyAroundThePusher
 				cs.rode = true
 				if s.pos[o.patient] != riderPos(c.fp) {
 					t.Fatalf("paso %d, tick %d: %s no va sobre la camilla (%v; la camilla pide %v)", step, tick, o.patient, s.pos[o.patient], riderPos(c.fp))
@@ -137,7 +137,9 @@ func TestDemo_PeopleStepAsideForTheStretcher(t *testing.T) {
 			}
 			lane := carryLane(s.carry.order.plan)
 			for id, spot := range s.dodge {
-				stepped[id] = true
+				if s.pos[id] == spot {
+					stepped[id] = true // llegó caminando a su sitio a un lado
+				}
 				if overlapsAny(feetRectAt(spot), lane) {
 					t.Fatalf("paso %d: %s se hizo a un lado a %v, todavía en el camino de la camilla", step, id, spot)
 				}
@@ -150,6 +152,6 @@ func TestDemo_PeopleStepAsideForTheStretcher(t *testing.T) {
 		}
 	}
 	if len(stepped) == 0 {
-		t.Error("en toda la demo nadie se hizo a un lado para dejar pasar una camilla")
+		t.Error("en toda la demo nadie llegó a hacerse a un lado para dejar pasar una camilla")
 	}
 }

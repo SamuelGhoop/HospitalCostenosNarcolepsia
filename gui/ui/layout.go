@@ -92,11 +92,13 @@ var zoneOrder = []zone{
 	zoneHallway1, zoneCafeteria, zoneLobby, zoneHallway2, zoneStaffRoom,
 }
 
-// Otras partes del mapa de la maqueta.
+// Otras partes del mapa de la maqueta. Desde el 2026-10-11 la calle es así,
+// de arriba abajo: acera (y 182–215), bordillo, un solo carril (218–243),
+// bordillo y playa (246–261).
 var (
 	buildingRect = fromMockup(4, 14, 456, 168)
-	sidewalkRect = fromMockup(0, 182, 464, 28)
-	streetRect   = fromMockup(0, 213, 464, 46)
+	sidewalkRect = fromMockup(0, 182, 464, 33)
+	streetRect   = fromMockup(0, 218, 464, 25) // el carril
 )
 
 // roomMockupX es la x de cada habitación en la maqueta, para ubicar su cama.

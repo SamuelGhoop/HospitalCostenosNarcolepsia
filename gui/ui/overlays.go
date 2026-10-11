@@ -110,12 +110,12 @@ func zoneLabelBox(z zone) image.Rectangle {
 	size := textBox(info.label, 0, 0, smallFace).Size()
 	candidates := []image.Point{
 		{info.rect.Min.X + 2, info.rect.Max.Y - 22},          // abajo a la izquierda
-		{info.rect.Min.X + 2, info.rect.Min.Y + 2},           // arriba a la izquierda
 		{info.rect.Max.X - 2 - size.X, info.rect.Max.Y - 22}, // abajo a la derecha
+		{info.rect.Min.X + 2, info.rect.Min.Y + 2},           // arriba a la izquierda
 		{info.rect.Min.X + 2, staffConsole.Min.Y - size.Y},   // encima de la consola (sala del personal)
 	}
 	for _, c := range candidates {
-		if box := textBox(info.label, c.X, c.Y, smallFace); box.In(info.rect) && !onFurniture(box) {
+		if box := textBox(info.label, c.X, c.Y, smallFace); box.In(info.rect) && !onFurniture(box) && !box.Overlaps(radiationSign) {
 			return box
 		}
 	}

@@ -27,7 +27,8 @@ type carrying struct {
 	stage carryStage
 	seg   int             // tramo actual del empuje
 	dir   dir             // hacia dónde apunta la camilla
-	fp    image.Rectangle // huella de la camilla (vacía mientras no se ve)
+	fp    image.Rectangle // huella de la camilla en el piso (vacía mientras no se ve; girando, la de después del giro)
+	swing *swing          // el giro en curso (nil si no está girando)
 }
 
 // visible dice si la camilla está en el mapa.
@@ -38,9 +39,12 @@ func (c *carrying) riding() bool { return c.stage == carryPush }
 
 // footprintAt es la huella de la camilla delante de quien empuja, con su
 // cuadro en corner.
-func footprintAt(corner vec, d dir) image.Rectangle {
+func footprintAt(corner vec, d dir) image.Rectangle { return stretcherFootprint(feetPoint(corner), d) }
+
+// feetPoint son los pies, en enteros, de alguien con el cuadro en corner.
+func feetPoint(corner vec) image.Point {
 	feet := corner.add(feetOffset)
-	return stretcherFootprint(image.Pt(int(math.Round(feet.x)), int(math.Round(feet.y))), d)
+	return image.Pt(int(math.Round(feet.x)), int(math.Round(feet.y)))
 }
 
 // stepCarry hace un tick del traslado: mueve a quien empuja y al paciente
@@ -63,6 +67,14 @@ func (s *DemoScene) stepCarry() {
 			c.stage = carryPush
 		}
 	case carryPush:
+		if w := c.swing; w != nil { // girando: quien empuja se queda quieto
+			w.tick++
+			s.pos[o.patient] = w.riderAt(w.progress())
+			if w.done() {
+				c.dir, c.swing = w.to, nil
+			}
+			return
+		}
 		goal := plan.path[c.seg]
 		s.pos[o.pusher] = moveToward(s.pos[o.pusher], goal, staffSpeed)
 		if s.pos[o.pusher] == goal {
@@ -70,8 +82,11 @@ func (s *DemoScene) stepCarry() {
 		}
 		if c.seg == len(plan.path) {
 			c.stage = carryHopOff
-		} else {
-			c.dir = plan.dirs[c.seg]
+		} else if d := plan.dirs[c.seg]; d != c.dir {
+			c.swing = newSwing(feetPoint(goal), c.dir, d) // gira en los próximos ticks
+			c.fp = footprintAt(s.pos[o.pusher], d)
+			s.pos[o.patient] = riderPos(footprintAt(s.pos[o.pusher], c.dir))
+			return
 		}
 		c.fp = footprintAt(s.pos[o.pusher], c.dir)
 		if c.stage == carryPush {
@@ -103,11 +118,17 @@ func (s *DemoScene) avoidFor(id string) []image.Rectangle {
 // ─── Hacerse a un lado ─────────────────────────────────────────────────
 
 // carryLane es por dónde pasa un traslado: los pies de quien empuja y la
-// huella de la camilla, cada 4 px de la ruta.
+// huella de la camilla, cada 4 px de la ruta, y lo que barre al girar.
 func carryLane(plan carryPlan) []image.Rectangle {
 	var out []image.Rectangle
 	prev := plan.pickup
 	for i, p := range plan.path {
+		if i > 0 && plan.dirs[i] != plan.dirs[i-1] { // gira donde terminó el tramo anterior
+			w := swing{pivot: feetPoint(prev), from: plan.dirs[i-1], to: plan.dirs[i]}
+			for k := 0; k <= swingSteps; k++ {
+				out = append(out, w.bounds(float64(k)/swingSteps))
+			}
+		}
 		steps := int(math.Ceil(math.Hypot(p.x-prev.x, p.y-prev.y) / 4))
 		for k := 0; k <= steps; k++ {
 			t := 1.0

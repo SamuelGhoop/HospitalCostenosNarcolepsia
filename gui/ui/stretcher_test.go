@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"image"
 	"image/color"
+	"math"
 	"testing"
 )
 
@@ -167,5 +168,112 @@ func TestStretcherGoingUp_TheRiderShowsAboveThePusher(t *testing.T) {
 	}
 	if above := float64(head) - minY; above < (maxY-minY)/2 {
 		t.Errorf("subiendo, del paciente (y de %.0f a %.0f) asoman %.0f px sobre la cabeza de quien empuja (y=%d); se esperaba al menos la mitad", minY, maxY, above, head)
+	}
+}
+
+// La camilla gira de a poco (pedido de Samuel, 2026-10-11): en turnTicks
+// ticks (~0,3 s) pasa de una dirección a la otra alrededor de los pies de
+// quien empuja; el paciente encima arranca y termina sobre la camilla y
+// recorre lo mismo en cada tick, sin saltos.
+func TestStretcherSwing_TurnsGraduallyAroundThePusher(t *testing.T) {
+	pivot := image.Pt(500, 400)
+	for _, from := range []dir{dirRight, dirLeft, dirUp, dirDown} {
+		for _, to := range []dir{dirRight, dirLeft, dirUp, dirDown} {
+			if to == from || to == from.opposite() {
+				continue
+			}
+			w := newSwing(pivot, from, to)
+			if len(w.ts) != turnTicks || turnTicks < 15 || turnTicks > 21 {
+				t.Errorf("%v→%v: el giro dura %d ticks; se esperaban unos 0,3 s (%d)", from, to, len(w.ts), turnTicks)
+			}
+			if got, want := w.riderAt(0), riderPos(stretcherFootprint(pivot, from)); got != want {
+				t.Errorf("%v→%v: al empezar el paciente está en %v; la camilla lo pide en %v", from, to, got, want)
+			}
+			if got, want := w.riderAt(1), riderPos(stretcherFootprint(pivot, to)); math.Hypot(got.x-want.x, got.y-want.y) > 1e-6 {
+				t.Errorf("%v→%v: al terminar el paciente está en %v; la camilla lo pide en %v", from, to, got, want)
+			}
+			step := w.riderStep()
+			prev := w.riderAt(0)
+			for k, tt := range w.ts {
+				p := w.riderAt(tt)
+				if d := math.Hypot(p.x-prev.x, p.y-prev.y); math.Abs(d-step) > 0.1 || d > 6 {
+					t.Errorf("%v→%v, tick %d: el paciente se movió %.2f px; se esperaban %.2f en cada tick (y nunca más de 6)", from, to, k+1, d, step)
+				}
+				prev = p
+			}
+			if a := w.angle(1); math.Abs(math.Abs(a)-math.Pi/2) > 1e-9 {
+				t.Errorf("%v→%v: gira %.2f rad; se esperaba un cuarto de vuelta", from, to, a)
+			}
+		}
+	}
+}
+
+// El A* de la camilla prefiere girar donde hay espacio (habitaciones,
+// recepción): con el costo de más de los giros sin espacio, cada traslado
+// de un puesto de piso a una cama hace a lo sumo los mismos giros sin
+// espacio que sin ese costo, y alguno hace menos.
+func TestCarryPlan_PrefersTurningWhereThereIsRoom(t *testing.T) {
+	needFonts(t)
+	tight := func(p carryPlan) int {
+		n := 0
+		for i := 1; i < len(p.path); i++ {
+			if p.dirs[i] != p.dirs[i-1] {
+				pivot := feetPoint(p.path[i-1])
+				if !swingClear(pivot, p.dirs[i-1], p.dirs[i], nil) {
+					n++
+				}
+			}
+		}
+		return n
+	}
+	fewer := false
+	for z := range lyingZones {
+		for _, room := range []zone{zoneRoom101, zoneRoom102, zoneRoom103} {
+			at := toVec(floorSpot(z, 0))
+			with, ok1 := planCarry(at, room, nil) // el que usa la escena
+			without, ok2 := planCarryWith(at, room, nil, 0)
+			if !ok1 || !ok2 {
+				t.Fatalf("%s → %s: sin ruta", zones[z].label, zones[room].label)
+			}
+			if a, b := tight(with), tight(without); a > b {
+				t.Errorf("%s → %s: %d giros sin espacio; sin el costo de más eran %d", zones[z].label, zones[room].label, a, b)
+			} else if a < b {
+				fewer = true
+			}
+		}
+	}
+	if !fewer {
+		t.Error("el costo de los giros sin espacio no cambió ningún traslado")
+	}
+}
+
+// Con la puerta de arriba de la cafetería alineada con la de la 101 (mapa
+// del 2026-10-11), la camilla que recoge a alguien en la cafetería sube
+// derecho por las dos puertas: pasa por la de la cafetería y no toca más
+// zonas que la cafetería, el pasillo 1 y la 101.
+func TestCarryPlan_FromTheCafeteriaToRoom101GoesStraightUp(t *testing.T) {
+	needFonts(t)
+	cafeDoor := doorways[4].gap // pasillo 1 ↔ cafetería
+	places := floorOf(zoneCafeteria)
+	if len(places) == 0 {
+		t.Fatal("la cafetería no tiene puestos de piso")
+	}
+	for _, f := range places {
+		plan, ok := planCarry(toVec(f.patient), zoneRoom101, nil)
+		if !ok {
+			t.Fatalf("del puesto %v a la 101: no hay ruta con la camilla", f.patient)
+		}
+		through := false
+		for _, r := range carryLane(plan) {
+			through = through || r.Overlaps(cafeDoor)
+			for _, z := range []zone{zoneLobby, zoneHallway2, zoneRadiology, zoneRoom102} {
+				if r.Overlaps(zones[z].rect) {
+					t.Errorf("del puesto %v a la 101: la camilla pasa por %s (%v)", f.patient, zones[z].label, r)
+				}
+			}
+		}
+		if !through {
+			t.Errorf("del puesto %v a la 101: la camilla no sube por la puerta de arriba de la cafetería", f.patient)
+		}
 	}
 }

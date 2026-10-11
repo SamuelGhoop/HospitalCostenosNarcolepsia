@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"math"
 	"testing"
 
 	"github.com/SamuelGhoop/HospitalCostenosNarcolepsia/game"
@@ -35,7 +36,7 @@ func TestDemo_PatientsArriveFromTheSidewalkOneByOne(t *testing.T) {
 	if len(ids) != 5 {
 		t.Fatalf("en el paso 3 hay %d pacientes; se esperaban 5", len(ids))
 	}
-	if s.doorOpen() {
+	if s.door.open != 0 {
 		t.Error("la puerta está abierta antes de que venga nadie")
 	}
 
@@ -50,7 +51,7 @@ func TestDemo_PatientsArriveFromTheSidewalkOneByOne(t *testing.T) {
 			before[id] = s.pos[id]
 		}
 		s.animate()
-		sawOpen = sawOpen || s.doorOpen()
+		sawOpen = sawOpen || s.door.open == 1
 		for _, id := range ids {
 			a, b := before[id].add(feetOffset), s.pos[id].add(feetOffset)
 			if _, ok := started[id]; !ok && a != b {
@@ -77,9 +78,49 @@ func TestDemo_PatientsArriveFromTheSidewalkOneByOne(t *testing.T) {
 		}
 	}
 	if !sawOpen {
-		t.Error("la puerta nunca se abrió mientras entraban")
+		t.Error("la puerta nunca se abrió del todo mientras entraban")
 	}
-	if s.doorOpen() {
-		t.Error("la puerta sigue abierta cuando ya entraron todos")
+	for i := 0; i < doorCloseDelay+doorSlideTicks; i++ {
+		s.animate()
+	}
+	if s.door.open != 0 {
+		t.Errorf("la puerta sigue abierta (%.2f) cuando ya entraron todos", s.door.open)
+	}
+}
+
+// La puerta principal se abre y se cierra suave (pedido de Samuel,
+// 2026-10-11): las hojas se corren en 12 ticks, y se cierra 0,5 s después
+// de que no haya nadie cerca. Si llega alguien mientras se cierra, se abre
+// otra vez.
+func TestMainDoor_SlidesOpenAndClosesHalfASecondLater(t *testing.T) {
+	var d mainDoor
+	if d.open != 0 {
+		t.Fatalf("al empezar la puerta está abierta %.2f", d.open)
+	}
+	for tick := 1; tick <= doorSlideTicks; tick++ {
+		d.step(true)
+		if want := float64(tick) / doorSlideTicks; math.Abs(d.open-want) > 1e-9 {
+			t.Fatalf("tick %d abriendo: %.3f; se esperaba %.3f", tick, d.open, want)
+		}
+	}
+	for tick := 1; tick < doorCloseDelay; tick++ {
+		d.step(false)
+		if d.open != 1 {
+			t.Fatalf("%d ticks sin nadie: la puerta ya se está cerrando (%.2f); se esperaba abierta medio segundo", tick, d.open)
+		}
+	}
+	d.step(false)
+	if want := 1 - 1.0/doorSlideTicks; math.Abs(d.open-want) > 1e-9 {
+		t.Fatalf("pasado el medio segundo: %.3f; se esperaba que empezara a cerrarse (%.3f)", d.open, want)
+	}
+	d.step(true) // vuelve alguien
+	if d.open != 1 {
+		t.Errorf("volvió alguien mientras se cerraba: %.3f; se esperaba que se abriera otra vez", d.open)
+	}
+	for tick := 0; tick < doorCloseDelay+doorSlideTicks; tick++ {
+		d.step(false)
+	}
+	if d.open != 0 {
+		t.Errorf("sin nadie cerca, la puerta quedó abierta %.2f", d.open)
 	}
 }
