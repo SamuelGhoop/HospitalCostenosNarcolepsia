@@ -479,6 +479,66 @@ Ronda antes de F3b; aplica a la demo y al juego (mismo código de `gui/`).
     - **Puestos de piso**: además, la camilla tiene que poder aparecer junto al paciente (a 6 celdas como mucho) y sacarlo al pasillo 1 por la puerta de su zona. Así, de la cafetería a la 101 la camilla **sube derecho por las dos puertas alineadas** (con test); el puesto de piso de la cafetería ya no queda debajo de una mesa.
     - **Giro de la camilla** (opción b de Samuel): gira de a poco alrededor de los pies de quien empuja en 18 ticks (0,3 s), con el paciente encima recorriendo lo mismo en cada tick. La huella en el piso no toca paredes ni muebles antes ni después del giro; mientras gira, el **dibujo** se puede montar sobre una pared, como las cabezas en el pasillo 1. El A* prefiere girar donde hay espacio (habitaciones, recepción): un giro cuyo barrido toca una pared cuesta 20 celdas de más (con test).
 
+### 10.9 Backdoor de pruebas (hecho, 2026-10-14)
+Aprobado por Samuel el 2026-10-14 ("Hazlo"), para que el agente `tester` llegue a cualquier
+momento del juego en segundos, sin una persona jugando, saque capturas y un dump de estado, y
+salga. `gui/main.go`, `gui/ui/agent.go`, `gui/ui/agent_hooks.go` y `gui/ui/script.go`.
+
+- **Flags** (`gui/main.go`; el modo normal, `cd gui && go run .`, queda idéntico):
+
+  | Flag | Qué hace |
+  |---|---|
+  | `-agent` | activa el modo de prueba: sin ventana de juego normal, arranca directo en `-scene`. Nunca escribe archivos del jugador (no hay partida guardada todavía) ni suena nada (hoy no hay sonido). |
+  | `-scene <id>` | escena de arranque: ver la tabla de abajo. |
+  | `-step N` | con `-scene demo`: adelanta hasta el paso N (1 a 12), con todos ya en su puesto final (sin reproducir las coreografías intermedias). |
+  | `-seed N` | semilla fija del azar de la partida/demo y del tráfico decorado (en vez de la hora). |
+  | `-input archivo` | guion de instrucciones, una por línea (ver abajo). |
+  | `-frames N` | ticks de `Update` sin entrada, después de que se acaba el guion (o directo, si no hay `-input`). |
+  | `-shot ruta.png` | captura al terminar (además de los `shot` del guion). |
+  | `-dump ruta.json` | dump de estado al terminar (además de los `dump` del guion). |
+  | `-quit` | termina solo al acabar; sin ella, la ventana se queda quieta para mirarla a mano. |
+
+- **Tabla de escenas** (`-scene`):
+
+  | id | Qué arma |
+  |---|---|
+  | `title` | la portada (`NewTitleScene`); es el valor por defecto. |
+  | `demo` | `game.NewDemo()` + `NewDemoScene`; con `-step N`, adelantada hasta ese paso. |
+  | `game` | una partida nueva (`newGameScene`, **sin** arrancar la goroutine motor: ver determinismo). |
+  | `pause` | una partida nueva, con el menú de pausa encima (`newPauseScene`). |
+  | `report` | corre la demostración completa (los 12 pasos) y muestra su Shift Report. |
+
+- **El guion** (`-input`), una instrucción por línea (`#` al principio o línea vacía: se ignoran); `gui/ui/script.go` valida todo antes de correr nada, con el número de línea en el error:
+
+  | Instrucción | Qué hace |
+  |---|---|
+  | `wait N` | N ticks de `Update` sin tocar nada. |
+  | `click X Y` | mueve el mouse a (X, Y) y hace clic izquierdo, un tick. |
+  | `rclick X Y` | igual, con clic derecho. |
+  | `mouse X Y` | solo mueve el mouse (para el tooltip, sin clic). |
+  | `key Nombre` | esa tecla, apretada un tick (como `inpututil.IsKeyJustPressed`). |
+  | `hold Nombre N` | esa tecla, sostenida N ticks (el primero dispara el "se acaba de apretar"; los demás, no — como de verdad). Hace falta para **Shift** (todas las etiquetas), que se lee continuo. |
+  | `shot ruta.png` | captura la pantalla (1280 × 720, PNG a 1×: sin escalar, a diferencia de los sprites) con el cuadro que sigue. |
+  | `dump ruta.json` | el estado que dibuja la escena (ver abajo), en ese momento. |
+  | `quit` | termina la corrida ahí mismo. |
+
+  Los nombres de tecla válidos son justo las que lee alguna escena del juego (`scriptKeys` en `script.go`): `Escape`, `Space`, `Enter`, `NumpadEnter`, `ArrowUp`, `ArrowDown`, `W`, `S`, `Shift`, `C`, `A`. Un nombre que no esté ahí es un error claro al cargar el guion.
+
+- **Determinismo** (GAME_DESIGN §11: "los tests llaman `Tick` a mano"; esto es lo mismo). `-agent` reemplaza tres relojes de prueba:
+  1. `seedSource` (`gui/ui/seed.go`): en vez de la hora, da `-seed` fija. La usan `NewGameScene`, `newGameScene` (tráfico) y `NewDemoScene` (tráfico).
+  2. `newGameSceneFn` (`gui/ui/game_scene.go`): a quién llaman NUEVA PARTIDA (desde la portada o el Game Over). En modo agente arma la partida con `newGameScene` directo, **sin** `Game.Start(ctx)`: así nadie más toca `Game.Tick` por su cuenta.
+  3. El propio driver (`agentRunner.driveFrame`, `gui/ui/agent.go`) llama `Game.Tick(100 * time.Millisecond)` cada 6 `Update` (60 Updates/s de Ebitengine ÷ 6 = 10/s = uno cada 100 ms), exactamente como la goroutine motor real y como `play()` en `game_scene_test.go`.
+
+  También fuerza `isFocused` (app.go) a verdadero: sin ventana real con foco, `GameScene.pausesOnBlur()` abriría la pausa en todos los ticks.
+
+- **Cómo lee la entrada cada escena** (`gui/ui/agent_hooks.go`): en vez de llamar directo a `inpututil`/`ebiten`, las escenas pasan por tres variables de paquete (`keyJustPressed`, `clickJustPressed`, `readInputFn`); en producción son la lectura real, y `-agent` las reemplaza por la entrada del guion. Así ninguna escena sabe si la está jugando una persona o un guion — ni `App.Update()` (el Esc), ni `DemoScene.Update()` (C, A, S, Espacio, clic), ni las escenas de portapapeles (`readInput`, `input.go`).
+
+- **El dump** (`dumpState`, `agent.go`): escena actual y tick; en el juego, la foto completa que usaría un tester para no tener que adivinar mirando los píxeles (reloj, día, plata, reputación, avisos, pacientes con ID/estado/posición en pantalla, personal con ID/rol/actividad/posición, camillas activas con su huella y hacia dónde apuntan); en la demo, el paso actual.
+
+- **Probado de verdad** (2026-10-14, `builder`): `go run . -agent -scene game -seed 7 -input guion.txt -quit` con un guion que espera a que P-001 se desplome, hace clic en el paciente y después en el camillero libre (C-01) y saca dos capturas y un dump: el dump mostró `C-01` pasando de `"libre"` a `"va a recogerlo"` y caminando hacia el paciente, y las capturas lo confirmaron a simple vista. `title`, `demo -step N`, `report` y `pause` probados igual.
+
+- **Tests** (`gui/ui/script_test.go`, `agent_test.go`): el parser del guion (líneas válidas, tecla desconocida, número inválido, argumentos de más o de menos, línea y archivo), que la misma semilla + el mismo guion da el mismo dump en dos corridas (sin ventana: arma la escena y llama `agentRunner.step()` a mano, como los demás tests de `gui/ui` llaman `s.update(in)`), `hold` como tecla sostenida de verdad (el borde solo en el primer tick, Shift continuo en todos) y `-step` de la demo. `shot` necesita una ventana real de Ebitengine (la prueba el agente `tester` a mano, no `go test`).
+
 ---
 
 ## 11. Concurrencia
@@ -570,7 +630,7 @@ Prioridad si el tiempo no alcanza: F1 → F2 → F3 → F4 → F5 → F6. **F2 e
 ### 12.6 Plan del 2026-10-14 (después de F3b)
 Samuel aprobó las recomendaciones ("Hazlo") y agregó: *"lo que hay de juego en este momento sigue bastante crudo, principalmente en los movimientos de las camillas ya que se sienten irreales"*.
 - Se acepta que la burbuja y los rayitos de un acostado queden sobre un mueble en radiología y en la cafetería (a ×3 no caben de otra forma).
-- **Backdoor de pruebas mínimo** en `gui/` (escena, semilla, guion de entrada, captura y dump) para que el agente `tester` pueda revisar las pantallas.
+- ✅ **Backdoor de pruebas mínimo** en `gui/` (escena, semilla, guion de entrada, captura y dump) para que el agente `tester` pueda revisar las pantallas (hecho 2026-10-14, detalle en §10.9).
 - Nueva tarea: **que la camilla se mueva de forma creíble** (pendiente definir qué se siente irreal).
 - Orden: F4 (lógica en paralelo con las vistas de Figma de la Bolsa de empleo, el reporte del día y el Game Over) → F5 (los 8 banners los propone el agente `art` en Figma y Samuel los aprueba) → F6 → etapa 8 el 18/10. Si no alcanza, se recortan primero la partida guardada, los ajustes y el sonido.
 - Agentes del skill `pixel-game-studio`: `art` dibuja en Aseprite y arma las vistas en Figma; `builder` hace un commit por feature; nadie hace push hasta la última prueba de Samuel.
