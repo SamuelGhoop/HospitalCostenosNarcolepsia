@@ -25,8 +25,13 @@ type input struct {
 // lastMouse es dónde estaba el mouse en el tick anterior.
 var lastMouse image.Point
 
-// readInput lee el teclado y el mouse de este tick.
-func readInput() input {
+// readInput lee el teclado y el mouse de este tick: delega en readInputFn
+// (agent_hooks.go), que en producción es defaultReadInput y que el backdoor
+// de pruebas (-agent) reemplaza por la entrada de un guion.
+func readInput() input { return readInputFn() }
+
+// defaultReadInput es la lectura real de Ebitengine.
+func defaultReadInput() input {
 	key := inpututil.IsKeyJustPressed
 	x, y := ebiten.CursorPosition()
 	mouse := image.Pt(x, y)

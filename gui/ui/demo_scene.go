@@ -7,10 +7,8 @@ import (
 	"math/rand"
 	"slices"
 	"sort"
-	"time"
 
 	"github.com/hajimehoshi/ebiten/v2"
-	"github.com/hajimehoshi/ebiten/v2/inpututil"
 
 	"github.com/SamuelGhoop/HospitalCostenosNarcolepsia/game"
 	"github.com/SamuelGhoop/HospitalCostenosNarcolepsia/hospital"
@@ -54,7 +52,7 @@ type DemoScene struct {
 // NewDemoScene prepara la escena para una demo recién creada.
 func NewDemoScene(d *game.Demo) *DemoScene {
 	s := &DemoScene{world: newWorld(), demo: d, showSubs: true,
-		scenery: newScenery(rand.New(rand.NewSource(time.Now().UnixNano())))} // el tráfico es decorado: cada vez distinto
+		scenery: newScenery(rand.New(rand.NewSource(seedSource())))} // el tráfico es decorado: cada vez distinto (o fijo, con -agent -seed)
 	s.refresh()
 	return s
 }
@@ -66,13 +64,13 @@ func NewDemoScene(d *game.Demo) *DemoScene {
 //	(Esc abre la pausa, pero eso lo atiende la App: ver app.go)
 func (s *DemoScene) Update() (Scene, error) {
 	s.scenery.update()
-	if inpututil.IsKeyJustPressed(ebiten.KeyC) {
+	if keyJustPressed(ebiten.KeyC) {
 		s.showSubs = !s.showSubs
 	}
-	if inpututil.IsKeyJustPressed(ebiten.KeyA) {
+	if keyJustPressed(ebiten.KeyA) {
 		s.auto.toggle()
 	}
-	if inpututil.IsKeyJustPressed(ebiten.KeyS) {
+	if keyJustPressed(ebiten.KeyS) {
 		if err := s.demo.Skip(); err != nil {
 			return s, err
 		}
@@ -80,8 +78,7 @@ func (s *DemoScene) Update() (Scene, error) {
 		s.choreo = nil // al saltar no se reproducen coreografías
 	}
 
-	pressed := inpututil.IsKeyJustPressed(ebiten.KeySpace) ||
-		inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft)
+	pressed := keyJustPressed(ebiten.KeySpace) || clickJustPressed()
 	switch {
 	case s.choreo != nil && pressed:
 		s.finishChoreography() // adelanta: cada uno queda en su sitio final

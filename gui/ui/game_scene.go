@@ -6,7 +6,6 @@ import (
 	"image"
 	"math/rand"
 	"sort"
-	"time"
 
 	"github.com/hajimehoshi/ebiten/v2"
 
@@ -43,9 +42,10 @@ type GameScene struct {
 }
 
 // NewGameScene arranca una partida nueva (NUEVA PARTIDA): el azar de la
-// partida y el cosmético salen de la hora, y el motor queda corriendo.
+// partida y el cosmético salen de seedSource (la hora, salvo que el
+// backdoor de pruebas la haya fijado), y el motor queda corriendo.
 func NewGameScene() (*GameScene, error) {
-	seed := time.Now().UnixNano()
+	seed := seedSource()
 	g, err := game.New(rand.New(rand.NewSource(seed)), rand.New(rand.NewSource(seed+1)))
 	if err != nil {
 		return nil, err
@@ -56,11 +56,17 @@ func NewGameScene() (*GameScene, error) {
 	return s, nil
 }
 
+// newGameSceneFn es a quién llaman NUEVA PARTIDA (aquí y en title_scene.go)
+// y "NUEVA PARTIDA" del Game Over. El backdoor de pruebas la reemplaza por
+// una que no arranca el motor y usa Tick a mano, para que el guion sea
+// determinista (agent.go).
+var newGameSceneFn = NewGameScene
+
 // newGameScene arma la escena para la partida g sin arrancar el motor: los
 // tests la avanzan llamando g.Tick a mano.
 func newGameScene(g *game.Game) *GameScene {
 	s := &GameScene{world: newWorld(), g: g, actors: map[string]*actor{}, standing: spotBook{}, lying: spotBook{},
-		noticeSeen: map[string]int{}, scenery: newScenery(rand.New(rand.NewSource(time.Now().UnixNano())))}
+		noticeSeen: map[string]int{}, scenery: newScenery(rand.New(rand.NewSource(seedSource())))}
 	s.snap = g.Snapshot()
 	s.hud.update(s.snap)
 	s.sync()
@@ -146,7 +152,7 @@ func (s *GameScene) gameOverInput(in input) (Scene, error) {
 	switch {
 	case in.click && in.mouse.In(newGameButton), in.confirm:
 		s.onQuit()
-		return NewGameScene()
+		return newGameSceneFn()
 	case in.click && in.mouse.In(menuButton), in.back:
 		s.onQuit()
 		return NewTitleScene(), nil

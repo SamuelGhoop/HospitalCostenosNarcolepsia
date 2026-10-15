@@ -50,7 +50,7 @@ func (s *TitleScene) update(in input) (Scene, error) {
 	}
 	switch chosen {
 	case optNew:
-		return NewGameScene()
+		return newGameSceneFn()
 	case optSettings: // AJUSTES llega en F6
 		s.notice = comingSoonTicks
 	case optDemo:

@@ -2,7 +2,6 @@ package ui
 
 import (
 	"github.com/hajimehoshi/ebiten/v2"
-	"github.com/hajimehoshi/ebiten/v2/inpututil"
 )
 
 // App es el juego para Ebitengine: cumple la interfaz ebiten.Game
@@ -17,22 +16,37 @@ var _ ebiten.Game = (*App)(nil)
 // NewApp carga las fuentes, los sprites, el mapa, la portada y la pausa, y
 // arranca en la portada.
 func NewApp() (*App, error) {
+	if err := loadAssets(); err != nil {
+		return nil, err
+	}
+	return &App{scene: NewTitleScene()}, nil
+}
+
+// loadAssets carga todo lo que hace falta antes de poner cualquier escena
+// en pantalla (fuentes, sprites, mapa, portada y pausa). Aparte de NewApp,
+// la usa el backdoor de pruebas (RunAgent, agent.go): arranca directo en
+// la escena que pida -scene, no siempre en la portada.
+func loadAssets() error {
 	for _, load := range []func() error{loadFonts, loadPixelFont, loadSprites, loadStretcher, loadMap, loadTitle, loadPause} {
 		if err := load(); err != nil {
-			return nil, err
+			return err
 		}
 	}
 	boxes, err := loadHitboxes()
 	if err != nil {
-		return nil, err
+		return err
 	}
 	titleHitboxes = boxes
-	return &App{scene: NewTitleScene()}, nil
+	return nil
 }
 
 // Update lo llama Ebitengine 60 veces por segundo. La escena devuelve cuál
 // sigue; así se cambia de pantalla sin un switch con todas las escenas.
-func (a *App) Update() error { return a.update(inpututil.IsKeyJustPressed(ebiten.KeyEscape)) }
+//
+// El Esc se lee con keyJustPressed (agent_hooks.go) en vez de llamar directo
+// a inpututil: así el backdoor de pruebas (-agent) lo puede reemplazar por
+// un guion sin ventana real.
+func (a *App) Update() error { return a.update(keyJustPressed(ebiten.KeyEscape)) }
 
 // update hace el trabajo de Update; esc dice si se acaba de apretar Esc
 // (los tests lo pasan a mano). La pausa la abre la App, así las escenas no
