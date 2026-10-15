@@ -44,6 +44,14 @@ type Game struct {
 	score                     int               // puntaje acumulado (§5.10)
 	episodeTimes              map[string]string // ID del episodio → hora del juego ("14:15"), §3.2
 	notices                   []string          // últimos avisos para la interfaz, del más viejo al más nuevo
+
+	// Contratación y nómina (§5.8 y §6, F4).
+	candidates         []*candidate // los candidatesPerDay candidatos de la bolsa de empleo de hoy
+	dayStartMoney      int          // plata al empezar el día de hoy, para el Shift Report diario
+	dayReviewIncome    int          // ingresos por revisiones acumulados hoy
+	dayDischargeIncome int          // ingresos por altas acumulados hoy
+	dayHires           []HireLine   // contrataciones hechas hoy
+	lastDayReport      DayReport    // el Shift Report del último día que cerró (ver DayReport())
 }
 
 // New crea una partida (GAME_DESIGN §5.2): un hospital con las habitaciones
@@ -70,6 +78,8 @@ func New(rng, looks *rand.Rand) (*Game, error) {
 		return nil, fmt.Errorf("contratando al camillero inicial: %w", err)
 	}
 	g.nextArrival = arrivalInterval(rng, g.clock.day)
+	g.dayStartMoney = g.money
+	g.generateCandidatesLocked() // §6: la bolsa de empleo ya tiene 3 candidatos desde el día 1
 	return g, nil
 }
 
@@ -95,8 +105,12 @@ func (g *Game) tickLocked(dt time.Duration) {
 	g.checkDefeatLocked()
 	if g.over == NotOver && g.clock.over() {
 		// Este es el tick que llegó a las 20:00: los siguientes ya no
-		// entran aquí (el reloj se detiene), así que suma una sola vez.
+		// entran aquí (el reloj se detiene), así que esto corre una sola
+		// vez. Primero los +500 del día (§5.10) y después la nómina
+		// (§5.8), que puede dejar la plata en negativo y terminar la
+		// partida por quiebra.
 		g.score += dayCompletedPoints
+		g.payPayrollLocked()
 	}
 }
 
@@ -115,15 +129,29 @@ func (g *Game) Resume() {
 }
 
 // StartNextDay empieza el día siguiente a las 08:00. Solo se puede cuando
-// el turno ya terminó (a las 20:00); si no, devuelve ErrDayNotOver.
-// (En F4 aquí se paga la nómina.)
+// el turno ya terminó (a las 20:00); si no, devuelve ErrDayNotOver. Si la
+// partida ya se perdió (incluida la quiebra que pagó tickLocked al cerrar
+// el día anterior), devuelve ErrGameOver: no hay día siguiente.
+//
+// La nómina del día que cierra se paga en tickLocked, no aquí (ver
+// payPayrollLocked): a las 20:00, no cuando el jugador decide seguir. Aquí
+// solo se reinician las cuentas del día nuevo y se renueva la bolsa de
+// empleo (§6).
 func (g *Game) StartNextDay() error {
 	g.mu.Lock()
 	defer g.mu.Unlock()
+	if g.over != NotOver {
+		return ErrGameOver
+	}
 	if !g.clock.over() {
 		return fmt.Errorf("%w: son las %s", ErrDayNotOver, g.clock)
 	}
 	g.clock.nextDay()
+	g.dayStartMoney = g.money
+	g.dayReviewIncome = 0
+	g.dayDischargeIncome = 0
+	g.dayHires = nil
+	g.generateCandidatesLocked()
 	return nil
 }
 

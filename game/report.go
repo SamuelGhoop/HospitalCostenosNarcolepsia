@@ -178,6 +178,14 @@ func realTime(rec hospital.EpisodeRecord) string {
 func (g *Game) Report() Report {
 	g.mu.Lock()
 	defer g.mu.Unlock()
+	return g.reportLocked()
+}
+
+// reportLocked hace el trabajo de Report con g.mu ya tomado: lo usa Report y
+// también payPayrollLocked, para que el Shift Report diario (DayReport)
+// incluya las mismas cuatro consultas, calculadas en el momento de la
+// nómina.
+func (g *Game) reportLocked() Report {
 	r := buildReport(g.h, g.doctorsLocked(), g.lastAssignErr, g.gameTimeOf)
 
 	// Los que ya se fueron siguen en el modelo (no tiene alta): el reporte
@@ -192,6 +200,39 @@ func (g *Game) Report() Report {
 		r.Severe[i].Note = g.notes[r.Severe[i].PatientID]
 	}
 	return r
+}
+
+// PayrollLine es lo que se le pagó a un miembro del personal en la nómina de
+// un día (§5.8).
+type PayrollLine struct {
+	Name     string
+	IsDoctor bool
+	Salary   int
+}
+
+// DayReport es el Shift Report diario (§5.8 y §6): el balance del día que
+// acaba de cerrar, más las cuatro consultas de Report, calculadas en el
+// momento de la nómina (a las 20:00). Solo valores, como el resto de las
+// vistas.
+type DayReport struct {
+	Day             int
+	ReviewIncome    int // ingresos por revisiones (5.8)
+	DischargeIncome int // ingresos por altas (5.8)
+	Payroll         []PayrollLine
+	PayrollTotal    int
+	Hires           []HireLine // contrataciones hechas durante el día
+	StartMoney      int        // plata al empezar el día
+	EndMoney        int        // plata después de pagar la nómina
+	Report          Report
+}
+
+// DayReport devuelve el Shift Report del último día que cerró (el de la
+// nómina más reciente). Antes de que termine el primer día está en su valor
+// cero.
+func (g *Game) DayReport() DayReport {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	return g.lastDayReport
 }
 
 // doctorsLocked devuelve los médicos reales (sin envolver) de la partida.

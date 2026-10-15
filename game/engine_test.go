@@ -82,6 +82,7 @@ func TestStart_SnapshotsWhileTheEngineRunsAreRaceFree(t *testing.T) {
 			_ = g.Dispatch("P-001", "C-01")
 			_ = g.Dispatch("P-002", "D-01")
 			_ = g.WakeEarly("P-001") // todavía no está en cama: ErrNotInBed, pero toca la partida
+			_ = g.Hire(0)            // F4: contratar también toca money, staff y candidates bajo g.mu
 			time.Sleep(20 * time.Millisecond)
 		}
 	}()

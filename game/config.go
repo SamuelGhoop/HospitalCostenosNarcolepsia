@@ -22,7 +22,36 @@ const (
 	staffMinAge = 25 // edad del personal, de staffMinAge a staffMaxAge
 	staffMaxAge = 60
 	maxStat     = 5 // la rapidez y la pericia van de 1 a maxStat (§6)
+	maxStaff    = 6 // tope de personal contratado (§6); no confundir con maxStat
 )
+
+// statWeights son los pesos (de 100) con que se sortean la rapidez y la
+// pericia de un candidato, de 1 a maxStat: más probabilidad de salir 2 o 3
+// (§6). Es un var y no una const porque Go no permite arreglos literales en
+// una const; se usa como solo-lectura igual.
+var statWeights = [maxStat]int{15, 30, 30, 15, 10}
+
+// Contratación (§6 y §5.8): 3 candidatos por día, ≈ 66 % médicos.
+const (
+	candidatesPerDay    = 3
+	doctorChancePercent = 66 // el resto, camilleros
+)
+
+// doctorSalaryBase, doctorSalaryPerStat, orderlySalaryBase y
+// orderlySalaryPerSpeed son la fórmula de la nómina (§5.8):
+// médico = base + perStat × (rapidez + pericia); camillero = base + perSpeed × rapidez.
+const (
+	doctorSalaryBase      = 250
+	doctorSalaryPerStat   = 50
+	orderlySalaryBase     = 120
+	orderlySalaryPerSpeed = 60
+)
+
+// doctorSpecialties: el modelo le pide una especialidad a cada médico
+// (hospital.NewDoctor). El médico inicial usa "Medicina del sueño"
+// (doctorSpecialty, en staff.go); los candidatos de la bolsa de empleo
+// sortean una de esta lista corta, inventada para la demo.
+var doctorSpecialties = []string{"Medicina del sueño", "Neurología", "Medicina interna", "Medicina general"}
 
 // Despacho (§5.5): el personal camina (walkBase − rapidez) segundos hasta
 // donde lo mandan, y otro tanto para llevar al paciente a la cama en camilla.

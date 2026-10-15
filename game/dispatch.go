@@ -205,7 +205,9 @@ func (g *Game) reviewLocked(s *StaffMember, pt *patient) {
 	pt.stage = InBed
 	pt.reviewedBy = s
 	pt.timer = sleepDuration(pt.p.Level(), s.skill)
-	g.money += reviewFee(pt.waited)
+	fee := reviewFee(pt.waited)
+	g.money += fee
+	g.dayReviewIncome += fee // para el Shift Report diario (§5.8, F4)
 	g.score += reviewPoints
 }
 

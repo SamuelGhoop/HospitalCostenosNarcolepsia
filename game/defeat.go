@@ -9,7 +9,7 @@ const (
 	NotOver           GameOver = iota // la partida sigue
 	LostLicense                       // la reputación llegó a 0
 	HospitalCollapsed                 // 5 o más pacientes desplomados o en el pasillo a la vez
-	// La quiebra (no alcanza para la nómina) llega en F4.
+	Bankrupt                          // la nómina de las 20:00 dejó la plata en negativo (§5.8, F4)
 )
 
 // String es el letrero que muestra la pantalla de Game Over.
@@ -21,6 +21,8 @@ func (o GameOver) String() string {
 		return "¡PERDIÓ LA LICENCIA!"
 	case HospitalCollapsed:
 		return "¡HOSPITAL COLAPSADO!"
+	case Bankrupt:
+		return "¡QUIEBRA!"
 	default:
 		return fmt.Sprintf("GameOver(%d)", int(o))
 	}

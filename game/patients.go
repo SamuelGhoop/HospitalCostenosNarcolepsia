@@ -164,6 +164,7 @@ func (g *Game) wakeUpLocked(pt *patient) {
 	if pt.sleeps >= sleepsBeforeDischarge(pt.p.Level()) {
 		g.noticeLocked(fmt.Sprintf("%s se fue de alta", pt.p))
 		g.money += dischargeFee
+		g.dayDischargeIncome += dischargeFee // para el Shift Report diario (§5.8, F4)
 		g.score += dischargePoints
 		g.changeReputationLocked(+dischargeBonus)
 		g.leaveLocked(pt, "(alta)")

@@ -28,4 +28,9 @@ var (
 
 	// ErrGameOver: se pidió una acción con la partida ya perdida.
 	ErrGameOver = errors.New("la partida ya terminó")
+
+	// Errores de Hire (§6).
+	ErrNotEnoughMoney = errors.New("no hay plata para pagarle el primer día a este candidato")
+	ErrStaffFull      = errors.New("ya hay 6 miembros del personal; no se puede contratar a nadie más")
+	ErrNoCandidate    = errors.New("no hay ningún candidato con ese índice en la bolsa de empleo")
 )

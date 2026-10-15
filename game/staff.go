@@ -28,6 +28,19 @@ type StaffMember struct {
 	job    *job              // lo que está haciendo; nil = libre
 	onCall bool              // "de guardia": true solo durante el despacho que eligió el jugador
 	look   Appearance        // cómo se ve (la interfaz lo dibuja así; en F4, el mismo de la bolsa de empleo)
+	salary int               // sueldo diario, fijado al contratarlo (§5.8); se paga en la nómina de las 20:00
+}
+
+// doctorSalary y orderlySalary son la fórmula de la nómina (§5.8): médico
+// 250 + 50 × (rapidez + pericia); camillero 120 + 60 × rapidez. Es la misma
+// cuenta para el personal inicial y para los candidatos de la bolsa de
+// empleo, y también el costo de contratar (un día de salario adelantado).
+func doctorSalary(speed, skill int) int {
+	return doctorSalaryBase + doctorSalaryPerStat*(speed+skill)
+}
+
+func orderlySalary(speed int) int {
+	return orderlySalaryBase + orderlySalaryPerSpeed*speed
 }
 
 // Verificación en tiempo de compilación, como en hospital/attender.go: si a
@@ -136,6 +149,7 @@ func (g *Game) newDoctorLocked(speed, skill int) *StaffMember {
 		randomAge(g.rng, staffMinAge, staffMaxAge), doctorSpecialty)
 	m := newDoctorMember(d, speed, skill)
 	m.look = RandomAppearance(g.looks)
+	m.salary = doctorSalary(speed, skill)
 	return m
 }
 
@@ -147,6 +161,7 @@ func (g *Game) newOrderlyLocked(speed int) *StaffMember {
 		randomAge(g.rng, staffMinAge, staffMaxAge))
 	m := newOrderlyMember(o, speed)
 	m.look = RandomAppearance(g.looks)
+	m.salary = orderlySalary(speed)
 	return m
 }
 

@@ -57,3 +57,21 @@ func (g *Game) SetSpeedForTest(id string, speed int) {
 		}
 	}
 }
+
+// SetMoneyForTest pone la plata del hospital en money, para probar la
+// contratación sin plata (§6) y la quiebra (§5.8) sin tener que jugar un
+// turno entero para llegar a esa cifra.
+func (g *Game) SetMoneyForTest(money int) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	g.money = money
+}
+
+// RegenerateCandidatesForTest vuelve a sortear los candidatos de la bolsa de
+// empleo (§6), como si empezara un día nuevo pero sin tener que jugar un
+// turno entero con StartNextDay.
+func (g *Game) RegenerateCandidatesForTest() {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	g.generateCandidatesLocked()
+}

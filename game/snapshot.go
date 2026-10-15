@@ -16,6 +16,7 @@ type Snapshot struct {
 	Rooms      []RoomView
 	Staff      []StaffMemberView // en orden de contratación
 	Patients   []GamePatientView // en orden de llegada
+	Candidates []CandidateView   // los 3 de la bolsa de empleo de hoy (§6, F4)
 	Notices    []string          // últimos avisos, del más viejo al más nuevo: "08:12 …"
 	DoorOpen   bool              // la puerta del hospital está abierta: alguien la va a cruzar (§5.3)
 	Money      int               // plata del hospital, en pesos
@@ -78,6 +79,9 @@ func (g *Game) Snapshot() Snapshot {
 	}
 	for _, s := range g.staff {
 		snap.Staff = append(snap.Staff, s.view())
+	}
+	for _, c := range g.candidates {
+		snap.Candidates = append(snap.Candidates, c.view(g.money))
 	}
 	for _, pt := range g.patients {
 		snap.Patients = append(snap.Patients, pt.view())
