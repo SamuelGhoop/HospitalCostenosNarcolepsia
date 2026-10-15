@@ -354,10 +354,6 @@ func (s *DemoScene) Draw(screen *ebiten.Image) {
 	if c != nil && c.visible() {
 		items = append(items, drawable{float64(c.fp.Max.Y), func() {
 			p, _ := s.figure(c.order.patient)
-			if c.swing != nil { // girando, con el paciente encima
-				drawSwing(screen, c.swing, func(g ebiten.GeoM) { drawRiderWith(screen, p, s.anims[p.id], g) })
-				return
-			}
 			drawStretcher(screen, c.fp, c.dir)
 			if c.riding() {
 				drawRider(screen, p, s.anims[p.id], c.fp, c.dir)

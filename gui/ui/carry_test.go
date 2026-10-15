@@ -52,7 +52,7 @@ func TestDemo_TransfersGoOnAStretcher(t *testing.T) {
 				}
 				cs.appearedNear = true
 			}
-			if c.riding() && c.swing == nil { // girando lo revisa TestStretcherSwing_TurnsGraduallyAroundThePusher
+			if c.riding() {
 				cs.rode = true
 				if s.pos[o.patient] != riderPos(c.fp) {
 					t.Fatalf("paso %d, tick %d: %s no va sobre la camilla (%v; la camilla pide %v)", step, tick, o.patient, s.pos[o.patient], riderPos(c.fp))
@@ -121,37 +121,41 @@ func TestDemo_OthersAvoidTheStretcher(t *testing.T) {
 
 // Los que están quietos en el camino de una camilla se hacen a un lado
 // mientras pasa (a un sitio fuera de su camino) y después vuelven a su
-// puesto. En la demo le pasa a alguien que espera en la recepción.
+// puesto.
+//
+// Antes esto se veía en la demo tal cual (alguien que esperaba en la
+// recepción). Desde el giro de golpe (2026-10-15, GAME_DESIGN §10.8) ya no
+// hace falta "preferir girar donde hay espacio" (la razón era no barrer una
+// pared en pleno giro, que ya no existe: el giro no pasa por cuadros
+// intermedios), y con eso la camilla de la demo gira en otro sitio y ya no
+// le pasa por encima a nadie quieto. El mecanismo sigue haciendo falta para
+// el juego (varias camillas, recepción llena), así que se prueba directo
+// con un traslado real (pasillo 2 → 101) y alguien de pie a mitad del
+// primer tramo.
 func TestDemo_PeopleStepAsideForTheStretcher(t *testing.T) {
 	needFonts(t)
-	s := NewDemoScene(game.NewDemo())
-	stepped := map[string]bool{}
-	for step := 1; step <= 11; step++ {
-		if err := s.advance(); err != nil {
-			t.Fatal(err)
-		}
-		for tick := 0; tick < 8000 && (s.choreo != nil || !s.everyoneArrived()); tick++ {
-			s.animate()
-			if s.carry == nil {
-				continue
-			}
-			lane := carryLane(s.carry.order.plan)
-			for id, spot := range s.dodge {
-				if s.pos[id] == spot {
-					stepped[id] = true // llegó caminando a su sitio a un lado
-				}
-				if overlapsAny(feetRectAt(spot), lane) {
-					t.Fatalf("paso %d: %s se hizo a un lado a %v, todavía en el camino de la camilla", step, id, spot)
-				}
-			}
-		}
-		for _, f := range s.figures {
-			if s.pos[f.id] != f.target {
-				t.Errorf("al terminar el paso %d, %s quedó en %v y no volvió a su puesto %v", step, f.id, s.pos[f.id], f.target)
-			}
-		}
+	plan, ok := planCarry(toVec(floorSpot(zoneHallway2, 0)), zoneRoom101, nil)
+	if !ok {
+		t.Fatal("no hay ruta con la camilla del pasillo 2 a la 101")
 	}
-	if len(stepped) == 0 {
-		t.Error("en toda la demo nadie llegó a hacerse a un lado para dejar pasar una camilla")
+	lane := carryLane(plan)
+	blockerAt := vec{(plan.pickup.x + plan.path[0].x) / 2, (plan.pickup.y + plan.path[0].y) / 2}
+	if !overlapsAny(feetRectAt(blockerAt), lane) {
+		t.Fatal("el sitio elegido para el que espera no queda en el camino de la camilla: el test no prueba nada")
+	}
+	s := &DemoScene{}
+	s.figures = []figure{
+		{id: "C-01", target: plan.pickup},
+		{id: "P-999", target: plan.anchor()},
+		{id: "W-01", target: blockerAt},
+	}
+	order := &carryOrder{pusher: "C-01", patient: "P-999", room: zoneRoom101, plan: plan}
+	dodge := s.dodgesFor(order)
+	spot, ok := dodge["W-01"]
+	if !ok {
+		t.Fatal("W-01 está en el camino de la camilla y no se hizo a un lado")
+	}
+	if overlapsAny(feetRectAt(spot), lane) {
+		t.Errorf("el sitio al que se hizo a un lado (%v) sigue en el camino de la camilla", spot)
 	}
 }

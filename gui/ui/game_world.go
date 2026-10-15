@@ -242,8 +242,10 @@ func (s *GameScene) sync() {
 
 // startCarry arranca el traslado en camilla que el juego empezó: pusher
 // lleva a p a su cama en left (lo que dice el juego). La velocidad sale de
-// repartir el camino en el tiempo que queda, descontando los giros y lo
-// que tarda el paciente en pasarse a la camilla y a la cama.
+// repartir el camino en el tiempo que queda, descontando lo que tarda el
+// paciente en pasarse a la camilla y a la cama. El giro ya no resta tiempo:
+// desde el 2026-10-15 es de golpe, en el mismo tick en que se llega a la
+// esquina (GAME_DESIGN §10.8).
 func (s *GameScene) startCarry(pusher string, p game.GamePatientView, left time.Duration) {
 	room := roomZone(p.Room)
 	from := s.pos[p.ID]
@@ -255,15 +257,12 @@ func (s *GameScene) startCarry(pusher string, p game.GamePatientView, left time.
 		return // no debería pasar (lo revisa un test): el paciente queda donde está y la foto lo pone en la cama
 	}
 	dist := math.Hypot(plan.pickup.x-s.pos[pusher].x, plan.pickup.y-s.pos[pusher].y)
-	prev, turns := plan.pickup, 0
-	for i, q := range plan.path {
+	prev := plan.pickup
+	for _, q := range plan.path {
 		dist += math.Hypot(q.x-prev.x, q.y-prev.y)
-		if i > 0 && plan.dirs[i] != plan.dirs[i-1] {
-			turns++
-		}
 		prev = q
 	}
-	ticks := left.Seconds()*60 - float64(turns*turnTicks) - 2*float64(figHeight)/hopSpeed
+	ticks := left.Seconds()*60 - 2*float64(figHeight)/hopSpeed
 	speed := staffSpeed
 	if ticks > 0 {
 		speed = math.Max(1, math.Min(6, dist/ticks))

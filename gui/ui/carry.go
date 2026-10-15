@@ -7,6 +7,14 @@ import (
 
 // El traslado en camilla dentro de la escena: lo que manda la fase de la
 // coreografía (carryOrder) hecho tick a tick, en cuatro etapas.
+//
+// El giro en una esquina (GAME_DESIGN §10.8, 2026-10-15) es de golpe, en un
+// solo tick: antes giraba de a poco en turnTicks ticks (18, unos 0,3 s)
+// alrededor de los pies de quien empuja; ahora, igual que gira una persona,
+// la camilla pasa de una dirección a la otra sin cuadros intermedios. Es la
+// única excepción nueva a "nada de teletransporte": en el tick del giro, el
+// paciente salta de donde lo pedía la huella de antes a donde lo pide la de
+// después (lo revisa TestDemo_NobodyJumps).
 type carryStage int
 
 const (
@@ -27,8 +35,7 @@ type carrying struct {
 	stage carryStage
 	seg   int             // tramo actual del empuje
 	dir   dir             // hacia dónde apunta la camilla
-	fp    image.Rectangle // huella de la camilla en el piso (vacía mientras no se ve; girando, la de después del giro)
-	swing *swing          // el giro en curso (nil si no está girando)
+	fp    image.Rectangle // huella de la camilla en el piso (vacía mientras no se ve)
 	speed float64         // lo que avanza por tick quien empuja; 0 = staffSpeed (en el juego, el ritmo que marca game/)
 }
 
@@ -75,26 +82,19 @@ func (s *world) stepCarry(c *carrying) {
 			c.stage = carryPush
 		}
 	case carryPush:
-		if w := c.swing; w != nil { // girando: quien empuja se queda quieto
-			w.tick++
-			s.pos[o.patient] = w.riderAt(w.progress())
-			if w.done() {
-				c.dir, c.swing = w.to, nil
-			}
-			return
-		}
 		goal := plan.path[c.seg]
 		s.pos[o.pusher] = moveToward(s.pos[o.pusher], goal, c.pushSpeed())
 		if s.pos[o.pusher] == goal {
 			c.seg++
-		}
-		if c.seg == len(plan.path) {
-			c.stage = carryHopOff
-		} else if d := plan.dirs[c.seg]; d != c.dir {
-			c.swing = newSwing(feetPoint(goal), c.dir, d) // gira en los próximos ticks
-			c.fp = footprintAt(s.pos[o.pusher], d)
-			s.pos[o.patient] = riderPos(footprintAt(s.pos[o.pusher], c.dir))
-			return
+			if c.seg == len(plan.path) {
+				c.stage = carryHopOff
+			} else {
+				// Gira de golpe, en este mismo tick (antes: de a poco, en
+				// turnTicks ticks). El salto de riderPos(antes) a
+				// riderPos(después) es la excepción nueva a "nada de
+				// teletransporte" (ver la nota de arriba).
+				c.dir = plan.dirs[c.seg]
+			}
 		}
 		c.fp = footprintAt(s.pos[o.pusher], c.dir)
 		if c.stage == carryPush {
@@ -117,11 +117,8 @@ func carryLane(plan carryPlan) []image.Rectangle {
 	var out []image.Rectangle
 	prev := plan.pickup
 	for i, p := range plan.path {
-		if i > 0 && plan.dirs[i] != plan.dirs[i-1] { // gira donde terminó el tramo anterior
-			w := swing{pivot: feetPoint(prev), from: plan.dirs[i-1], to: plan.dirs[i]}
-			for k := 0; k <= swingSteps; k++ {
-				out = append(out, w.bounds(float64(k)/swingSteps))
-			}
+		if i > 0 && plan.dirs[i] != plan.dirs[i-1] { // gira de golpe donde terminó el tramo anterior
+			out = append(out, footprintAt(prev, plan.dirs[i-1]), footprintAt(prev, plan.dirs[i]))
 		}
 		steps := int(math.Ceil(math.Hypot(p.x-prev.x, p.y-prev.y) / 4))
 		for k := 0; k <= steps; k++ {

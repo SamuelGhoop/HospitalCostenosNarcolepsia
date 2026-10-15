@@ -278,6 +278,10 @@ func TestGameScene_ReportPausesAndComesBack(t *testing.T) {
 // en la demo), salvo al aparecer; y los pies de quien camina o está de pie
 // no pisan paredes ni muebles. Juega solo: manda a recoger y a revisar a
 // quien lo necesite.
+//
+// La EXCEPCIÓN del giro de golpe (GAME_DESIGN §10.8, 2026-10-15) también
+// vale aquí: en el tick en que una camilla gira, el paciente encima salta
+// de la huella de antes a la de después.
 func TestGameScene_NobodyJumpsOrWalksThroughWalls(t *testing.T) {
 	s := newTestGameScene(t)
 	const maxStep = 10.0
@@ -295,7 +299,19 @@ func TestGameScene_NobodyJumpsOrWalksThroughWalls(t *testing.T) {
 				}
 			}
 		}
+		prevDirs := map[*carrying]dir{}
+		for _, c := range s.allCarries() {
+			if c.riding() {
+				prevDirs[c] = c.dir
+			}
+		}
 		play(s, 1)
+		turning := map[string]bool{} // quien gira de golpe con la camilla en este tick
+		for _, c := range s.allCarries() {
+			if d, ok := prevDirs[c]; ok && c.dir != d {
+				turning[c.order.patient] = true
+			}
+		}
 		present := map[string]bool{}
 		for _, f := range s.figures {
 			present[f.id] = true
@@ -307,7 +323,7 @@ func TestGameScene_NobodyJumpsOrWalksThroughWalls(t *testing.T) {
 		}
 		for _, f := range s.figures {
 			now := s.pos[f.id]
-			if was, ok := before[f.id]; ok && math.Hypot(now.x-was.x, now.y-was.y) > maxStep {
+			if was, ok := before[f.id]; ok && !turning[f.id] && math.Hypot(now.x-was.x, now.y-was.y) > maxStep {
 				t.Fatalf("tick %d: %s se movió %.1f px (de %v a %v)", tick, f.id, math.Hypot(now.x-was.x, now.y-was.y), was, now)
 			}
 			pa := s.anims[f.id]

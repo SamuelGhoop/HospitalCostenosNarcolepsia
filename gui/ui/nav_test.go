@@ -126,6 +126,38 @@ func TestRoute_ConnectsEveryPairOfZones(t *testing.T) {
 	}
 }
 
+// Movimiento "cuadriculado" (pedido de Samuel, 2026-10-14): ya no hay
+// diagonales, ni en el A* ni después del suavizado; los tramos van solo
+// horizontales y verticales, por el centro de las celdas (GAME_DESIGN §10.8,
+// 2026-10-15). Se prueba entre todas las zonas, como en
+// TestRoute_ConnectsEveryPairOfZones.
+func TestRoute_EveryLegIsHorizontalOrVertical(t *testing.T) {
+	needFonts(t)
+	check := func(what string, from, to vec) {
+		path := routeAvoiding(from, to, nil)
+		prev := from
+		for _, p := range path {
+			if prev.x != p.x && prev.y != p.y {
+				t.Errorf("%s: el tramo %v → %v no es horizontal ni vertical", what, prev, p)
+			}
+			prev = p
+		}
+	}
+	spots := map[string]vec{"acera": arrivalSpawn()}
+	for _, z := range zoneOrder {
+		feet, ok := reachableFeetNear(zones[z].rect.Min.Add(zones[z].rect.Max).Div(2))
+		if !ok {
+			t.Fatalf("%s: no hay piso libre cerca del centro", zones[z].label)
+		}
+		spots[zones[z].label] = toVec(feet).add(vec{-feetOffset.x, -feetOffset.y})
+	}
+	for a, from := range spots {
+		for b, to := range spots {
+			check(fmt.Sprintf("%s → %s", a, b), from, to)
+		}
+	}
+}
+
 // De la 101 a la 102 se sale al pasillo 1 (no se atraviesa la pared).
 func TestRoute_FromRoom101ToRoom102GoesThroughHallway1(t *testing.T) {
 	needFonts(t)

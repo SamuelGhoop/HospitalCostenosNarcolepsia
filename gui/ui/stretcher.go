@@ -16,14 +16,17 @@ import (
 //
 // Para las rutas cuenta la HUELLA de la camilla en el piso (como los pies
 // de un personaje), no el dibujo del paciente acostado encima (48×45 a ×3),
-// que sobresale por la vista 3/4. Al cambiar de dirección gira de a poco
-// (swing.go).
+// que sobresale por la vista 3/4. Al cambiar de dirección gira 90° de golpe,
+// en un tick (GAME_DESIGN §10.8, 2026-10-15; antes giraba de a poco en 18).
 
-// dir es hacia dónde se mueve alguien.
+// dir es hacia dónde se mueve alguien. dirNone (solo para el A* de nav.go)
+// es "todavía no se movió": el primer paso de una ruta no paga el costo de
+// girar.
 type dir int
 
 const (
-	dirRight dir = iota
+	dirNone dir = iota - 1
+	dirRight
 	dirLeft
 	dirUp
 	dirDown
@@ -232,13 +235,12 @@ type carryPlan struct {
 func (p carryPlan) anchor() vec { return p.path[len(p.path)-1] }
 
 // carryTurnCost: lo que cuesta girar la camilla, en celdas. Así la ruta
-// sale con pocas vueltas (en L) y no en escalera.
+// sale con pocas vueltas (en L) y no en escalera. Como ahora gira de golpe
+// en un tick (sin barrer la pared mientras gira; GAME_DESIGN §10.8,
+// 2026-10-15), ya no hace falta un costo de más por girar sin espacio: la
+// huella solo tiene que caber en las dos direcciones, antes y después, y
+// eso ya lo revisa carryFree en cada una.
 const carryTurnCost = 6
-
-// carryTightTurnCost: lo que cuesta de más un giro en el que la camilla,
-// al girar alrededor de quien empuja, barre una pared o un mueble (se ve
-// montada encima un momento). Así gira donde hay espacio si puede.
-const carryTightTurnCost = 20
 
 // carryPickupCost: lo que cuesta cada celda de distancia entre la camilla
 // recién aparecida y el paciente: así aparece junto a él si se puede.
@@ -271,21 +273,14 @@ func bedApproach(k cell, d dir, room zone) bool {
 // (from, esquina de su cuadro) hasta la cama de room. Es un Dijkstra sobre
 // (celda, hacia dónde apunta la camilla), con pasos rectos: hacia delante,
 // girando (la camilla tiene que caber en las dos direcciones en la celda
-// del giro, con un costo por girar, y más si al girar barre una pared) o de
-// costado (sin girarla, con más costo); nunca hacia atrás. En cada celda la
-// camilla cabe delante.
+// del giro, con un costo por girar) o de costado (sin girarla, con más
+// costo); nunca hacia atrás. En cada celda la camilla cabe delante.
 //
 // patientAt es la esquina del cuadro del paciente acostado en el piso: la
 // camilla aparece lo más cerca posible de él (cada celda de distancia
 // entre la camilla y su cuerpo cuesta carryPickupCost), y de ahí sale.
 func planCarry(patientAt vec, room zone, avoid []image.Rectangle) (carryPlan, bool) {
-	return planCarryWith(patientAt, room, avoid, carryTightTurnCost)
-}
-
-// planCarryWith es planCarry con el costo de más de un giro sin espacio
-// (tightTurnCost); con 0, gira donde sea (lo usa un test para comparar).
-func planCarryWith(patientAt vec, room zone, avoid []image.Rectangle, tightTurnCost float64) (carryPlan, bool) {
-	chain, ok := carrySearch(patientAt, avoid, tightTurnCost, func(cell) bool { return true },
+	chain, ok := carrySearch(patientAt, avoid, func(cell) bool { return true },
 		func(s carryState) bool { return bedApproach(s.k, s.d, room) })
 	if !ok {
 		return carryPlan{}, false
@@ -324,7 +319,7 @@ type carryState struct {
 // paciente acostado en patientAt donde puede aparecer la camilla, hasta el
 // primer estado que cumple goal, pasando solo por celdas que cumplen
 // inside. Devuelve los estados del camino, del primero al último.
-func carrySearch(patientAt vec, avoid []image.Rectangle, tightTurnCost float64, inside func(cell) bool, goal func(carryState) bool) ([]carryState, bool) {
+func carrySearch(patientAt vec, avoid []image.Rectangle, inside func(cell) bool, goal func(carryState) bool) ([]carryState, bool) {
 	idx := func(s carryState) int { return (s.k.r*navCols+s.k.c)*4 + int(s.d) }
 	dist := map[int]float64{}
 	prev := map[int]carryState{}
@@ -350,16 +345,6 @@ func carrySearch(patientAt vec, avoid []image.Rectangle, tightTurnCost float64, 
 		}
 	}
 	done := map[int]bool{}
-	roomy := map[int]bool{} // giros ya revisados, por (estado, dirección nueva)
-	turnClear := func(s carryState, m dir) bool {
-		key := idx(s)*4 + int(m)
-		ok, seen := roomy[key]
-		if !seen {
-			ok = swingClear(s.k.center(), s.d, m, avoid)
-			roomy[key] = ok
-		}
-		return ok
-	}
 	for open.Len() > 0 {
 		it := heap.Pop(open).(stateItem)
 		s := carryState{it.k, it.d}
@@ -395,9 +380,6 @@ func carrySearch(patientAt vec, avoid []image.Rectangle, tightTurnCost float64, 
 				cost := dist[idx(s)] + cellCost(next)
 				if m != s.d {
 					cost += carryTurnCost
-					if tightTurnCost > 0 && !turnClear(s, m) {
-						cost += tightTurnCost
-					}
 				}
 				relax(carryState{next, m}, cost)
 			}
@@ -423,7 +405,7 @@ func carryCanLeave(patientAt vec, z zone) bool {
 		zz, ok := zoneAt(toVec(s.k.center()))
 		return ok && zz == zoneHallway1
 	}
-	_, ok := carrySearch(patientAt, nil, 0, inside, goal)
+	_, ok := carrySearch(patientAt, nil, inside, goal)
 	return ok
 }
 

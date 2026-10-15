@@ -113,13 +113,17 @@ func checkTick(t *testing.T, s *DemoScene, step, tick int) {
 // Pedido por Samuel (2026-10-11): nada de teletransporte. En toda la demo,
 // tick a tick, nadie se mueve en un tick más que su velocidad, más un píxel
 // de redondeo (la camilla y el paciente encima van al píxel). La excepción
-// es aparecer: los pacientes nuevos aparecen fuera de la pantalla. Al
+// de aparecer: los pacientes nuevos aparecen fuera de la pantalla. Al
 // paciente que llevan en camilla lo mueve quien la empuja: va a la
 // velocidad del personal.
 //
-// Cuando la camilla gira (de a poco, en turnTicks ticks; decisión de Samuel
-// del 2026-10-11), el paciente encima va a la velocidad del giro: recorre
-// lo mismo en cada tick, lo que sale de repartir el arco en esos ticks.
+// La EXCEPCIÓN NUEVA del 2026-10-15 (GAME_DESIGN §10.8): la camilla ya no
+// gira de a poco en turnTicks ticks, gira 90° de golpe en el tick en el que
+// quien empuja llega a la esquina. En ese tick el paciente salta de donde
+// lo pedía la huella de antes del giro a donde lo pide la de después (sigue
+// siendo la misma camilla, solo cambia de lado); se detecta porque c.dir
+// cambia sin que el traslado haya terminado. Ese tick, y solo ese, queda
+// afuera del límite de velocidad.
 func TestDemo_NobodyJumps(t *testing.T) {
 	needFonts(t)
 	s := NewDemoScene(game.NewDemo())
@@ -138,23 +142,25 @@ func TestDemo_NobodyJumps(t *testing.T) {
 			}
 		}
 		for tick := 0; tick < 8000; tick++ {
-			var turning *swing // el giro de este tick, si lo hay (puede terminar en este tick)
-			if s.carry != nil {
-				turning = s.carry.swing
+			wasCarry, prevDir := s.carry, dirNone
+			ridingPatient := ""
+			if wasCarry != nil && wasCarry.riding() {
+				prevDir, ridingPatient = wasCarry.dir, wasCarry.order.patient
 			}
 			s.animate()
-			c := s.carry
-			if c != nil && c.swing != nil {
-				turning = c.swing
+			turningPatient := "" // quien gira de golpe este tick, si alguien
+			if c := s.carry; c == wasCarry && c != nil && ridingPatient != "" && c.dir != prevDir {
+				turningPatient = ridingPatient
 			}
+			c := s.carry
 			for _, f := range s.figures {
 				was, now := before[f.id], s.pos[f.id]
+				if f.id == turningPatient {
+					continue // el salto del giro de golpe: la excepción de arriba
+				}
 				limit := speedOf(f)
 				if c != nil && c.visible() && f.id == c.order.patient {
 					limit = staffSpeed
-					if turning != nil {
-						limit = math.Max(limit, turning.riderStep())
-					}
 				}
 				if d := math.Hypot(now.x-was.x, now.y-was.y); d > limit+rounding {
 					t.Errorf("paso %d, tick %d: %s se movió %.1f px en un tick (de %v a %v); su velocidad es %.1f", step, tick, f.id, d, was, now, limit)
