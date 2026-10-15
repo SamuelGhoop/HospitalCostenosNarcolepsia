@@ -74,7 +74,7 @@ func TestArrival_EntersTheLobbyWhenCrossingTheDoor(t *testing.T) {
 // colapsa (§5.10) y la partida se congela.
 func TestAttack_NeverOnTheStreetAndOnlyAfterTheAwakeTime(t *testing.T) {
 	for seed := int64(1); seed <= 5; seed++ {
-		g, err := game.New(rand.New(rand.NewSource(seed)), rand.New(rand.NewSource(seed)))
+		g, err := game.New(rand.New(rand.NewSource(seed)), rand.New(rand.NewSource(seed)), rand.New(rand.NewSource(seed)))
 		if err != nil {
 			t.Fatalf("New: %v", err)
 		}

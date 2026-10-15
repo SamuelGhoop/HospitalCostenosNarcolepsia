@@ -25,8 +25,9 @@ import (
 type Game struct {
 	mu sync.Mutex
 
-	rng    *rand.Rand // azar inyectado; solo con g.mu tomado
+	rng    *rand.Rand // azar de la partida (llegadas, ataques, nombres del personal inicial); solo con g.mu tomado
 	looks  *rand.Rand // azar cosmético (la apariencia del personal), aparte para no cambiar la secuencia de rng
+	hiring *rand.Rand // azar de la bolsa de empleo (§6, F4): los candidatos salen de aquí, aparte, para que sortear la bolsa (al crear la partida y cada día) no mueva la secuencia de rng que usa el resto de la partida
 	h      *hospital.Hospital
 	clock  clock
 	paused bool
@@ -58,16 +59,17 @@ type Game struct {
 // 101, 102 y 103, un médico y un camillero, el día 1 a las 08:00. rng es el
 // azar de la partida; los tests pasan uno con semilla fija para que todo sea
 // repetible. looks es el azar cosmético, solo para la apariencia del
-// personal: va aparte para que sortear apariencias no cambie lo que sale de
-// rng (los nombres, las llegadas, los ataques).
-func New(rng, looks *rand.Rand) (*Game, error) {
+// personal, y hiring el de la bolsa de empleo (§6): ambos van aparte para
+// que sortear apariencias o candidatos no cambie lo que sale de rng (los
+// nombres, las llegadas, los ataques).
+func New(rng, looks, hiring *rand.Rand) (*Game, error) {
 	h := hospital.NewHospital("Hospital de los Costeños con Narcolepsia")
 	for _, number := range []int{101, 102, 103} {
 		if err := h.AddRoom(number, 1); err != nil {
 			return nil, fmt.Errorf("creando la habitación %d: %w", number, err)
 		}
 	}
-	g := &Game{rng: rng, looks: looks, h: h, clock: newClock(), episodeTimes: map[string]string{}, notes: map[string]string{}, money: startMoney, reputation: startReputation}
+	g := &Game{rng: rng, looks: looks, hiring: hiring, h: h, clock: newClock(), episodeTimes: map[string]string{}, notes: map[string]string{}, money: startMoney, reputation: startReputation}
 
 	// Los helpers ...Locked se pueden llamar sin tomar g.mu porque la
 	// partida todavía no existe para ninguna otra goroutine.

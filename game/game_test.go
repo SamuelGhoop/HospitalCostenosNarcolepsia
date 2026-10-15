@@ -16,7 +16,7 @@ const tick = 100 * time.Millisecond
 // newGame crea una partida con azar de semilla fija, para tests repetibles.
 func newGame(t *testing.T) *game.Game {
 	t.Helper()
-	g, err := game.New(rand.New(rand.NewSource(1)), rand.New(rand.NewSource(2)))
+	g, err := game.New(rand.New(rand.NewSource(1)), rand.New(rand.NewSource(2)), rand.New(rand.NewSource(3)))
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}

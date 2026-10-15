@@ -17,7 +17,7 @@ import (
 // newInternalGame es el newGame de los tests internos (semilla fija).
 func newInternalGame(t *testing.T) *Game {
 	t.Helper()
-	g, err := New(rand.New(rand.NewSource(1)), rand.New(rand.NewSource(2)))
+	g, err := New(rand.New(rand.NewSource(1)), rand.New(rand.NewSource(2)), rand.New(rand.NewSource(3)))
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
@@ -127,7 +127,7 @@ func TestNotices_KeepsOnlyTheLastOnes(t *testing.T) {
 // (2026-10-11), un médico rápido puede llegar antes que la camilla: entonces
 // espera junto a la cama y lo revisa cuando termina el traslado.
 func TestDispatch_TheDoctorWaitsForTheCarryToEnd(t *testing.T) {
-	g, err := New(rand.New(rand.NewSource(1)), rand.New(rand.NewSource(2)))
+	g, err := New(rand.New(rand.NewSource(1)), rand.New(rand.NewSource(2)), rand.New(rand.NewSource(3)))
 	if err != nil {
 		t.Fatal(err)
 	}

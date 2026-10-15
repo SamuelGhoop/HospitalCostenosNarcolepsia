@@ -79,7 +79,11 @@ func weightedStat(rng *rand.Rand) int {
 }
 
 // generateCandidatesLocked sortea los candidatesPerDay candidatos del día
-// (§6): al crear la partida y cada vez que empieza un día nuevo.
+// (§6): al crear la partida y cada vez que empieza un día nuevo. Sale de
+// g.hiring, no de g.rng: la bolsa de empleo es un sorteo aparte (como la
+// apariencia con g.looks) para que generarla no mueva la secuencia de rng
+// que usa el resto de la partida (llegadas, ataques, nombres del personal
+// inicial) en los tests con semilla fija.
 func (g *Game) generateCandidatesLocked() {
 	g.candidates = make([]*candidate, candidatesPerDay)
 	for i := range g.candidates {
@@ -89,23 +93,23 @@ func (g *Game) generateCandidatesLocked() {
 
 // newCandidateLocked sortea un candidato: ≈ 66 % médico, el resto camillero.
 func (g *Game) newCandidateLocked() *candidate {
-	age := randomAge(g.rng, staffMinAge, staffMaxAge)
-	look := RandomAppearance(g.looks) // azar cosmético: no toca la secuencia de g.rng
-	if g.rng.Intn(100) < doctorChancePercent {
-		speed, skill := weightedStat(g.rng), weightedStat(g.rng)
+	age := randomAge(g.hiring, staffMinAge, staffMaxAge)
+	look := RandomAppearance(g.looks) // azar cosmético: no toca la secuencia de g.rng ni la de g.hiring
+	if g.hiring.Intn(100) < doctorChancePercent {
+		speed, skill := weightedStat(g.hiring), weightedStat(g.hiring)
 		return &candidate{
 			isDoctor:  true,
-			name:      doctorName(g.rng),
+			name:      doctorName(g.hiring),
 			age:       age,
-			specialty: doctorSpecialties[g.rng.Intn(len(doctorSpecialties))],
+			specialty: doctorSpecialties[g.hiring.Intn(len(doctorSpecialties))],
 			speed:     speed,
 			skill:     skill,
 			salary:    doctorSalary(speed, skill),
 			look:      look,
 		}
 	}
-	name, _ := randomName(g.rng) // _ : a los camilleros no se les pone título
-	speed := weightedStat(g.rng)
+	name, _ := randomName(g.hiring) // _ : a los camilleros no se les pone título
+	speed := weightedStat(g.hiring)
 	return &candidate{
 		isDoctor: false,
 		name:     name,

@@ -84,7 +84,7 @@ func installAgentDeterminism(seed int64) {
 	seedSource = func() int64 { return seed }
 	isFocused = func() bool { return true }
 	newGameSceneFn = func() (*GameScene, error) {
-		g, err := game.New(rand.New(rand.NewSource(seed)), rand.New(rand.NewSource(seed+1)))
+		g, err := game.New(rand.New(rand.NewSource(seed)), rand.New(rand.NewSource(seed+1)), rand.New(rand.NewSource(seed+2)))
 		if err != nil {
 			return nil, err
 		}

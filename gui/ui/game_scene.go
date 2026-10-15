@@ -42,11 +42,12 @@ type GameScene struct {
 }
 
 // NewGameScene arranca una partida nueva (NUEVA PARTIDA): el azar de la
-// partida y el cosmético salen de seedSource (la hora, salvo que el
-// backdoor de pruebas la haya fijado), y el motor queda corriendo.
+// partida, el cosmético y el de la bolsa de empleo salen de seedSource (la
+// hora, salvo que el backdoor de pruebas la haya fijado), y el motor queda
+// corriendo.
 func NewGameScene() (*GameScene, error) {
 	seed := seedSource()
-	g, err := game.New(rand.New(rand.NewSource(seed)), rand.New(rand.NewSource(seed+1)))
+	g, err := game.New(rand.New(rand.NewSource(seed)), rand.New(rand.NewSource(seed+1)), rand.New(rand.NewSource(seed+2)))
 	if err != nil {
 		return nil, err
 	}

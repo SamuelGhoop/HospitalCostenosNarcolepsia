@@ -18,7 +18,7 @@ import (
 func newTestGameScene(t *testing.T) *GameScene {
 	t.Helper()
 	needFonts(t)
-	g, err := game.New(rand.New(rand.NewSource(7)), rand.New(rand.NewSource(8)))
+	g, err := game.New(rand.New(rand.NewSource(7)), rand.New(rand.NewSource(8)), rand.New(rand.NewSource(9)))
 	if err != nil {
 		t.Fatal(err)
 	}

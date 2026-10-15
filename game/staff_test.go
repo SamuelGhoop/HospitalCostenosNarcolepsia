@@ -44,7 +44,7 @@ func TestNew_StaffNamesComeFromTheGameRandomness(t *testing.T) {
 
 	names := map[string]bool{}
 	for seed := int64(1); seed <= 20; seed++ {
-		g, err := game.New(rand.New(rand.NewSource(seed)), rand.New(rand.NewSource(seed)))
+		g, err := game.New(rand.New(rand.NewSource(seed)), rand.New(rand.NewSource(seed)), rand.New(rand.NewSource(seed)))
 		if err != nil {
 			t.Fatalf("New(semilla %d): %v", seed, err)
 		}
@@ -62,7 +62,7 @@ func TestNew_StaffNamesComeFromTheGameRandomness(t *testing.T) {
 // fija no cambian). Y no cambia de un momento a otro.
 func TestNew_StaffLooksComeFromTheirOwnRandomness(t *testing.T) {
 	newWithLooks := func(looks int64) game.Snapshot {
-		g, err := game.New(rand.New(rand.NewSource(1)), rand.New(rand.NewSource(looks)))
+		g, err := game.New(rand.New(rand.NewSource(1)), rand.New(rand.NewSource(looks)), rand.New(rand.NewSource(1)))
 		if err != nil {
 			t.Fatalf("New: %v", err)
 		}
