@@ -263,6 +263,7 @@ La demo no cambia: sigue el round-robin real de la Sección 6 (sección 4).
 - Nómina a las 20:00. Médico: `250 + 50 × (rapidez + pericia)`; camillero: `120 + 60 × rapidez`.
 - Contratar cuesta un día de salario por adelantado.
 - (Opcional, fase final) **Ampliar**: comprar la habitación 104 por $2.500 con `AddRoom`.
+- **Cómo quedó (F4, 2026-10-15)**: la nómina se paga en el `Tick` de las 20:00, justo después de los +500 del día completado, y no al pulsar SIGUIENTE DÍA. Así el reporte del día (`Game.DayReport()`) ya muestra la plata después de pagar cuando sale la pantalla de fin de día.
 
 ### 5.9 Reputación (0–5)
 - Más de **20 s** de espera (`Collapsed`, `InHallway` o esperando revisión): **−0,5**, y luego **−0,25** cada 10 s más. Se mide con el cronómetro de espera (5.4), así que no vuelve a empezar cuando el paciente cambia de estado.
@@ -274,6 +275,7 @@ La demo no cambia: sigue el round-robin real de la Sección 6 (sección 4).
 ### 5.10 Derrota y puntaje
 - Pierde con: reputación en 0 ("¡PERDIÓ LA LICENCIA!"), quiebra al pagar la nómina ("¡QUIEBRA!") o **5 o más** pacientes `Collapsed` + `InHallway` a la vez ("¡HOSPITAL COLAPSADO!").
 - Se revisa al final de cada `Tick`. Al perder, la partida queda **congelada**: `Tick` no hace nada, y `Dispatch` y `WakeEarly` devuelven `ErrGameOver`.
+- **Quiebra (F4, 2026-10-15)**: si la nómina de las 20:00 deja la plata en negativo, la derrota es `Bankrupt` ("¡QUIEBRA!"). `Hire` y `StartNextDay` también devuelven `ErrGameOver` con la partida perdida.
 - Puntaje: +100 por atención (cada **revisión**), +250 por alta, +500 por día completado (cuando el reloj llega a las 20:00; en F4 la nómina va después); al final, + plata ÷ 10 + estrellas × 200 (en centésimas: `reputación × 2`, aritmética entera).
 
 ### 5.11 Partida guardada (pendiente: F6)
@@ -292,6 +294,8 @@ La demo no cambia: sigue el round-robin real de la Sección 6 (sección 4).
 - Estadísticas de 1 a 5, con más probabilidad de 2–3. Cada ficha: retrato, nombre, rol, barras de **Rapidez** y **Pericia** (solo médicos) y salario diario.
 - Botón deshabilitado si no alcanza la plata. Máximo **6** miembros del personal.
 - Contratar crea el `*hospital.Doctor` o `*hospital.Orderly`, lo envuelve en `StaffMember` y llama `HireStaff`.
+- **Lógica (hecha en F4, 2026-10-15)**: `Game.Hire(i int) error`, con los errores `ErrNotEnoughMoney`, `ErrStaffFull` (tope 6), `ErrNoCandidate` y `ErrGameOver`. Rapidez y pericia se sortean con pesos 15/30/30/15/10 sobre 1–5. Los médicos llevan una especialidad de la lista `Medicina del sueño`, `Neurología`, `Medicina interna` y `Medicina general` (el médico inicial sigue en Medicina del sueño). `Snapshot().Candidates` trae los 3 candidatos del día como valores (`CandidateView`: nombre, rol, especialidad, edad, rapidez, pericia, sueldo = costo, apariencia y `Affordable` para el botón en gris). El contratado es exactamente el de la hoja: no se vuelve a sortear.
+- **Vista aprobada (2026-10-15)**: Figma, sección `7:4` (frames A `7:5`, B `8:64`, C `8:127`, HUD `8:190`; notas `12:219`–`12:222`). Assets y medidas en `gui/assets/hiring/HIRING_ASSETS.md`. Samuel: *"Continúa, con tus recomendaciones para bolsa"*: el portapapeles del HUD de 120 × 68 (la imagen mide 120 × 74 con el gancho), "SIN PERICIA: NO REVISA" para el camillero, TU PLATA y "TE FALTAN $ X" en la hoja, y el tablero como imagen con el texto dibujado por el código. El camillero (`staff_orderly_skin{1,3,4}.png`) es verde, como la maqueta.
 - **Interfaz** (decidida el 2026-10-10; se hace en F4):
   - En el HUD hay un **portapapeles chiquito** con la miniatura de la cabeza de un candidato, que va cambiando entre los candidatos disponibles. En F3 ya aparece, pero al darle clic muestra "Próximamente".
   - Al hacerle clic, el portapapeles se anima hasta el centro de la pantalla y se agranda; **el juego se pausa** mientras está abierto.
@@ -634,6 +638,11 @@ Samuel aprobó las recomendaciones ("Hazlo") y agregó: *"lo que hay de juego en
 - Nueva tarea: **que la camilla se mueva de forma creíble** (pendiente definir qué se siente irreal).
 - Orden: F4 (lógica en paralelo con las vistas de Figma de la Bolsa de empleo, el reporte del día y el Game Over) → F5 (los 8 banners los propone el agente `art` en Figma y Samuel los aprueba) → F6 → etapa 8 el 18/10. Si no alcanza, se recortan primero la partida guardada, los ajustes y el sonido.
 - Agentes del skill `pixel-game-studio`: `art` dibuja en Aseprite y arma las vistas en Figma; `builder` hace un commit por feature; nadie hace push hasta la última prueba de Samuel.
+
+### 12.7 Decisiones de F4 (2026-10-15)
+- La lógica de F4 (candidatos, `Hire`, nómina, quiebra y `DayReport`) está en `game/`, con TDD y 4 contrapruebas.
+- La nómina se paga en el `Tick` de las 20:00 y no en `StartNextDay`. Se corrigió el comentario de `game.go` que decía lo contrario.
+- Falta en `gui/`: la bolsa de empleo, el reporte del día y el Game Over con la quiebra.
 ---
 
 ## 13. Notas para la sustentación
