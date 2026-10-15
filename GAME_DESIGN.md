@@ -443,7 +443,7 @@ type Scene interface {
 
 ### 10.6 Comunicación con `game/`
 - Cada `Draw` usa `game.Snapshot()`: una copia de solo lectura construida con el mutex de `Game` tomado. `Snapshot()` y `Report()` contienen **solo valores** (textos, números y estados), nunca punteros del modelo como `*hospital.Patient`: la interfaz no puede leer el hospital sin pasar por `Game`.
-- Las acciones son métodos de `Game` (`Dispatch`, `WakeEarly`, `Hire`, `Pause`, `Resume`, `Report`). Una partida nueva es un `game.New(rng, looks)` nuevo con su propio `context`, que cancela la anterior: `rng` es el azar de la partida y `looks` el cosmético (la apariencia del personal), aparte para no cambiar la secuencia de los tests con semilla fija.
+- Las acciones son métodos de `Game` (`Dispatch`, `WakeEarly`, `Hire`, `Pause`, `Resume`, `Report`). Una partida nueva es un `game.New(rng, looks)` nuevo con su propio `context`, que cancela la anterior: `rng` es el azar de la partida y `looks` el cosmético (la apariencia del personal), aparte para no cambiar la secuencia de los tests con semilla fija. Desde F4 es `game.New(rng, looks, hiring)`: `hiring` sortea la bolsa de empleo (§6), aparte por la misma razón (2026-10-15).
 - Para que la interfaz haga caminar a cada uno al ritmo del juego, la foto trae `Left`: lo que le falta a la caminata o al traslado del personal y, en los pacientes, a la llegada, la salida o el cabeceo. El personal trae también su `Look`. La demo usa el tipo `game.Demo` (`Next`, `Skip`, `Snapshot`, `Report`). Los errores se muestran como avisos.
 - Los estados se muestran con el `String()` de las constantes tipadas del modelo.
 
