@@ -100,8 +100,11 @@ func (g *Game) anyOrderlyFreeLocked() bool {
 }
 
 // tickStaffLocked avanza dt el trabajo de cada miembro del personal. Al que
-// termina lo que estaba haciendo le toca el paso siguiente.
+// termina lo que estaba haciendo le toca el paso siguiente. Las revisiones
+// van al final: así, si la camilla termina en este mismo tick, el médico que
+// la esperaba revisa ya, sin importar el orden del personal.
 func (g *Game) tickStaffLocked(dt time.Duration) {
+	var reviews []*StaffMember
 	for _, s := range g.staff {
 		if s.job == nil {
 			continue
@@ -116,11 +119,30 @@ func (g *Game) tickStaffLocked(dt time.Duration) {
 		case Carrying:
 			s.job = nil // lo dejó en la cama: queda libre
 		case GoingToReview:
-			g.reviewLocked(s, s.job.patient)
+			reviews = append(reviews, s)
 		case GoingToTransfer:
 			g.transferLocked(s, s.job.patient)
 		}
 	}
+	for _, s := range reviews {
+		if g.beingCarriedLocked(s.job.patient) {
+			s.job.left = 0 // llegó antes que la camilla: espera junto a la cama
+			continue
+		}
+		g.reviewLocked(s, s.job.patient)
+	}
+}
+
+// beingCarriedLocked dice si a pt todavía lo llevan a la cama. Llevarlo dura
+// (8 − rapidez) s de quien lo lleva, así que un médico rápido mandado a
+// revisarlo puede llegar antes: espera a que termine el traslado.
+func (g *Game) beingCarriedLocked(pt *patient) bool {
+	for _, s := range g.staff {
+		if s.job != nil && s.job.activity == Carrying && s.job.patient == pt {
+			return true
+		}
+	}
+	return false
 }
 
 // pickUpLocked: s llegó donde el paciente desplomado y lo carga. Aquí se
@@ -153,7 +175,7 @@ func (g *Game) pickUpLocked(s *StaffMember, pt *patient) {
 		return
 	}
 	pt.stage = AwaitingReview
-	s.job = &job{activity: Carrying, patient: pt, left: carryDuration}
+	s.job = &job{activity: Carrying, patient: pt, left: s.walkTime()} // en camilla, al paso de quien la empuja
 }
 
 // transferLocked: s llegó donde el paciente del pasillo y lo carga. Recién
@@ -169,7 +191,7 @@ func (g *Game) transferLocked(s *StaffMember, pt *patient) {
 		return
 	}
 	pt.stage = AwaitingReview
-	s.job = &job{activity: Carrying, patient: pt, left: carryDuration}
+	s.job = &job{activity: Carrying, patient: pt, left: s.walkTime()}
 }
 
 // reviewLocked: el médico s llegó a la habitación y revisa al paciente.

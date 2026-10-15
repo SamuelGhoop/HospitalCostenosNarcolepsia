@@ -16,6 +16,8 @@ import (
 // un portapapeles, como el menú de la pantalla de inicio de la maqueta.
 type ReportScene struct {
 	report game.Report
+	title  string // "" = el de la demo
+	back   Scene  // a dónde vuelve; nil = la portada (la demo)
 }
 
 // NewReportScene muestra un Report ya calculado por el paquete game.
@@ -23,13 +25,19 @@ func NewReportScene(r game.Report) *ReportScene {
 	return &ReportScene{report: r}
 }
 
-// Update: Espacio o clic vuelven a la portada. (El botón "¡AHORA TE
-// TOCA!" se activa cuando exista el modo juego.)
+// Update: Espacio o clic vuelven a la portada o, en el modo juego, a la
+// partida (que sigue: el reporte la tenía en pausa).
 func (s *ReportScene) Update() (Scene, error) { return s.update(readInput()) }
 
 func (s *ReportScene) update(in input) (Scene, error) {
 	if in.space || in.click {
-		return NewTitleScene(), nil
+		if s.back == nil {
+			return NewTitleScene(), nil
+		}
+		if p, ok := s.back.(pausable); ok {
+			p.onResume()
+		}
+		return s.back, nil
 	}
 	return s, nil
 }
@@ -48,7 +56,11 @@ func (s *ReportScene) Draw(screen *ebiten.Image) {
 
 	c := column{dst: screen, x: 92, y: 68}
 	r := s.report
-	c.line("REPORTE DEL TURNO — DEMOSTRACIÓN DE LA SECCIÓN 6", boldFace, colBlue)
+	title := s.title
+	if title == "" {
+		title = "REPORTE DEL TURNO — DEMOSTRACIÓN DE LA SECCIÓN 6"
+	}
+	c.line(title, boldFace, colBlue)
 	c.gap(8)
 
 	c.line("5.1  Pacientes dormidos en el pasillo", boldFace, colInk)

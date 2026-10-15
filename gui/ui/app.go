@@ -40,7 +40,7 @@ func (a *App) Update() error { return a.update(inpututil.IsKeyJustPressed(ebiten
 // tapa con el menú de pausa en vez de darle el tick. Con la pausa abierta,
 // Esc lo atiende la pausa (ella no es pausable).
 func (a *App) update(esc bool) error {
-	if p, ok := a.scene.(pausable); ok && esc {
+	if p, ok := a.scene.(pausable); ok && (esc || blurred(a.scene)) {
 		a.scene = newPauseScene(p)
 		return nil
 	}
@@ -50,6 +50,17 @@ func (a *App) update(esc bool) error {
 	}
 	a.scene = next
 	return nil
+}
+
+// isFocused dice si la ventana tiene el foco (los tests la cambian).
+var isFocused = ebiten.IsFocused
+
+// blurred dice si la escena se tiene que pausar porque la ventana perdió el
+// foco: solo el modo juego (pausesOnBlur), para que el turno no corra
+// mientras el jugador no está mirando.
+func blurred(s Scene) bool {
+	b, ok := s.(interface{ pausesOnBlur() bool })
+	return ok && b.pausesOnBlur() && !isFocused()
 }
 
 // Draw lo llama Ebitengine para pintar cada cuadro.

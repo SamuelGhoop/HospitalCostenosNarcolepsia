@@ -61,6 +61,7 @@ func TestStart_SnapshotsWhileTheEngineRunsAreRaceFree(t *testing.T) {
 		defer wg.Done()
 		for ctx.Err() == nil {
 			_ = g.Snapshot()
+			_ = g.Report() // el botón REPORTE
 		}
 	}()
 	go func() { // el jugador

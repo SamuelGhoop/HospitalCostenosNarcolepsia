@@ -50,7 +50,10 @@ func patientByID(t *testing.T, snap game.Snapshot, id string) game.GamePatientVi
 }
 
 // §5.5, recoger: el camillero camina (8 − rapidez) s, lo carga, ahí se hace
-// el despacho "de guardia" y lo lleva a la cama en 2 s.
+// el despacho "de guardia" y lo lleva a la cama en otros (8 − rapidez) s
+// (antes 2 s; decisión de Samuel del 2026-10-11: la camilla va por su ruta).
+// Left dice cuánto le falta a lo que está haciendo, para que la interfaz
+// lo haga caminar al ritmo justo.
 func TestDispatch_OrderlyWalksPicksUpAndCarries(t *testing.T) {
 	g := newGame(t)
 	collapse(t, g, "P-001", "Yeimy Padilla", hospital.Severe, game.Cafeteria)
@@ -59,15 +62,19 @@ func TestDispatch_OrderlyWalksPicksUpAndCarries(t *testing.T) {
 		t.Fatalf("Dispatch: %v", err)
 	}
 	snap := g.Snapshot()
-	if s := staffByID(t, snap, "C-01"); s.Activity != game.GoingToPickUp || s.PatientID != "P-001" {
-		t.Errorf("C-01 = (%v, %q); se esperaba (va a recogerlo, P-001)", s.Activity, s.PatientID)
+	if s := staffByID(t, snap, "C-01"); s.Activity != game.GoingToPickUp || s.PatientID != "P-001" || s.Left != 5*time.Second {
+		t.Errorf("C-01 = (%v, %q, le falta %v); se esperaba (va a recogerlo, P-001, 5 s)", s.Activity, s.PatientID, s.Left)
 	}
 	if p := patientByID(t, snap, "P-001"); p.Stage != game.Collapsed || p.State != hospital.Awake {
 		t.Errorf("P-001 = (%v, %v); mientras nadie lo recoge el modelo no se entera", p.Stage, p.State)
 	}
 
 	// Con rapidez 3 camina 5 s: a los 4,9 s todavía no ha llegado.
-	tickFor(g, 4900*time.Millisecond)
+	tickFor(g, 1*time.Second)
+	if s := staffByID(t, g.Snapshot(), "C-01"); s.Left != 4*time.Second {
+		t.Errorf("al segundo de salir a C-01 le faltan %v; se esperaban 4 s", s.Left)
+	}
+	tickFor(g, 3900*time.Millisecond)
 	if p := patientByID(t, g.Snapshot(), "P-001"); p.Stage != game.Collapsed {
 		t.Fatalf("a los 4,9 s P-001 ya está %v; el camillero no había llegado", p.Stage)
 	}
@@ -77,13 +84,13 @@ func TestDispatch_OrderlyWalksPicksUpAndCarries(t *testing.T) {
 	if p := patientByID(t, snap, "P-001"); p.Stage != game.AwaitingReview || p.State != hospital.AsleepInBed || p.Room != 101 {
 		t.Errorf("P-001 = (%v, %v, hab. %d); se esperaba (esperando revisión, dormido en cama, 101)", p.Stage, p.State, p.Room)
 	}
-	if s := staffByID(t, snap, "C-01"); s.Activity != game.Carrying || s.PatientID != "P-001" {
-		t.Errorf("C-01 = (%v, %q); se esperaba que lo llevara a la cama", s.Activity, s.PatientID)
+	if s := staffByID(t, snap, "C-01"); s.Activity != game.Carrying || s.PatientID != "P-001" || s.Left != 5*time.Second {
+		t.Errorf("C-01 = (%v, %q, le falta %v); se esperaba que lo llevara a la cama en 5 s", s.Activity, s.PatientID, s.Left)
 	}
 
-	tickFor(g, 1900*time.Millisecond)
+	tickFor(g, 4900*time.Millisecond)
 	if s := staffByID(t, g.Snapshot(), "C-01"); s.Activity != game.Carrying {
-		t.Errorf("a los 1,9 s de cargarlo C-01 ya está %v; llevarlo dura 2 s", s.Activity)
+		t.Errorf("a los 4,9 s de cargarlo C-01 ya está %v; llevarlo dura 5 s con rapidez 3", s.Activity)
 	}
 	g.Tick(tick)
 	if s := staffByID(t, g.Snapshot(), "C-01"); s.Activity != game.Free || s.PatientID != "" {
@@ -158,11 +165,11 @@ func TestDispatch_DoctorPicksUpOnlyWhenNoOrderlyIsFree(t *testing.T) {
 // §5.5: sin cama, el paciente queda en el pasillo, sale el aviso rojo y el
 // personal queda libre de una vez (no hay a dónde llevarlo).
 func TestDispatch_WithoutBedThePatientStaysInTheHallway(t *testing.T) {
-	g := newGame(t)
+	g := newQuietGame(t)                                     // sin llegadas por la calle: P-004 es el de este test
 	for _, id := range []string{"P-001", "P-002", "P-003"} { // llenan la 101, la 102 y la 103
 		collapse(t, g, id, "Paciente "+id, hospital.Mild, game.Cafeteria)
 		dispatch(t, g, id, "C-01")
-		tickFor(g, 7*time.Second) // 5 s caminando + 2 s llevándolo
+		tickFor(g, 10*time.Second) // 5 s caminando + 5 s llevándolo
 	}
 	collapse(t, g, "P-004", "Wilfrido Berrío", hospital.Severe, game.Hallway2)
 	dispatch(t, g, "P-004", "C-01")
@@ -220,7 +227,7 @@ func TestDispatch_OnlyADoctorCanReview(t *testing.T) {
 	g := newGame(t)
 	collapse(t, g, "P-001", "Yeimy Padilla", hospital.Severe, game.Cafeteria)
 	dispatch(t, g, "P-001", "C-01")
-	tickFor(g, 7*time.Second) // C-01 lo deja en la cama y queda libre
+	tickFor(g, 10*time.Second) // C-01 lo deja en la cama y queda libre
 
 	if err := g.Dispatch("P-001", "C-01"); !errors.Is(err, game.ErrNotADoctor) {
 		t.Errorf("mandar al camillero a revisar: err = %v; se esperaba ErrNotADoctor", err)
@@ -276,11 +283,11 @@ func TestPause_FreezesTheStaff(t *testing.T) {
 
 // Los avisos de la foto son una copia: la interfaz no puede cambiar los del juego.
 func TestSnapshot_NoticesAreCopies(t *testing.T) {
-	g := newGame(t)
+	g := newQuietGame(t)                                              // sin llegadas por la calle: P-004 es el de este test
 	for _, id := range []string{"P-001", "P-002", "P-003", "P-004"} { // P-004 se queda sin cama
 		collapse(t, g, id, "Paciente "+id, hospital.Mild, game.Cafeteria)
 		dispatch(t, g, id, "C-01")
-		tickFor(g, 7*time.Second)
+		tickFor(g, 10*time.Second)
 	}
 
 	snap := g.Snapshot()

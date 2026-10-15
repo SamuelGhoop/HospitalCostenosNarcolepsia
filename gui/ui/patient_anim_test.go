@@ -150,3 +150,17 @@ func TestPatientAnim_WakesUpThenWavesOnceThenStandsStill(t *testing.T) {
 		t.Errorf("no debe volver a saludar: animación %d", a.anim)
 	}
 }
+
+// En el juego, los 2 s antes del ataque cabecea (Stage Drowsy): quieto, con
+// la animación de aviso de sueño; caminando, camina.
+func TestPatientAnim_DrowsyNodsWhenStill(t *testing.T) {
+	a := &patientAnim{state: hospital.Awake, drowsy: true}
+	stepN(a, 3, 0, 0, false)
+	if a.anim != animDrowsy {
+		t.Errorf("cabeceando y quieto: animación %d; se esperaba el aviso de sueño", a.anim)
+	}
+	stepN(a, 3, 1.5, 0, false)
+	if a.anim != animWalkLeft {
+		t.Errorf("cabeceando y caminando: animación %d; se esperaba caminar", a.anim)
+	}
+}

@@ -30,10 +30,10 @@ func choose(t *testing.T, s *TitleScene, o option) (Scene, error) {
 	return next, err
 }
 
-// NUEVA PARTIDA (hasta F3) y AJUSTES (hasta F6) muestran "Próximamente" un
-// rato y la portada sigue ahí.
-func TestTitle_NewGameAndSettingsSayComingSoon(t *testing.T) {
-	for _, o := range []option{optNew, optSettings} {
+// AJUSTES (hasta F6) muestra "Próximamente" un rato y la portada sigue ahí.
+// (NUEVA PARTIDA ya abre el juego: ver TestTitle_NewGameOpensTheGame.)
+func TestTitle_SettingsSayComingSoon(t *testing.T) {
+	for _, o := range []option{optSettings} {
 		s := NewTitleScene()
 		next, err := choose(t, s, o)
 		if err != nil || next != Scene(s) {

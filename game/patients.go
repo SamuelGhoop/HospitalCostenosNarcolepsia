@@ -71,6 +71,9 @@ type patient struct {
 // view copia los datos del paciente a una vista (solo valores).
 func (pt *patient) view() GamePatientView {
 	v := GamePatientView{PatientView: patientViewOf(pt.p), Stage: pt.stage, Zone: pt.zone, Look: pt.look, Waited: pt.waited}
+	if pt.stage == Arriving || pt.stage == Leaving || pt.stage == Drowsy {
+		v.Left = pt.timer
+	}
 	if pt.reviewedBy != nil {
 		v.ReviewedBy = pt.reviewedBy.ID()
 	}

@@ -9,7 +9,7 @@ import (
 	"github.com/SamuelGhoop/HospitalCostenosNarcolepsia/hospital"
 )
 
-// fullHospital deja la partida a los 13 s con las 3 camas ocupadas por
+// fullHospital deja la partida a los 16 s con las 3 camas ocupadas por
 // pacientes que esperan revisión (P-001 Mild, P-002 Moderate y P-003 Severe)
 // y P-004 (Severe) dormido en el pasillo. Los cuatro se desplomaron en el
 // instante 0.
@@ -23,11 +23,11 @@ func fullHospital(t *testing.T) *game.Game {
 
 	dispatch(t, g, "P-001", "C-01")
 	dispatch(t, g, "P-002", "D-01") // C-01 ya va ocupado
-	tickFor(g, 7*time.Second)       // 101 y 102 ocupadas; los dos quedan libres
+	tickFor(g, 10*time.Second)      // 5 s caminando + 5 s llevándolos: 101 y 102 ocupadas; los dos quedan libres
 	dispatch(t, g, "P-003", "C-01")
 	tickFor(g, time.Second)
 	dispatch(t, g, "P-004", "D-01") // C-01 ya va ocupado
-	tickFor(g, 5*time.Second)       // 12 s: P-003 a la 103 · 13 s: P-004 sin cama
+	tickFor(g, 5*time.Second)       // 15 s: P-003 a la 103 · 16 s: P-004 sin cama
 
 	snap := g.Snapshot()
 	for id, want := range map[string]game.Stage{"P-001": game.AwaitingReview, "P-002": game.AwaitingReview, "P-003": game.AwaitingReview, "P-004": game.InHallway} {
@@ -92,21 +92,25 @@ func TestAngry_NobodyPickedHimUpSoTheModelNeverKnew(t *testing.T) {
 // Las camas se llenan con dos pacientes que SÍ se revisan a tiempo (P-001 y
 // P-002) para que solo esperen P-003 y P-004: si esperaran los cuatro, la
 // reputación llegaría a 0 a los 30 s y la partida terminaría antes (§5.10).
+// El médico va con rapidez 5 (3 s caminando y 3 s llevándolo): con la
+// inicial, la segunda revisión caería a los 20 s, ya con penalización.
 func TestAngry_FromTheHallwayOrAwaitingReviewCallsWakePatient(t *testing.T) {
 	g := newGame(t)
+	g.SetSpeedForTest("D-01", 5)
 	for _, id := range []string{"P-001", "P-002", "P-003", "P-004"} {
 		collapse(t, g, id, "Paciente "+id, hospital.Severe, game.Cafeteria)
 	}
-	dispatch(t, g, "P-001", "C-01")
-	dispatch(t, g, "P-002", "D-01") // C-01 ya va ocupado
-	tickFor(g, 7*time.Second)       // los dos en cama; C-01 y D-01 libres
-	dispatch(t, g, "P-003", "C-01") // lo deja en la última cama a los 12 s
+	dispatch(t, g, "P-001", "C-01") // lo recoge a los 5 s y termina de llevarlo a los 10 s
+	dispatch(t, g, "P-002", "D-01") // C-01 ya va ocupado: lo recoge a los 3 s y termina a los 6 s
+	tickFor(g, 6*time.Second)
+	dispatch(t, g, "P-002", "D-01") // revisado a los 9 s
+	tickFor(g, 3*time.Second)
 	dispatch(t, g, "P-001", "D-01") // revisado a los 12 s
-	tickFor(g, 5*time.Second)
-	dispatch(t, g, "P-002", "D-01") // revisado a los 17 s
-	tickFor(g, 2*time.Second)
-	dispatch(t, g, "P-004", "C-01") // a los 19 s: ya no hay cama
-	tickFor(g, 5*time.Second)       // 19 s
+	tickFor(g, time.Second)
+	dispatch(t, g, "P-003", "C-01") // a los 10 s: lo deja en la última cama a los 15 s y termina a los 20 s
+	tickFor(g, 10*time.Second)
+	dispatch(t, g, "P-004", "C-01") // a los 20 s: llega a los 25 s y ya no hay cama
+	tickFor(g, 5*time.Second)       // 25 s
 
 	snap := g.Snapshot()
 	p3, p4 := patientByID(t, snap, "P-003"), patientByID(t, snap, "P-004")
@@ -115,7 +119,7 @@ func TestAngry_FromTheHallwayOrAwaitingReviewCallsWakePatient(t *testing.T) {
 	}
 	bed := p3.Room
 
-	tickFor(g, 26*time.Second) // 45 s desde el desplome de P-003 y P-004
+	tickFor(g, 20*time.Second) // 45 s desde el desplome de P-003 y P-004
 	snap = g.Snapshot()
 	for _, id := range []string{"P-003", "P-004"} {
 		if p := patientByID(t, snap, id); p.Stage != game.Leaving || p.State != hospital.Awake || p.Room != 0 {
@@ -148,7 +152,7 @@ func TestAngry_ReviewedJustInTimeStays(t *testing.T) {
 	g := newGame(t)
 	collapse(t, g, "P-001", "Yeimy Padilla", hospital.Severe, game.Cafeteria)
 	dispatch(t, g, "P-001", "C-01")
-	tickFor(g, 39900*time.Millisecond) // C-01 lo dejó en la 101 a los 7 s
+	tickFor(g, 39900*time.Millisecond) // C-01 lo dejó en la 101 a los 10 s
 	dispatch(t, g, "P-001", "D-01")    // llega a los 44,9 s
 
 	tickFor(g, 10*time.Second)

@@ -331,3 +331,20 @@ func TestRoute_FromTheLobbyToHallway2UsesTheSideDoor(t *testing.T) {
 		t.Errorf("de la recepción al pasillo 2: pasa por la puerta del costado=%v, por el pasillo 1=%v; se esperaba (true, false)", through, hallway1)
 	}
 }
+
+// Si la camilla de otro tapa el único paso, la ruta no se va en línea recta
+// por las paredes: pasa como si la camilla no estuviera (en el juego puede
+// haber varias camillas a la vez).
+func TestRoute_WhenAStretcherBlocksTheWayItIgnoresIt(t *testing.T) {
+	needFonts(t)
+	door := doorways[0].gap // la puerta de la 101: la camilla la tapa entera
+	block := image.Rect(door.Min.X-40, door.Min.Y-40, door.Max.X+40, door.Max.Y+60)
+	from, to := toVec(wakeSpot(zoneRoom101)), toVec(slot(zoneStaffRoom, 0))
+	path := routeAvoiding(from, to, []image.Rectangle{block})
+	if len(path) < 3 {
+		t.Fatalf("con la puerta tapada la ruta es %v: en línea recta por las paredes", path)
+	}
+	if want := route(from, to); len(path) != len(want) {
+		t.Errorf("con la puerta tapada la ruta es %v; se esperaba la de sin camilla %v", path, want)
+	}
+}

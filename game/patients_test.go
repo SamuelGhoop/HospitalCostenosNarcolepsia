@@ -19,6 +19,20 @@ func arrive(t *testing.T, g *game.Game, wantID, name string, level hospital.Narc
 	}
 }
 
+// Left dice cuánto le falta al que camina por la acera hasta la puerta (y al
+// que sale): con eso la interfaz lo hace caminar al ritmo del juego.
+func TestSnapshot_LeftTellsHowLongTheWalkToTheDoorTakes(t *testing.T) {
+	g := newGame(t)
+	arrive(t, g, "P-001", "Yeimy Padilla", hospital.Mild)
+	if p := patientByID(t, g.Snapshot(), "P-001"); p.Left != 4*time.Second {
+		t.Errorf("recién llegado a P-001 le faltan %v para la puerta; se esperaban 4 s", p.Left)
+	}
+	tickFor(g, time.Second)
+	if p := patientByID(t, g.Snapshot(), "P-001"); p.Left != 3*time.Second {
+		t.Errorf("al segundo a P-001 le faltan %v; se esperaban 3 s", p.Left)
+	}
+}
+
 // §5.3: camina 4 s por la acera y al cruzar la puerta queda en la recepción.
 // La puerta se abre sola el último segundo antes de que la cruce.
 func TestArrival_EntersTheLobbyWhenCrossingTheDoor(t *testing.T) {
@@ -60,7 +74,7 @@ func TestArrival_EntersTheLobbyWhenCrossingTheDoor(t *testing.T) {
 // colapsa (§5.10) y la partida se congela.
 func TestAttack_NeverOnTheStreetAndOnlyAfterTheAwakeTime(t *testing.T) {
 	for seed := int64(1); seed <= 5; seed++ {
-		g, err := game.New(rand.New(rand.NewSource(seed)))
+		g, err := game.New(rand.New(rand.NewSource(seed)), rand.New(rand.NewSource(seed)))
 		if err != nil {
 			t.Fatalf("New: %v", err)
 		}
@@ -218,9 +232,9 @@ func TestDischarge_LeavesWithoutAnotherAttackAndIsMarkedInTheReport(t *testing.T
 	collapse(t, g, "P-002", "Kevin Mercado", hospital.Severe, game.Hallway2)
 	dispatch(t, g, "P-002", "C-01") // ocupa al camillero…
 	dispatch(t, g, "P-001", "D-01") // …para que a P-001 lo recoja el médico (sale en su 5.2)
-	tickFor(g, 7*time.Second)       // D-01 lo recoge y lo deja en la cama
+	tickFor(g, 10*time.Second)      // D-01 lo recoge a los 5 s y lo deja en la cama a los 10 s
 	dispatch(t, g, "P-001", "D-01")
-	tickFor(g, 5*time.Second) // lo revisa a los 12 s
+	tickFor(g, 5*time.Second) // lo revisa a los 15 s
 
 	tickFor(g, 11400*time.Millisecond) // 15 s × 0,76 = 11,4 s de sueño
 	if p := patientByID(t, g.Snapshot(), "P-001"); p.Stage != game.Leaving {

@@ -45,3 +45,15 @@ func (g *Game) CollapseForTest(name string, level hospital.NarcolepsyLevel, zone
 	g.patients = append(g.patients, &patient{p: p, stage: Collapsed, zone: zone})
 	return p.ID(), nil
 }
+
+// SetSpeedForTest cambia la rapidez de un miembro del personal, para probar
+// tiempos que con la rapidez inicial (3) no se dan.
+func (g *Game) SetSpeedForTest(id string, speed int) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	for _, s := range g.staff {
+		if s.ID() == id {
+			s.speed = speed
+		}
+	}
+}

@@ -469,10 +469,15 @@ func routeAvoiding(from, to vec, avoid []image.Rectangle) []vec {
 	start, goal := from.add(feetOffset), to.add(feetOffset)
 	sc, okS := nearestFreeCell(feetCellOf(start), avoid)
 	gc, okG := nearestFreeCell(feetCellOf(goal), avoid)
-	if !okS || !okG {
-		return []vec{to}
+	var cells []cell
+	if okS && okG {
+		cells = astar(sc, gc, avoid)
 	}
-	cells := astar(sc, gc, avoid)
+	if cells == nil && len(avoid) > 0 {
+		// La camilla de otro tapa el único paso (en el juego puede haber
+		// varias): mejor pasar junto a ella que atravesar una pared.
+		return routeAvoiding(from, to, nil)
+	}
 	if cells == nil {
 		return []vec{to} // no hay camino (no debería pasar): en línea recta
 	}

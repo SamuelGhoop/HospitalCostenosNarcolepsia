@@ -39,19 +39,12 @@ func speedOf(f figure) float64 {
 // personaje (la coreografía del paso) y lo que el usuario ve (HUD,
 // subtítulos).
 type DemoScene struct {
+	world    // dónde está y por dónde camina cada personaje (world.go)
 	demo     *game.Demo
 	snap     game.DemoSnapshot
-	figures  []figure
-	pos      map[string]vec          // posición dibujada de cada personaje, por ID
-	paths    map[string][]vec        // lo que le falta de ruta a cada personaje (ver routes.go)
-	pathTo   map[string]vec          // el destino para el que se calculó esa ruta
-	anims    map[string]*patientAnim // animación de cada paciente, por ID
-	staff    map[string]*staffAnim   // animación de cada médico, por ID
-	choreo   *choreography           // coreografía del último paso; nil si no hay o ya terminó
-	carry    *carrying               // traslado en camilla en curso (nil si no hay)
-	dodge    map[string]vec          // los que se hicieron a un lado para dejar pasar la camilla
-	carried  string                  // paciente que el último paso pasó del pasillo a una cama
-	arrivals []string                // pacientes que llegaron en el último paso, en orden
+	choreo   *choreography // coreografía del último paso; nil si no hay o ya terminó
+	carried  string        // paciente que el último paso pasó del pasillo a una cama
+	arrivals []string      // pacientes que llegaron en el último paso, en orden
 	auto     autoAdvance
 	showSubs bool
 	scenery  scenery  // los carros de la calle y el humo de la olla
@@ -60,8 +53,7 @@ type DemoScene struct {
 
 // NewDemoScene prepara la escena para una demo recién creada.
 func NewDemoScene(d *game.Demo) *DemoScene {
-	s := &DemoScene{demo: d, pos: map[string]vec{}, paths: map[string][]vec{}, pathTo: map[string]vec{},
-		anims: map[string]*patientAnim{}, staff: map[string]*staffAnim{}, showSubs: true,
+	s := &DemoScene{world: newWorld(), demo: d, showSubs: true,
 		scenery: newScenery(rand.New(rand.NewSource(time.Now().UnixNano())))} // el tráfico es decorado: cada vez distinto
 	s.refresh()
 	return s
@@ -148,7 +140,7 @@ func (s *DemoScene) animate() {
 		before[id] = p
 	}
 	if s.carry != nil {
-		s.stepCarry()
+		s.stepCarry(s.carry)
 	}
 
 	for _, f := range s.figures {
@@ -186,24 +178,6 @@ func (s *DemoScene) animate() {
 	}
 }
 
-// nextWaypoint es el próximo punto al que camina id para llegar a dest.
-// Si dest cambió (otra fase de la coreografía, otro puesto), calcula la
-// ruta de nuevo; cuando llega a un punto de paso, sigue con el siguiente.
-func (s *DemoScene) nextWaypoint(id string, from, dest vec) vec {
-	if from == dest {
-		return dest // ya llegó (por ejemplo, acostado en su cama: ahí no hay piso libre)
-	}
-	if s.pathTo[id] != dest || len(s.paths[id]) == 0 {
-		s.paths[id], s.pathTo[id] = routeAvoiding(from, dest, s.avoidFor(id)), dest
-	}
-	path := s.paths[id]
-	for len(path) > 1 && from == path[0] {
-		path = path[1:]
-	}
-	s.paths[id] = path
-	return path[0]
-}
-
 // destination es a dónde tiene que caminar un personaje ahora mismo.
 func (s *DemoScene) destination(f figure) vec {
 	if to, ok := s.dodge[f.id]; ok {
@@ -215,22 +189,6 @@ func (s *DemoScene) destination(f figure) vec {
 		}
 	}
 	return f.target
-}
-
-// onBed dice si un paciente ya está SOBRE su cama (no solo asignada: la
-// cama se asigna en el modelo antes de que lo terminen de llevar).
-func (s *DemoScene) onBed(f figure) bool {
-	return f.room != 0 && s.pos[f.id] == bedCell(roomZone(f.room))
-}
-
-// figure busca un personaje por ID.
-func (s *DemoScene) figure(id string) (figure, bool) {
-	for _, f := range s.figures {
-		if f.id == id {
-			return f, true
-		}
-	}
-	return figure{}, false
 }
 
 // finishChoreography adelanta la coreografía en curso: cada personaje

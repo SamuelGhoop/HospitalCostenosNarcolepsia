@@ -14,6 +14,7 @@ type patientAnim struct {
 	room            int                   // última cama en la que durmió (para el cuadro 1 de despertarse)
 	pendingCollapse bool                  // se durmió fuera de la cama: primero camina hasta el sitio
 	waveOnArrival   bool                  // se acaba de despertar: saluda cuando llegue a su sitio
+	drowsy          bool                  // cabecea: en el juego, los 2 s antes del ataque (Stage Drowsy)
 }
 
 // holdsStill dice si el paciente no se puede mover todavía: mientras se
@@ -122,6 +123,9 @@ func (a *patientAnim) step(dx, dy float64, inBed bool) {
 		an, flip := walkAnimation(dx, dy)
 		a.keep(an)
 		a.flip = flip
+	case a.drowsy:
+		a.flip = false
+		a.keep(animDrowsy) // quieto, cabeceando
 	case a.waveOnArrival:
 		a.waveOnArrival = false
 		a.flip = false

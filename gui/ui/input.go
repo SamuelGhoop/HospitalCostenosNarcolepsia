@@ -16,6 +16,8 @@ type input struct {
 	space      bool // Espacio
 	back       bool // Esc
 	click      bool // clic izquierdo
+	rightClick bool // clic derecho
+	shift      bool // Shift apretado (en el juego, muestra todas las etiquetas)
 	mouse      image.Point
 	mouseMoved bool // el mouse se movió desde el tick anterior
 }
@@ -35,6 +37,8 @@ func readInput() input {
 		space:      key(ebiten.KeySpace),
 		back:       key(ebiten.KeyEscape),
 		click:      inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft),
+		rightClick: inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonRight),
+		shift:      ebiten.IsKeyPressed(ebiten.KeyShift),
 		mouse:      mouse,
 		mouseMoved: mouse != lastMouse,
 	}

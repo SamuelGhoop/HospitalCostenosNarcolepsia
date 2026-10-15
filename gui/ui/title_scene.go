@@ -49,7 +49,9 @@ func (s *TitleScene) update(in input) (Scene, error) {
 		return s, nil
 	}
 	switch chosen {
-	case optNew, optSettings: // NUEVA PARTIDA llega en F3 y AJUSTES en F6
+	case optNew:
+		return NewGameScene()
+	case optSettings: // AJUSTES llega en F6
 		s.notice = comingSoonTicks
 	case optDemo:
 		return NewDemoScene(game.NewDemo()), nil

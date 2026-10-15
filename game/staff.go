@@ -27,6 +27,7 @@ type StaffMember struct {
 	skill  int               // pericia, de 1 a 5; 0 en los camilleros
 	job    *job              // lo que está haciendo; nil = libre
 	onCall bool              // "de guardia": true solo durante el despacho que eligió el jugador
+	look   Appearance        // cómo se ve (la interfaz lo dibuja así; en F4, el mismo de la bolsa de empleo)
 }
 
 // Verificación en tiempo de compilación, como en hospital/attender.go: si a
@@ -76,10 +77,12 @@ func (s *StaffMember) view() StaffMemberView {
 		StaffView: StaffView{ID: s.ID(), Name: s.Name(), IsDoctor: s.isDoctor()},
 		Speed:     s.speed,
 		Skill:     s.skill,
+		Look:      s.look,
 	}
 	if s.job != nil { // sin trabajo, Activity queda en su valor cero: Free
 		v.Activity = s.job.activity
 		v.PatientID = s.job.patient.p.ID()
+		v.Left = s.job.left
 	}
 	return v
 }
@@ -131,7 +134,9 @@ func (g *Game) newDoctorLocked(speed, skill int) *StaffMember {
 	g.doctorCount++
 	d := hospital.NewDoctor(fmt.Sprintf("D-%02d", g.doctorCount), doctorName(g.rng),
 		randomAge(g.rng, staffMinAge, staffMaxAge), doctorSpecialty)
-	return newDoctorMember(d, speed, skill)
+	m := newDoctorMember(d, speed, skill)
+	m.look = RandomAppearance(g.looks)
+	return m
 }
 
 // newOrderlyLocked crea un camillero al azar (C-01, C-02…), envuelto.
@@ -140,7 +145,9 @@ func (g *Game) newOrderlyLocked(speed int) *StaffMember {
 	name, _ := randomName(g.rng) // _ : al camillero no se le pone título
 	o := hospital.NewOrderly(fmt.Sprintf("C-%02d", g.orderlyCount), name,
 		randomAge(g.rng, staffMinAge, staffMaxAge))
-	return newOrderlyMember(o, speed)
+	m := newOrderlyMember(o, speed)
+	m.look = RandomAppearance(g.looks)
+	return m
 }
 
 // hireLocked contrata a s en el hospital y lo agrega a la lista de Game.

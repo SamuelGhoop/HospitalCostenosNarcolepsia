@@ -26,6 +26,7 @@ type Game struct {
 	mu sync.Mutex
 
 	rng    *rand.Rand // azar inyectado; solo con g.mu tomado
+	looks  *rand.Rand // azar cosmético (la apariencia del personal), aparte para no cambiar la secuencia de rng
 	h      *hospital.Hospital
 	clock  clock
 	paused bool
@@ -48,15 +49,17 @@ type Game struct {
 // New crea una partida (GAME_DESIGN §5.2): un hospital con las habitaciones
 // 101, 102 y 103, un médico y un camillero, el día 1 a las 08:00. rng es el
 // azar de la partida; los tests pasan uno con semilla fija para que todo sea
-// repetible.
-func New(rng *rand.Rand) (*Game, error) {
+// repetible. looks es el azar cosmético, solo para la apariencia del
+// personal: va aparte para que sortear apariencias no cambie lo que sale de
+// rng (los nombres, las llegadas, los ataques).
+func New(rng, looks *rand.Rand) (*Game, error) {
 	h := hospital.NewHospital("Hospital de los Costeños con Narcolepsia")
 	for _, number := range []int{101, 102, 103} {
 		if err := h.AddRoom(number, 1); err != nil {
 			return nil, fmt.Errorf("creando la habitación %d: %w", number, err)
 		}
 	}
-	g := &Game{rng: rng, h: h, clock: newClock(), episodeTimes: map[string]string{}, notes: map[string]string{}, money: startMoney, reputation: startReputation}
+	g := &Game{rng: rng, looks: looks, h: h, clock: newClock(), episodeTimes: map[string]string{}, notes: map[string]string{}, money: startMoney, reputation: startReputation}
 
 	// Los helpers ...Locked se pueden llamar sin tomar g.mu porque la
 	// partida todavía no existe para ninguna otra goroutine.

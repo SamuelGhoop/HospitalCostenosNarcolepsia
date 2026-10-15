@@ -29,6 +29,15 @@ type carrying struct {
 	dir   dir             // hacia dónde apunta la camilla
 	fp    image.Rectangle // huella de la camilla en el piso (vacía mientras no se ve; girando, la de después del giro)
 	swing *swing          // el giro en curso (nil si no está girando)
+	speed float64         // lo que avanza por tick quien empuja; 0 = staffSpeed (en el juego, el ritmo que marca game/)
+}
+
+// pushSpeed es lo que avanza por tick quien empuja.
+func (c *carrying) pushSpeed() float64 {
+	if c.speed > 0 {
+		return c.speed
+	}
+	return staffSpeed
 }
 
 // visible dice si la camilla está en el mapa.
@@ -47,15 +56,14 @@ func feetPoint(corner vec) image.Point {
 	return image.Pt(int(math.Round(feet.x)), int(math.Round(feet.y)))
 }
 
-// stepCarry hace un tick del traslado: mueve a quien empuja y al paciente
+// stepCarry hace un tick del traslado c: mueve a quien empuja y al paciente
 // (los demás los mueve animate) y pasa de etapa cuando toca.
-func (s *DemoScene) stepCarry() {
-	c := s.carry
+func (s *world) stepCarry(c *carrying) {
 	o, plan := c.order, c.order.plan
 	switch c.stage {
 	case carryToPickup:
 		at := s.pos[o.pusher]
-		s.pos[o.pusher] = moveToward(at, s.nextWaypoint(o.pusher, at, plan.pickup), staffSpeed)
+		s.pos[o.pusher] = moveToward(at, s.nextWaypoint(o.pusher, at, plan.pickup), c.pushSpeed())
 		if s.pos[o.pusher] == plan.pickup {
 			c.stage, c.dir = carryHopOn, plan.dirs[0]
 			c.fp = footprintAt(plan.pickup, c.dir) // aparece la camilla, delante de quien la va a empujar
@@ -76,7 +84,7 @@ func (s *DemoScene) stepCarry() {
 			return
 		}
 		goal := plan.path[c.seg]
-		s.pos[o.pusher] = moveToward(s.pos[o.pusher], goal, staffSpeed)
+		s.pos[o.pusher] = moveToward(s.pos[o.pusher], goal, c.pushSpeed())
 		if s.pos[o.pusher] == goal {
 			c.seg++
 		}
@@ -99,20 +107,6 @@ func (s *DemoScene) stepCarry() {
 			c.stage, c.fp = carryDone, image.Rectangle{} // la camilla desaparece
 		}
 	}
-}
-
-// inCarry dice si id es quien empuja o el paciente del traslado en curso.
-func (s *DemoScene) inCarry(id string) bool {
-	return s.carry != nil && (id == s.carry.order.pusher || id == s.carry.order.patient)
-}
-
-// avoidFor es lo que tiene que esquivar id al calcular su ruta: la camilla
-// de otro (quien la empuja y el paciente no se la esquivan a sí mismos).
-func (s *DemoScene) avoidFor(id string) []image.Rectangle {
-	if s.carry == nil || !s.carry.visible() || s.inCarry(id) {
-		return nil
-	}
-	return []image.Rectangle{s.carry.fp}
 }
 
 // ─── Hacerse a un lado ─────────────────────────────────────────────────

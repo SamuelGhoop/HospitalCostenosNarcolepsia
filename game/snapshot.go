@@ -33,7 +33,9 @@ type StaffMemberView struct {
 	StaffView
 	Speed, Skill int // Skill es 0 en los camilleros
 	Activity     Activity
-	PatientID    string // a quién va o a quién lleva; "" si está libre
+	PatientID    string        // a quién va o a quién lleva; "" si está libre
+	Left         time.Duration // cuánto le falta a lo que está haciendo (la interfaz lo hace caminar a ese ritmo)
+	Look         Appearance    // cómo se ve
 }
 
 // GamePatientView es la foto de un paciente en el modo juego: los datos del
@@ -46,6 +48,7 @@ type GamePatientView struct {
 	Look       Appearance    // cómo se ve
 	Waited     time.Duration // cronómetro de espera del episodio (§5.4): del desplome a la revisión
 	ReviewedBy string        // ID del médico que lo revisó; "" si nadie
+	Left       time.Duration // llegando, saliendo o cabeceando: cuánto le falta (a la puerta o al desplome)
 }
 
 // Snapshot devuelve la foto actual de la partida.

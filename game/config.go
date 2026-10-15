@@ -24,11 +24,9 @@ const (
 	maxStat     = 5 // la rapidez y la pericia van de 1 a maxStat (§6)
 )
 
-// Despacho (§5.5).
-const (
-	walkBase      = 8               // el personal camina (walkBase − rapidez) segundos
-	carryDuration = 2 * time.Second // lo que tarda en llevar al paciente a la cama
-)
+// Despacho (§5.5): el personal camina (walkBase − rapidez) segundos hasta
+// donde lo mandan, y otro tanto para llevar al paciente a la cama en camilla.
+const walkBase = 8
 
 // Llegadas de pacientes (§5.3).
 const (

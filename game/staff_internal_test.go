@@ -9,6 +9,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/SamuelGhoop/HospitalCostenosNarcolepsia/hospital"
 )
@@ -16,7 +17,7 @@ import (
 // newInternalGame es el newGame de los tests internos (semilla fija).
 func newInternalGame(t *testing.T) *Game {
 	t.Helper()
-	g, err := New(rand.New(rand.NewSource(1)))
+	g, err := New(rand.New(rand.NewSource(1)), rand.New(rand.NewSource(2)))
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
@@ -122,11 +123,38 @@ func TestNotices_KeepsOnlyTheLastOnes(t *testing.T) {
 }
 
 // Mientras el camillero lleva al paciente a la cama ya se puede mandar al
-// médico a revisarlo. Eso solo funciona si el médico más rápido (rapidez
-// máxima) tarda más en llegar que el traslado.
-func TestConfig_TheDoctorNeverArrivesBeforeTheCarryEnds(t *testing.T) {
-	fastest := &StaffMember{speed: maxStat}
-	if fastest.walkTime() <= carryDuration {
-		t.Errorf("con rapidez %d el médico llega en %v y el traslado dura %v", maxStat, fastest.walkTime(), carryDuration)
+// médico a revisarlo. Como el traslado dura (8 − rapidez) s del camillero
+// (2026-10-11), un médico rápido puede llegar antes que la camilla: entonces
+// espera junto a la cama y lo revisa cuando termina el traslado.
+func TestDispatch_TheDoctorWaitsForTheCarryToEnd(t *testing.T) {
+	g, err := New(rand.New(rand.NewSource(1)), rand.New(rand.NewSource(2)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	g.StopArrivalsForTest()
+	g.staff[0].speed, g.staff[1].speed = maxStat, 1 // médico rápido (3 s), camillero lento (7 s)
+	id, err := g.CollapseForTest("Yeimy Padilla", hospital.Severe, Cafeteria)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ticks := func(d time.Duration) {
+		for elapsed := time.Duration(0); elapsed < d; elapsed += 100 * time.Millisecond {
+			g.Tick(100 * time.Millisecond)
+		}
+	}
+	if err := g.Dispatch(id, "C-01"); err != nil {
+		t.Fatal(err)
+	}
+	ticks(7 * time.Second) // llega, lo carga y empieza a llevarlo (7 s)
+	if err := g.Dispatch(id, "D-01"); err != nil {
+		t.Fatal(err)
+	}
+	ticks(3 * time.Second) // el médico ya llegó; a la camilla le faltan 4 s
+	if pt := g.patients[0]; pt.stage != AwaitingReview || g.staff[0].job == nil {
+		t.Fatalf("con la camilla en camino P-001 está %v y el médico %v; se esperaba que el médico esperara", pt.stage, g.staff[0].job)
+	}
+	ticks(4*time.Second + 100*time.Millisecond) // termina el traslado y el médico lo revisa
+	if pt := g.patients[0]; pt.stage != InBed || pt.reviewedBy != g.staff[0] || g.staff[0].job != nil {
+		t.Errorf("después del traslado P-001 está %v (revisado por %v) y el médico %v; se esperaba revisado y el médico libre", pt.stage, pt.reviewedBy, g.staff[0].job)
 	}
 }
