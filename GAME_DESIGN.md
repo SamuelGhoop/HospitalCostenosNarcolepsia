@@ -233,7 +233,7 @@ Cada episodio necesita dos despachos: primero alguien **recoge** al paciente y d
    - **Sin cama**: el paciente queda `InHallway`, sale el aviso rojo "sin cama disponible" y el personal queda libre.
 
 **Revisar**
-3. Clic en un paciente que espera revisión y luego en un **médico** libre. El médico camina hasta la habitación, lo revisa (animación *atender*) y ahí arranca el cronómetro de sueño, con la pericia de ese médico (5.4).
+3. Clic en un paciente que espera revisión y luego en un **médico** libre. El médico camina hasta la habitación, lo revisa (animación *atender*) y ahí arranca el cronómetro de sueño, con la pericia de ese médico (5.4). Si llega mientras al paciente todavía lo traen en camilla (con un camillero lento, el traslado dura más que su caminata), **espera junto a la cama** y lo revisa al terminar el traslado (2026-10-11).
 4. La revisión es **solo lógica del juego: no llama nada del modelo**. Tampoco llama `DiagnosePatient`, porque llena el cupo de 4 pacientes del médico y el modelo no lo libera nunca.
 5. **Pago**: uno solo por episodio, en la revisión (5.8).
 
@@ -439,7 +439,8 @@ type Scene interface {
 
 ### 10.6 Comunicación con `game/`
 - Cada `Draw` usa `game.Snapshot()`: una copia de solo lectura construida con el mutex de `Game` tomado. `Snapshot()` y `Report()` contienen **solo valores** (textos, números y estados), nunca punteros del modelo como `*hospital.Patient`: la interfaz no puede leer el hospital sin pasar por `Game`.
-- Las acciones son métodos de `Game` (`Dispatch`, `WakeEarly`, `Hire`, `Pause`, `Resume`, `Report`). Una partida nueva es un `game.New(rng)` nuevo con su propio `context`, que cancela la anterior. La demo usa el tipo `game.Demo` (`Next`, `Skip`, `Snapshot`, `Report`). Los errores se muestran como avisos.
+- Las acciones son métodos de `Game` (`Dispatch`, `WakeEarly`, `Hire`, `Pause`, `Resume`, `Report`). Una partida nueva es un `game.New(rng, looks)` nuevo con su propio `context`, que cancela la anterior: `rng` es el azar de la partida y `looks` el cosmético (la apariencia del personal), aparte para no cambiar la secuencia de los tests con semilla fija.
+- Para que la interfaz haga caminar a cada uno al ritmo del juego, la foto trae `Left`: lo que le falta a la caminata o al traslado del personal y, en los pacientes, a la llegada, la salida o el cabeceo. El personal trae también su `Look`. La demo usa el tipo `game.Demo` (`Next`, `Skip`, `Snapshot`, `Report`). Los errores se muestran como avisos.
 - Los estados se muestran con el `String()` de las constantes tipadas del modelo.
 
 ### 10.7 Mapa con imagen de fondo y rutas (hecho, 2026-10-10)
@@ -497,7 +498,7 @@ Ronda antes de F3b; aplica a la demo y al juego (mismo código de `gui/`).
 - Orden de candados siempre: primero `g.mu` (Game), después `h.mu` (Hospital, adentro de sus métodos). Los métodos de `StaffMember` nunca toman `g.mu` (sección 3.1).
 - El `sync.Mutex` no es reentrante: los métodos públicos de `Game` no se llaman entre sí, sino que delegan en helpers `...Locked`. Es la misma convención que usa `hospital/`.
 - Nunca se usa `time.Sleep` mientras se tiene `g.mu`: el motor espera al `Ticker` sin candado y solo lo toma dentro de `Tick`.
-- Verificación: `go test -race ./...` limpio en la raíz (incluye `game/`).
+- Verificación: `go test -race ./...` limpio en la raíz (incluye `game/`). El test del motor tiene tres goroutines, como el juego real: el motor, la interfaz (que pide `Snapshot()` y `Report()` sin parar) y el jugador (despacha, despierta, pausa y reanuda).
 
 ---
 
@@ -556,6 +557,23 @@ Prioridad si el tiempo no alcanza: F1 → F2 → F3 → F4 → F5 → F6. **F2 e
 - La penalización por espera sigue el cronómetro de espera y se detiene con la revisión; para el colapso cuentan solo desplomados y del pasillo (5.9).
 - La reputación sale en la foto en centésimas (la interfaz la muestra como "2,75 ★"); no hay aviso por cada pago, sí al perder.
 
+
+### 12.5 F3b: modo juego (hecho, 2026-10-11)
+- **NUEVA PARTIDA** abre `GameScene` (`gui/ui/game_scene.go`): `game.New` con el azar de la hora y el motor corriendo (`Game.Start`). Es `pausable`: Esc, el botón PAUSA o **perder el foco** de la ventana abren la pausa (`Game.Pause`); SALIR AL MENÚ cancela el `context` y espera a que el motor termine.
+- **Dibujo desde la foto** (`game_world.go`): cada tick la escena lee `Snapshot()` y decide a dónde camina cada uno. Los pacientes, por su etapa: llegan por la acera (al ritmo de `Left`), deambulan entre los puestos de pie de su zona, cabecean, se desploman en un puesto de piso, van en camilla a la cama y se van caminando por la acera hasta salir de la pantalla. El personal, por lo que hace: a recoger o a revisar al ritmo de `Left` (llega cuando el juego dice que llegó), lleva al paciente en camilla repartiendo el camino en el tiempo del traslado, y después de revisar atiende junto a la cama antes de volver a su sala. La demo y el juego comparten el mismo código de movimiento (`world.go`): posiciones, rutas, animaciones y camillas (en el juego puede haber varias a la vez; si la camilla de otro tapa el único paso, la ruta pasa junto a ella en vez de atravesar una pared).
+- **Entrada** (`game_input.go`): clic en un paciente desplomado, en el pasillo o esperando revisión (queda con un marco amarillo) y después en alguien del personal → `Dispatch`; clic derecho en uno revisado en su cama → `WakeEarly`. Los errores del juego salen como aviso. Pasar el mouse muestra su ficha (ID y nombre, nivel y estado con el cronómetro; en el personal, rol, rapidez y pericia y lo que hace); **Shift**, todas las etiquetas. Siempre se ven las burbujas ("Zzz! 0:42" roja, que titila desde los 15 s, y "Zzz" azul en la cama), los rayitos y el punto del personal (verde libre, rojo ocupado).
+- **Barra de arriba** (`hud.go`), según `HUD.dc.html`: ver 9.1. Un test lee la maqueta y compara los mapas de píxeles y la paleta con los de Go.
+- **Abajo a la derecha**: el portapapeles chiquito de CONTRATAR ("Próximamente" hasta F4), REPORTE (el reporte de las 4 consultas con la partida en pausa; al cerrarlo sigue) y PAUSA. Los avisos del juego salen arriba a la izquierda unos segundos.
+- **Fin del día y derrota mínimos**: a las 20:00, "FIN DEL DÍA N" con el puntaje y SIGUIENTE DÍA (la nómina y el reporte del día llegan en F4); al perder, el motivo, el puntaje final y los días, con NUEVA PARTIDA y MENÚ.
+- ✅ **Decidido (2026-10-14)**: el traslado sigue en (8 − rapidez) s, aunque un jugador automático que atiende primero al que más lleva esperando sobrevive el día 1 en 16 de 20 partidas (con el de 2 s, en 20 de 20). F4 permite contratar personal más rápido.
+
+### 12.6 Plan del 2026-10-14 (después de F3b)
+Samuel aprobó las recomendaciones ("Hazlo") y agregó: *"lo que hay de juego en este momento sigue bastante crudo, principalmente en los movimientos de las camillas ya que se sienten irreales"*.
+- Se acepta que la burbuja y los rayitos de un acostado queden sobre un mueble en radiología y en la cafetería (a ×3 no caben de otra forma).
+- **Backdoor de pruebas mínimo** en `gui/` (escena, semilla, guion de entrada, captura y dump) para que el agente `tester` pueda revisar las pantallas.
+- Nueva tarea: **que la camilla se mueva de forma creíble** (pendiente definir qué se siente irreal).
+- Orden: F4 (lógica en paralelo con las vistas de Figma de la Bolsa de empleo, el reporte del día y el Game Over) → F5 (los 8 banners los propone el agente `art` en Figma y Samuel los aprueba) → F6 → etapa 8 el 18/10. Si no alcanza, se recortan primero la partida guardada, los ajustes y el sonido.
+- Agentes del skill `pixel-game-studio`: `art` dibuja en Aseprite y arma las vistas en Figma; `builder` hace un commit por feature; nadie hace push hasta la última prueba de Samuel.
 ---
 
 ## 13. Notas para la sustentación
