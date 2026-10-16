@@ -304,6 +304,12 @@ La demo no cambia: sigue el round-robin real de la Sección 6 (sección 4).
   - Abajo, un botón grande **CONTRATAR**, en gris si no alcanza la plata.
   - **Esc** o clic afuera lo cierra y el portapapeles vuelve a su sitio.
   - El candidato es el mismo que después camina en el mapa: su apariencia vive en `game/` (`StaffMember` la guarda y `StaffView` la expone, F3b).
+- **Cómo quedó (F4, 2026-10-16)**:
+  - `HiringScene` (`gui/ui/hiring_scene.go`) es una capa encima del juego, como la pausa, pero **no implementa `pausable`**: así Esc solo la cierra y no abre además el menú de pausa.
+  - Abre con ease-out en 0,22 s desde el portapapeles chiquito del HUD y cierra con ease-in en 0,18 s, escalando el tablero completo como una sola pieza. El cambio de hoja dura 0,10 s, con un salto de 6 px.
+  - CONTRATAR llama `Game.Hire(i)`. Si no alcanza la plata, el botón sale en gris con "TE FALTAN $ X" y el clic no hace nada. Si ya se contrató a los 3, sale un aviso simple en el tablero.
+  - En el portapapeles chiquito se ve la cabeza ×3 del candidato de turno, que cambia cada 2 s.
+  - La flecha presionada (`_1`) se ve 0,10 s después del clic o de la tecla: el juego solo lee el clic recién apretado.
 
 ---
 
@@ -352,7 +358,7 @@ La demo no cambia: sigue el round-robin real de la Sección 6 (sección 4).
 
 ### 9.1 HUD
 - **Arriba**: plata, estrellas, "DÍA N", reloj con barra de progreso, icono del evento activo. En la demo: "MODO DEMOSTRACIÓN — PASO N/12".
-- **Abajo a la derecha**: CONTRATAR, REPORTE, PAUSA (ocultos en la demo).
+- **Abajo a la derecha**: CONTRATAR (desde F4, el portapapeles chiquito `hud_hire_clipboard.png` con la cabeza ×3 del candidato de turno), REPORTE y PAUSA (ocultos en la demo).
 - **Siempre visible**: burbuja roja "Zzz!" con cronómetro (`Collapsed` e `InHallway`; intermitente tras 15 s), burbuja azul "Zzz" en cama, rayitos de nivel solo en dormidos (1 amarillo Mild, 2 naranja Moderate, 3 rojos Severe), punto verde/rojo sobre el personal (libre/ocupado), letreros OCCUPIED/AVAILABLE y nombres de zonas.
 - **Etiquetas ocultas** en el modo juego (confirmado el 2026-10-11; en la demo se ven siempre): tooltip al pasar el cursor (ID, nombre, nivel, estado). **Shift** las muestra todas.
 - **Barra de arriba del modo juego (F3b)**, según `gui/design/claude-design/Hospital de los Costeños/HUD.dc.html`: los iconos ESTRELLA, VACÍA, PLATA y RELOJ copiados de sus mapas de píxeles a Go con la misma paleta y dibujados ×3; la estrella parcial es la vacía y, encima, la llena recortada a 1 + round(9 × fracción) columnas; textos en Press Start 2P de 16 px (DÍA con el helper de tildes). La reputación en pantalla se mueve 0,1 a la vez hacia el valor real, con un destello de 0,25 s en cada paso: **verde** si sube y **rojo** si baja. La plata cuenta hacia el valor real en ~0,6 s, y el "+$450" verde (#2fb84f) o el "−$X" rojo (#e5484d), a 16 px, sube 24 px y se desvanece en 1 s.
@@ -405,7 +411,8 @@ type Scene interface {
 
 ### 10.3 Sprites y animaciones
 - Personajes por capas: cuerpo (tono de piel), pelo, camisa y sombrero. La camisa va en escala de grises y se tiñe con `ColorScale`.
-  - **Cómo quedó (F3a, 2026-10-11)**: el paciente se dibuja cuerpo → camisa → pelo → sombrero y el médico con su hoja (`staff_doctor_skin*`, 64 × 120: quieto, caminar abajo, arriba e izquierda, y atender) y el pelo del paciente encima; todas las capas con el mismo cuadro y la misma GeoM (`gui/ui/layers.go`). Camisa y pelo vienen en gris y se tiñen: camisas con los 6 colores del catálogo de sprites (azul, rojo, verde, amarillo, turquesa y naranja) y pelo con negro #2e2a28, castaño oscuro #5b3a24, castaño claro #9c6b3f y canoso #d9d6d0. Calvo y "sin sombrero" no tienen capa. Un tono de piel sin hoja (hoy la piel 2) usa la 1. En el médico el pelo usa el mismo cuadro al estar quieto y caminar, y el cuadro 1 de quieto al atender (la cabeza no se mueve). El sombrero no se dibuja dormido: se cae al desplomarse y vuelve al despertarse (así vienen las hojas). En la demo la apariencia sale de `game.RandomAppearance` con una semilla sacada del ID, y el médico que atiende un episodio hace la animación de atender a su lado antes de llevárselo. El camillero sigue como rectángulo hasta que tenga sprite.
+  - **Cómo quedó (F3a, 2026-10-11)**: el paciente se dibuja cuerpo → camisa → pelo → sombrero y el médico con su hoja (`staff_doctor_skin*`, 64 × 120: quieto, caminar abajo, arriba e izquierda, y atender) y el pelo del paciente encima; todas las capas con el mismo cuadro y la misma GeoM (`gui/ui/layers.go`). Camisa y pelo vienen en gris y se tiñen: camisas con los 6 colores del catálogo de sprites (azul, rojo, verde, amarillo, turquesa y naranja) y pelo con negro #2e2a28, castaño oscuro #5b3a24, castaño claro #9c6b3f y canoso #d9d6d0. Calvo y "sin sombrero" no tienen capa. Un tono de piel sin hoja (hoy la piel 2) usa la 1. En el médico el pelo usa el mismo cuadro al estar quieto y caminar, y el cuadro 1 de quieto al atender (la cabeza no se mueve). El sombrero no se dibuja dormido: se cae al desplomarse y vuelve al despertarse (así vienen las hojas). En la demo la apariencia sale de `game.RandomAppearance` con una semilla sacada del ID, y el médico que atiende un episodio hace la animación de atender a su lado antes de llevárselo. El camillero sigue como rectángulo hasta que tenga sprite *(ya lo tiene desde F4: ver abajo)*.
+  - **Cómo quedó (F4, 2026-10-16)**: el camillero tiene su hoja (`staff_orderly_skin{1,3,4}.png`, pijama verde como la maqueta, aprobada el 2026-10-15). Tiene el mismo formato que la del médico, pero la fila 5 es **empujar** en vez de atender. Se dibuja igual que el médico (`drawOrderlySprite`/`orderlyLayers`): su hoja con el pelo del paciente encima, y en la fila de empujar el pelo usa la de caminar a la izquierda. Mientras mueve la camilla usa la animación de empujar. Un médico que empuja (porque no había camillero libre) sigue con la de caminar, porque su hoja no tiene fila de empujar.
 - Spritesheet PNG: **una fila por animación, una columna por cuadro**, cuadros de 16 × 24 px. La animación hacia la derecha es la de la izquierda volteada con `GeoM.Scale(-1, 1)`.
 - Primer sprite: `gui/assets/sprites/patient_body_skin1.png` (cuerpo base), de 64 × 240 px = 4 columnas × 10 filas. Las filas van en el orden de la tabla: quieto, caminar abajo, caminar arriba, caminar izquierda, aviso de sueño, desplomarse, dormido en el piso, dormido en cama, despertarse y alta. Las animaciones de 2 cuadros dejan vacías las columnas 3 y 4.
 
@@ -511,6 +518,7 @@ salga. `gui/main.go`, `gui/ui/agent.go`, `gui/ui/agent_hooks.go` y `gui/ui/scrip
   | `game` | una partida nueva (`newGameScene`, **sin** arrancar la goroutine motor: ver determinismo). |
   | `pause` | una partida nueva, con el menú de pausa encima (`newPauseScene`). |
   | `report` | corre la demostración completa (los 12 pasos) y muestra su Shift Report. |
+  | `hiring` | una partida nueva con la bolsa de empleo ya abierta (sin la animación de abrir). |
 
 - **El guion** (`-input`), una instrucción por línea (`#` al principio o línea vacía: se ignoran); `gui/ui/script.go` valida todo antes de correr nada, con el número de línea en el error:
 
@@ -526,7 +534,7 @@ salga. `gui/main.go`, `gui/ui/agent.go`, `gui/ui/agent_hooks.go` y `gui/ui/scrip
   | `dump ruta.json` | el estado que dibuja la escena (ver abajo), en ese momento. |
   | `quit` | termina la corrida ahí mismo. |
 
-  Los nombres de tecla válidos son justo las que lee alguna escena del juego (`scriptKeys` en `script.go`): `Escape`, `Space`, `Enter`, `NumpadEnter`, `ArrowUp`, `ArrowDown`, `W`, `S`, `Shift`, `C`, `A`. Un nombre que no esté ahí es un error claro al cargar el guion.
+  Los nombres de tecla válidos son justo las que lee alguna escena del juego (`scriptKeys` en `script.go`): `Escape`, `Space`, `Enter`, `NumpadEnter`, `ArrowUp`, `ArrowDown`, `ArrowLeft`, `ArrowRight`, `W`, `S`, `Shift`, `C`, `A`. Un nombre que no esté ahí es un error claro al cargar el guion.
 
 - **Determinismo** (GAME_DESIGN §11: "los tests llaman `Tick` a mano"; esto es lo mismo). `-agent` reemplaza tres relojes de prueba:
   1. `seedSource` (`gui/ui/seed.go`): en vez de la hora, da `-seed` fija. La usan `NewGameScene`, `newGameScene` (tráfico) y `NewDemoScene` (tráfico).
