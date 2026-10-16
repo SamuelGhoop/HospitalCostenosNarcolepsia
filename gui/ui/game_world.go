@@ -179,9 +179,7 @@ func (s *GameScene) sync() {
 		f := figure{id: st.ID, doctor: st.IsDoctor, look: st.Look, target: home}
 		if _, seen := s.pos[st.ID]; !seen {
 			s.pos[st.ID] = home // el personal empieza en su sala
-			if st.IsDoctor {
-				s.staff[st.ID] = &staffAnim{}
-			}
+			s.staff[st.ID] = &staffAnim{}
 		}
 		if a.activity == game.GoingToReview && st.Activity != game.GoingToReview {
 			a.attend, a.attendAt = attendTicks, s.pos[st.ID] // acaba de revisar: atiende junto a la cama
@@ -331,7 +329,11 @@ func (s *GameScene) animate() {
 			pa.step(now.x-old.x, now.y-old.y, s.onBed(f))
 		}
 		if sa, ok := s.staff[f.id]; ok {
-			sa.step(now.x-old.x, now.y-old.y, a.attend > 0 && now == old)
+			c := s.carryOf(f.id)
+			// Solo el camillero tiene fila de empujar; un médico que empuja
+			// (no había camillero libre) sigue con la animación de caminar.
+			pushing := !f.doctor && c != nil && c.visible() && c.order.pusher == f.id
+			sa.step(now.x-old.x, now.y-old.y, a.attend > 0 && now == old, pushing)
 		}
 		if a.attend > 0 && now == f.target {
 			a.attend--

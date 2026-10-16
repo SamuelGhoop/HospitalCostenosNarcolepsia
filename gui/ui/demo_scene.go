@@ -151,7 +151,11 @@ func (s *DemoScene) animate() {
 			a.step(now.x-old.x, now.y-old.y, s.onBed(f))
 		}
 		if a, ok := s.staff[f.id]; ok {
-			a.step(now.x-old.x, now.y-old.y, s.choreo != nil && s.choreo.attending() == f.id)
+			c := s.carryOf(f.id)
+			// Solo el camillero tiene fila de empujar; un médico que empuja
+			// (no había camillero libre) sigue con la animación de caminar.
+			pushing := !f.doctor && c != nil && c.visible() && c.order.pusher == f.id
+			a.step(now.x-old.x, now.y-old.y, s.choreo != nil && s.choreo.attending() == f.id, pushing)
 		}
 	}
 
@@ -310,9 +314,7 @@ func (s *DemoScene) refresh() {
 		f := figure{id: st.ID, doctor: st.IsDoctor, target: toVec(slot(zoneStaffRoom, i)), look: demoLook(st.ID)}
 		if _, seen := s.pos[st.ID]; !seen {
 			s.pos[st.ID] = f.target // el personal aparece directo en su sala
-			if st.IsDoctor {
-				s.staff[st.ID] = &staffAnim{}
-			}
+			s.staff[st.ID] = &staffAnim{}
 		}
 		s.figures = append(s.figures, f)
 	}

@@ -18,8 +18,8 @@ func TestDemo_TransfersGoOnAStretcher(t *testing.T) {
 	needFonts(t)
 	s := NewDemoScene(game.NewDemo())
 	type seen struct {
-		appearedNear, rode, pushedFromBehind, onBed bool
-		doctor                                      bool
+		appearedNear, rode, pushedFromBehind, onBed, pushAnim bool
+		doctor                                                bool
 	}
 	carries := map[string]*seen{} // por paciente
 	for step := 1; step <= 11; step++ {
@@ -65,6 +65,9 @@ func TestDemo_TransfersGoOnAStretcher(t *testing.T) {
 					t.Fatalf("paso %d, tick %d: yendo %v la camilla mide %v", step, tick, c.dir, c.fp.Size())
 				}
 				cs.pushedFromBehind = true
+				if s.staff[o.pusher].anim == animPush {
+					cs.pushAnim = true
+				}
 				for _, f := range s.figures { // la camilla no pisa a nadie que esté quieto
 					if s.inCarry(f.id) || (f.patient && s.onBed(f)) || s.pos[f.id] != s.destination(f) || s.pos[f.id].x >= ScreenWidth {
 						continue
@@ -84,6 +87,12 @@ func TestDemo_TransfersGoOnAStretcher(t *testing.T) {
 		if !cs.appearedNear || !cs.rode || !cs.pushedFromBehind || !cs.onBed {
 			t.Errorf("%s: apareció la camilla junto a él=%v, fue encima=%v, empujada desde atrás=%v, terminó en la cama=%v",
 				patient, cs.appearedNear, cs.rode, cs.pushedFromBehind, cs.onBed)
+		}
+		// El camillero empuja con la animación de empujar (fila 5 de SU
+		// hoja); el médico, cuando no había camillero libre, sigue con la
+		// de caminar (su hoja no tiene esa fila).
+		if cs.pushAnim != !cs.doctor {
+			t.Errorf("%s: empujó con la animación de empujar=%v; se esperaba %v (doctor=%v)", patient, cs.pushAnim, !cs.doctor, cs.doctor)
 		}
 		if cs.doctor {
 			doctors++

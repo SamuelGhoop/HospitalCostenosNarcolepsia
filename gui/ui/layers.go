@@ -32,9 +32,10 @@ type layer struct {
 // Las hojas de cada pieza. Un tono de piel por índice de SkinTone (4 tonos,
 // GAME_DESIGN §7); el pelo calvo y "sin sombrero" no tienen hoja.
 var (
-	bodySheets   = skinSheets(assets.Sprites, "patient_body")
-	doctorSheets = skinSheets(assets.Sprites, "staff_doctor")
-	shirtSheets  = map[game.ShirtPattern]string{
+	bodySheets    = skinSheets(assets.Sprites, "patient_body")
+	doctorSheets  = skinSheets(assets.Sprites, "staff_doctor")
+	orderlySheets = skinSheets(assets.Sprites, "staff_orderly")
+	shirtSheets   = map[game.ShirtPattern]string{
 		game.PlainShirt:   "sprites/patient_shirt_lisa.png",
 		game.FloralShirt:  "sprites/patient_shirt_florida.png",
 		game.StripedShirt: "sprites/patient_shirt_rayas.png",
@@ -113,6 +114,23 @@ func doctorLayers(look game.Appearance, a animation, frame int) []layer {
 		ha, hf := a, frame
 		if a == animAttend {
 			ha, hf = animIdle, 0
+		}
+		ls = append(ls, layer{hairSheets[look.Hair], frameRect(ha, hf), hairPalette[look.HairColor]})
+	}
+	return ls
+}
+
+// orderlyLayers son las capas de un camillero: su hoja (uniforme, sin camisa
+// ni sombrero) y el pelo del paciente encima. En quieto y caminando el pelo
+// usa el mismo cuadro que el cuerpo; empujando la camilla (fila 5 de SU
+// hoja) la cabeza no se mueve distinto de caminar a la izquierda, así que
+// el pelo usa esa fila, columna por columna (GAME_DESIGN §10.3).
+func orderlyLayers(look game.Appearance, a animation, frame int) []layer {
+	ls := []layer{{orderlySheets[look.SkinTone], staffRect(a, frame), nil}}
+	if look.Hair != game.Bald {
+		ha, hf := a, frame
+		if a == animPush {
+			ha, hf = animWalkLeft, frame
 		}
 		ls = append(ls, layer{hairSheets[look.Hair], frameRect(ha, hf), hairPalette[look.HairColor]})
 	}

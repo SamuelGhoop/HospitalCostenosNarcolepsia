@@ -47,6 +47,17 @@ func TestSpriteSheets_AllEmbeddedWithTheirSizes(t *testing.T) {
 			t.Errorf("%s mide %v; se esperaba %v", p, got, doctor)
 		}
 	}
+	// El camillero tiene el mismo formato que el médico (4×5), pero su
+	// quinta fila es empujar, no atender.
+	for _, p := range orderlySheets {
+		img, err := decodePNG(assets.Sprites, p)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := img.Bounds().Size(); got != doctor {
+			t.Errorf("%s mide %v; se esperaba %v (5 filas)", p, got, doctor)
+		}
+	}
 	if len(shirtSheets) != 3 || len(hairSheets) != 3 || len(hatSheets) != 2 {
 		t.Errorf("hay %d camisas, %d pelos y %d sombreros; se esperaban 3, 3 (calvo no tiene hoja) y 2 (sin sombrero tampoco)",
 			len(shirtSheets), len(hairSheets), len(hatSheets))
@@ -133,6 +144,40 @@ func TestDoctorLayers_HairFrames(t *testing.T) {
 	look.Hair = game.Bald
 	if got := doctorLayers(look, animIdle, 0); len(got) != 1 {
 		t.Errorf("médico calvo: %d capas; se esperaba solo el cuerpo", len(got))
+	}
+}
+
+// El camillero: su hoja (uniforme) y encima el pelo del paciente. En quieto
+// y caminando el pelo usa el mismo cuadro; empujando (fila 5 de SU hoja) el
+// pelo usa la fila de caminar a la izquierda, columna por columna (la
+// cabeza no se mueve distinto en las dos).
+func TestOrderlyLayers_PushUsesWalkLeftHairRow(t *testing.T) {
+	look := game.Appearance{SkinTone: 1, Hair: game.BraidsHair, HairColor: 0}
+	for _, c := range []struct {
+		a     animation
+		frame int
+	}{{animIdle, 0}, {animWalkDown, 2}, {animWalkLeft, 1}} {
+		want := []layer{
+			{orderlySheets[1], frameRect(c.a, c.frame), nil},
+			{"sprites/patient_hair_trenzas.png", frameRect(c.a, c.frame), hairPalette[0]},
+		}
+		if got := orderlyLayers(look, c.a, c.frame); !reflect.DeepEqual(got, want) {
+			t.Errorf("%v cuadro %d: %+v\nse esperaba %+v", c.a, c.frame, got, want)
+		}
+	}
+
+	got := orderlyLayers(look, animPush, 2)
+	wantBody := image.Rect(2*cellWidth, 4*cellHeight, 3*cellWidth, 5*cellHeight)
+	if got[0].rect != wantBody {
+		t.Errorf("empujando, cuerpo: %v; se esperaba la fila 5, cuadro 3: %v", got[0].rect, wantBody)
+	}
+	if want := frameRect(animWalkLeft, 2); got[1].rect != want {
+		t.Errorf("empujando, pelo: %v; se esperaba la fila de caminar a la izquierda, cuadro 3: %v", got[1].rect, want)
+	}
+
+	look.Hair = game.Bald
+	if got := orderlyLayers(look, animIdle, 0); len(got) != 1 {
+		t.Errorf("camillero calvo: %d capas; se esperaba solo el cuerpo", len(got))
 	}
 }
 

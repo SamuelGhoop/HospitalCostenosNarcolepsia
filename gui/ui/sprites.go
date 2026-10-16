@@ -27,7 +27,8 @@ const (
 	animSleepBed                    // dormido en cama
 	animWakeUp                      // despertarse
 	animWave                        // alta (saluda)
-	animAttend                      // atender (solo el personal: fila 5 de su hoja, ver staffRect)
+	animAttend                      // atender (solo el médico: fila 5 de su hoja, ver staffRect)
+	animPush                        // empujar la camilla (solo el camillero: fila 5 de SU hoja)
 )
 
 // animSpec dice cuántos cuadros tiene una animación, cuántos ticks dura
@@ -54,6 +55,7 @@ var animSpecs = [...]animSpec{
 	animWakeUp:     {4, 9, false},
 	animWave:       {4, 9, false}, // en la demo saluda una sola vez
 	animAttend:     {4, 9, false}, // atiende una vez al llegar junto al paciente
+	animPush:       {4, 8, true},  // empuja la camilla al mismo ritmo que camina
 }
 
 // attendTicks: lo que dura atender (4 cuadros × 9 ticks).
@@ -67,10 +69,12 @@ func frameRect(a animation, i int) image.Rectangle {
 }
 
 // staffRect es el recorte en una hoja del personal: las 4 primeras filas
-// son las mismas del paciente (quieto y caminar) y la 5 es atender.
+// son las mismas del paciente (quieto y caminar) y la 5 es la propia de cada
+// hoja (atender en la del médico, empujar en la del camillero: la misma
+// fila 4, cada uno con la suya).
 func staffRect(a animation, i int) image.Rectangle {
 	row := int(a)
-	if a == animAttend {
+	if a == animAttend || a == animPush {
 		row = 4
 	}
 	x, y := i*cellWidth, row*cellHeight
@@ -159,6 +163,7 @@ func decodePNG(fsys fs.FS, path string) (image.Image, error) {
 // capas (las de piel repetidas se cargan una vez).
 func loadSprites() error {
 	paths := append(bodySheets[:], doctorSheets[:]...) // el arreglo está lleno: append copia
+	paths = append(paths, orderlySheets[:]...)
 	for _, p := range shirtSheets {
 		paths = append(paths, p)
 	}

@@ -21,12 +21,19 @@ func (a *staffAnim) keep(an animation) {
 }
 
 // step avanza un tick. dx, dy es cuánto se movió en este tick; attending
-// dice si la coreografía lo tiene atendiendo a un paciente. Al parar ahí
-// hace atender una vez y después queda quieto.
-func (a *staffAnim) step(dx, dy float64, attending bool) {
+// dice si la coreografía lo tiene atendiendo a un paciente (solo médicos) y
+// pushing si está empujando una camilla (solo camilleros; con un médico
+// empujando porque no había camillero libre, sigue caminando: su hoja no
+// tiene fila de empujar). Al parar junto al paciente hace atender una vez y
+// después queda quieto.
+func (a *staffAnim) step(dx, dy float64, attending, pushing bool) {
 	a.ticks++
 	moving := dx != 0 || dy != 0
 	switch {
+	case moving && pushing:
+		a.attended = false
+		a.keep(animPush)
+		a.flip = dx > 0 // la fila de empujar es "hacia la izquierda"; a la derecha se voltea
 	case moving:
 		a.attended = false // en la próxima parada puede volver a atender
 		an, flip := walkAnimation(dx, dy)

@@ -2,8 +2,6 @@ package ui
 
 import (
 	"image"
-	"image/color"
-	"math"
 
 	"github.com/hajimehoshi/ebiten/v2"
 
@@ -19,7 +17,7 @@ type figure struct {
 	state   hospital.PatientState
 	level   hospital.NarcolepsyLevel
 	room    int             // habitación con cama asignada en el modelo; 0 = ninguna
-	look    game.Appearance // cómo se ve (el camillero todavía no la usa: va como rectángulo)
+	look    game.Appearance // cómo se ve
 	target  vec             // puesto final según la foto del modelo (sin coreografía)
 }
 
@@ -28,14 +26,13 @@ type figure struct {
 // figureOverlays, porque se dibujan encima de todo (incluida la cobija).
 // pa es la animación del paciente y sa la del médico (nil si no aplica).
 func drawFigureBody(dst *ebiten.Image, f figure, at vec, pa *patientAnim, sa *staffAnim) {
-	x, y := int(math.Round(at.x)), int(math.Round(at.y))
 	switch {
 	case f.patient:
 		drawPatientSprite(dst, f, at, pa)
 	case f.doctor:
 		drawDoctorSprite(dst, f, at, sa)
 	default:
-		drawStanding(dst, x, y, colGreen, colGreenDark) // uniforme verde del camillero
+		drawOrderlySprite(dst, f, at, sa)
 	}
 }
 
@@ -84,16 +81,17 @@ func drawDoctorSprite(dst *ebiten.Image, f figure, at vec, a *staffAnim) {
 	drawLayers(dst, doctorLayers(f.look, a.anim, frame), g)
 }
 
-// drawStanding: personaje de pie (cabeza, tronco y piernas) con contorno.
-// Las medidas están en píxeles de la hoja (un cuadro de 16×24) y se
-// escalan como los sprites, así el personal mide lo mismo que los pacientes.
-// Lo usa el camillero mientras llega su sprite.
-func drawStanding(dst *ebiten.Image, x, y int, body, legs color.RGBA) {
-	at := image.Pt(x, y)
-	fillRect(dst, scaleRect(image.Rect(3, 2, 13, 23)).Add(at), colInk) // contorno
-	fillRect(dst, scaleRect(image.Rect(4, 3, 12, 9)).Add(at), colSkin) // cabeza
-	fillRect(dst, scaleRect(image.Rect(4, 10, 12, 17)).Add(at), body)  // tronco
-	fillRect(dst, scaleRect(image.Rect(4, 18, 12, 22)).Add(at), legs)  // piernas
+// drawOrderlySprite dibuja al camillero (su hoja y el pelo encima) en el
+// cuadro actual de su animación: quieto, caminando o empujando la camilla
+// (fila 5 de su hoja). Igual que el médico, solo se voltea caminando a la
+// derecha o empujando hacia la derecha.
+func drawOrderlySprite(dst *ebiten.Image, f figure, at vec, a *staffAnim) {
+	if a == nil {
+		a = &staffAnim{} // sin animación todavía: quieto
+	}
+	frame := frameAt(a.anim, a.ticks)
+	g, _ := spritePlacement(a.anim, frame, vec{}, false, at, a.flip)
+	drawLayers(dst, orderlyLayers(f.look, a.anim, frame), g)
 }
 
 // toVec convierte un punto entero de la pantalla en un vec.
