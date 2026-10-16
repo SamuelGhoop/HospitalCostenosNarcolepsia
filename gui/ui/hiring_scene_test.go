@@ -175,3 +175,38 @@ func TestHiring_UnaffordableHireDoesNothing(t *testing.T) {
 		t.Error("contrató a un candidato sin plata para pagarle")
 	}
 }
+
+// BUG (commit 2a6253d): "DRA. YORLEDIS CASSIANI" a 24 px se salía del papel
+// por la derecha (pasaba de x = 946). "DRA. YORLEDIS CASSIANI" y
+// "DR. DAGOBERTO CANTILLO" son la combinación título+nombre+apellido más
+// larga de las listas de GAME_DESIGN §7 (22 letras las dos), ya en
+// mayúsculas como las dibuja drawCandidateName. fitCandidateName tiene que
+// bajar a 16 px (o partir en dos renglones) para que el ancho dibujado
+// quepa en la columna, de x = 526 a x = 946.
+func TestFitCandidateName_LongestNameFits(t *testing.T) {
+	for _, name := range []string{"DRA. YORLEDIS CASSIANI", "DR. DAGOBERTO CANTILLO"} {
+		lines, size := fitCandidateName(name, candidateNameMaxWidth)
+		if len(lines) == 0 {
+			t.Fatalf("%q: fitCandidateName no devolvió ningún renglón", name)
+		}
+		for _, l := range lines {
+			if w := pixelTextWidth(l, size); w > candidateNameMaxWidth {
+				t.Errorf("%q: el renglón %q a %v px mide %d px; no cabe en %d", name, l, size, w, candidateNameMaxWidth)
+			}
+		}
+		// A 24 px (el tamaño de la vista aprobada) este nombre no cabe: si
+		// fitCandidateName no hubiera bajado el tamaño, seguiría dando 24.
+		if size == 24 {
+			t.Errorf("%q: fitCandidateName devolvió 24 px; a ese tamaño no cabe (ese era el bug)", name)
+		}
+	}
+}
+
+// Un nombre que sí cabe a 24 px (el caso normal) se dibuja en un solo
+// renglón a 24 px, sin bajarlo de tamaño.
+func TestFitCandidateName_ShortNameKeeps24(t *testing.T) {
+	lines, size := fitCandidateName("DR. ÉDER POLO", candidateNameMaxWidth)
+	if len(lines) != 1 || size != 24 {
+		t.Errorf("fitCandidateName(%q) = %v, %v; se esperaba un renglón a 24 px", "DR. ÉDER POLO", lines, size)
+	}
+}

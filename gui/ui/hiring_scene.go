@@ -5,6 +5,7 @@ import (
 	"image"
 	"image/color"
 	"math"
+	"strings"
 
 	"github.com/hajimehoshi/ebiten/v2"
 
@@ -241,6 +242,67 @@ var (
 	hireButton     = image.Rect(976, 640, 976+120, 640+68) // el cuerpo del portapapeles chiquito del HUD
 )
 
+// ─── Nombre del candidato ──────────────────────────────────────────────
+
+// candidateNameMaxWidth es lo que mide la columna de datos de la hoja, de
+// x = 526 a x = 946 (HIRING_ASSETS.md): el nombre tiene que caber ahí.
+const candidateNameMaxWidth = 946 - 526
+
+// candidateNameLineGap es cuánto baja el segundo renglón del nombre cuando
+// hay que partirlo en dos (BUG F4: a 24 px "Dra. Yorledis Cassiani" se salía
+// del papel). No pisa el rol, que va en y = 250.
+const candidateNameLineGap = 18
+
+// fitCandidateName decide a qué tamaño y en cuántos renglones cabe name en
+// maxWidth: primero prueba 24 px (el tamaño de la vista aprobada); si no
+// cabe, 16 px; si tampoco cabe entero, lo parte en dos renglones por
+// palabras a 16 px. Con los nombres de GAME_DESIGN §7 nunca hace falta
+// partir (el más largo entra a 16 px), pero queda listo si algún día se
+// agrega un nombre más largo a las listas.
+func fitCandidateName(name string, maxWidth int) (lines []string, size float64) {
+	if pixelTextWidth(name, 24) <= maxWidth {
+		return []string{name}, 24
+	}
+	if pixelTextWidth(name, 16) <= maxWidth {
+		return []string{name}, 16
+	}
+	return wrapNameInTwoLines(name, maxWidth, 16), 16
+}
+
+// wrapNameInTwoLines llena el primer renglón con todas las palabras que
+// quepan en maxWidth y deja el resto en el segundo. Si una sola palabra ya
+// no cabe (no pasa con los nombres de §7), se deja como está: no hay por
+// dónde partirla.
+func wrapNameInTwoLines(name string, maxWidth int, size float64) []string {
+	words := strings.Fields(name)
+	if len(words) == 0 {
+		return []string{name}
+	}
+	line1 := words[0]
+	i := 1
+	for i < len(words) {
+		grown := line1 + " " + words[i]
+		if pixelTextWidth(grown, size) > maxWidth {
+			break
+		}
+		line1 = grown
+		i++
+	}
+	if i >= len(words) {
+		return []string{line1}
+	}
+	return []string{line1, strings.Join(words[i:], " ")}
+}
+
+// drawCandidateName dibuja el nombre del candidato con fitCandidateName, con
+// la esquina de arriba a la izquierda en (x, y).
+func drawCandidateName(dst *ebiten.Image, name string, x, y, maxWidth int) {
+	lines, size := fitCandidateName(name, maxWidth)
+	for i, line := range lines {
+		drawPixelText(dst, line, x, y+i*candidateNameLineGap, size, []textLayer{{0, 0, colInk}}, 1)
+	}
+}
+
 // hiringImgs son las imágenes de la bolsa y del portapapeles chiquito del
 // HUD, por nombre de archivo. Las carga loadHiring.
 var hiringImgs = map[string]*ebiten.Image{}
@@ -373,14 +435,17 @@ func (s *HiringScene) drawPage(dst *ebiten.Image, c game.CandidateView, i, n int
 	dst.DrawImage(candidateCell(c), op)
 	pixelTextCentered(dst, fmt.Sprintf("%d/%d", i+1, n), 414, y(444), 16, []textLayer{{0, 0, colInk}})
 
-	// Los datos, en la columna de la derecha.
-	drawPixelText(dst, c.Name, 526, y(210), 24, []textLayer{{0, 0, colInk}}, 1)
-	role, roleColor := "CAMILLERO", colGreenDark
+	// Los datos, en la columna de la derecha. La vista aprobada va toda en
+	// mayúsculas (ROSA MENDOZA, MEDICINA DEL SUEÑO...); es solo
+	// presentación, strings.ToUpper al dibujar, nunca sobre los datos de
+	// game/ (accentMarks ya sabe dibujar la tilde de las mayúsculas).
+	drawCandidateName(dst, strings.ToUpper(c.Name), 526, y(210), candidateNameMaxWidth)
+	roleColor := colGreenDark
 	if c.IsDoctor {
-		role, roleColor = "MÉDICO", colBlue
+		roleColor = colBlue
 	}
-	drawPixelText(dst, role, 526, y(250), 16, []textLayer{{0, 0, roleColor}}, 1)
-	drawPixelText(dst, c.Specialty, 526, y(276), 16, []textLayer{{0, 0, colMuted}}, 1)
+	drawPixelText(dst, strings.ToUpper(c.RoleLabel), 526, y(250), 16, []textLayer{{0, 0, roleColor}}, 1)
+	drawPixelText(dst, strings.ToUpper(c.Specialty), 526, y(276), 16, []textLayer{{0, 0, colMuted}}, 1)
 	drawPixelText(dst, fmt.Sprintf("EDAD: %d", c.Age), 526, y(302), 16, []textLayer{{0, 0, colMuted}}, 1)
 	fillRect(dst, image.Rect(526, y(328), 526+420, y(328)+2), colPaperShade)
 
