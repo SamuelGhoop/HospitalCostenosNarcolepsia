@@ -652,6 +652,16 @@ Samuel aprobó las recomendaciones ("Hazlo") y agregó: *"lo que hay de juego en
 - La lógica de F4 (candidatos, `Hire`, nómina, quiebra y `DayReport`) está en `game/`, con TDD y 4 contrapruebas.
 - La nómina se paga en el `Tick` de las 20:00 y no en `StartNextDay`. Se corrigió el comentario de `game.go` que decía lo contrario.
 - Falta en `gui/`: la bolsa de empleo, el reporte del día y el Game Over con la quiebra.
+
+### 12.8 Prueba de Samuel (2026-10-16)
+Samuel: *"Las animaciones ya están mejor así, ahora la animación de empujar la camilla es solo lateral entonces cuando se mueven abajo o arribala animación no se ve en la dirección correcta, también no se si estoy jugandolo mal pero me estaban bajando las estrellas solas. Los menus de game over Como el de quiebra o el reporte no mantienen la estética de la letra"*.
+- ✅ El movimiento cuadriculado queda aprobado ("ya están mejor así").
+- **Empujar hacia arriba y hacia abajo**: la hoja del camillero suma dos filas (6: empujar_abajo, 7: empujar_arriba; pasa a 64 × 168).
+- **Por qué bajan las estrellas** (Samuel eligió las tres opciones):
+  - **Aviso con el motivo** cada vez que bajan, por ejemplo "−0,5 ★ P-003 lleva 20 s esperando revisión" o "−0,5 ★ P-005 se fue enojado". `game/` expone los cambios de reputación con su motivo como valores.
+  - **Ícono "falta el médico"** sobre el paciente que ya está en la cama pero sin revisar.
+  - **Más margen**: el primer −0,5 ★ llega a los **30 s** de espera en vez de 20 (§5.9; constante en `config.go`). Lo demás queda igual.
+- **Letra**: Press Start 2P en **toda** la interfaz, incluidos los rótulos del mapa, los IDs, los tooltips y los subtítulos de la demo. Reemplaza la regla de §9.3 de usarla solo en la portada, los créditos y el aviso.
 ---
 
 ## 13. Notas para la sustentación
