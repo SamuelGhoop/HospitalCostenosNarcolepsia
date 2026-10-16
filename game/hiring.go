@@ -21,6 +21,24 @@ type candidate struct {
 	skill     int        // 1 a maxStat; 0 en los camilleros
 	salary    int        // sueldo diario; también el costo de contratarlo (§5.8)
 	look      Appearance // sorteada con el azar cosmético, como el resto del personal
+	female    bool       // mismo sorteo que decide "Dr."/"Dra." en el nombre (§6, F4): decide "Médica"/"Camillera" en RoleLabel
+}
+
+// roleLabel decide cómo se llama el rol en la hoja del candidato (§6, F4):
+// la vista aprobada usa "MÉDICA" para una doctora, así que el rol lleva
+// género, con el mismo dato que ya puso "Dra." en el nombre. gui/ui solo
+// dibuja esta palabra (en mayúsculas): no vuelve a decidir el género.
+func roleLabel(isDoctor, female bool) string {
+	switch {
+	case isDoctor && female:
+		return "Médica"
+	case isDoctor:
+		return "Médico"
+	case female:
+		return "Camillera"
+	default:
+		return "Camillero"
+	}
 }
 
 // view copia el candidato a una vista de solo valores para el Snapshot.
@@ -30,6 +48,7 @@ func (c *candidate) view(money int) CandidateView {
 	return CandidateView{
 		IsDoctor:   c.isDoctor,
 		Name:       c.name,
+		RoleLabel:  roleLabel(c.isDoctor, c.female),
 		Specialty:  c.specialty,
 		Age:        c.age,
 		Speed:      c.speed,
@@ -54,6 +73,7 @@ type HireLine struct {
 type CandidateView struct {
 	IsDoctor   bool
 	Name       string
+	RoleLabel  string // "Médico"/"Médica"/"Camillero"/"Camillera" (§6, F4): ya decidido por el juego, gui/ui solo lo dibuja
 	Specialty  string // "" en los camilleros
 	Age        int
 	Speed      int
@@ -97,9 +117,11 @@ func (g *Game) newCandidateLocked() *candidate {
 	look := RandomAppearance(g.looks) // azar cosmético: no toca la secuencia de g.rng ni la de g.hiring
 	if g.hiring.Intn(100) < doctorChancePercent {
 		speed, skill := weightedStat(g.hiring), weightedStat(g.hiring)
+		name, female := doctorNameAndGender(g.hiring)
 		return &candidate{
 			isDoctor:  true,
-			name:      doctorName(g.hiring),
+			name:      name,
+			female:    female,
 			age:       age,
 			specialty: doctorSpecialties[g.hiring.Intn(len(doctorSpecialties))],
 			speed:     speed,
@@ -108,11 +130,14 @@ func (g *Game) newCandidateLocked() *candidate {
 			look:      look,
 		}
 	}
-	name, _ := randomName(g.hiring) // _ : a los camilleros no se les pone título
+	// El camillero no lleva título, pero su nombre sale de la misma lista
+	// con género (§7): female decide "Camillera" en RoleLabel.
+	name, female := randomName(g.hiring)
 	speed := weightedStat(g.hiring)
 	return &candidate{
 		isDoctor: false,
 		name:     name,
+		female:   female,
 		age:      age,
 		speed:    speed,
 		salary:   orderlySalary(speed),

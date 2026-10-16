@@ -26,13 +26,22 @@ func randomName(rng *rand.Rand) (name string, female bool) {
 	return first + " " + surnames[rng.Intn(len(surnames))], female
 }
 
+// doctorNameAndGender es como doctorName, pero además devuelve female: lo
+// usa la bolsa de empleo (§6, F4) para decidir "Médica" en la hoja del
+// candidato con el mismo sorteo que ya pone "Dra." en el nombre, sin volver
+// a tirar el dado.
+func doctorNameAndGender(rng *rand.Rand) (name string, female bool) {
+	n, female := randomName(rng)
+	if female {
+		return "Dra. " + n, true
+	}
+	return "Dr. " + n, false
+}
+
 // doctorName es un nombre al azar con su título: "Dra. Yeimy Polo".
 func doctorName(rng *rand.Rand) string {
-	name, female := randomName(rng)
-	if female {
-		return "Dra. " + name
-	}
-	return "Dr. " + name
+	name, _ := doctorNameAndGender(rng)
+	return name
 }
 
 // randomAge devuelve una edad al azar entre lo y hi, los dos incluidos.
