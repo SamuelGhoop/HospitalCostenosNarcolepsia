@@ -310,6 +310,7 @@ La demo no cambia: sigue el round-robin real de la Sección 6 (sección 4).
   - CONTRATAR llama `Game.Hire(i)`. Si no alcanza la plata, el botón sale en gris con "TE FALTAN $ X" y el clic no hace nada. Si ya se contrató a los 3, sale un aviso simple en el tablero.
   - En el portapapeles chiquito se ve la cabeza ×3 del candidato de turno, que cambia cada 2 s.
   - La flecha presionada (`_1`) se ve 0,10 s después del clic o de la tecla: el juego solo lee el clic recién apretado.
+  - La hoja va toda en mayúsculas, como la vista aprobada; la conversión la hace la interfaz al dibujar, y los datos de `game/` no cambian. Si el nombre no cabe a 24 px baja a 16 px, y si tampoco cabe se parte en dos renglones. `CandidateView.RoleLabel` ("Médico", "Médica", "Camillero" o "Camillera") sale del mismo sorteo que pone "Dr."/"Dra." en el nombre (2026-10-16).
 
 ---
 
