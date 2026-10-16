@@ -36,7 +36,7 @@ import (
 
 func main() {
 	agent := flag.Bool("agent", false, "modo de prueba: sin ventana de juego normal, arranca directo en -scene")
-	scene := flag.String("scene", "title", "con -agent: escena de arranque (title, demo, game, report, pause)")
+	scene := flag.String("scene", "title", "con -agent: escena de arranque (title, demo, game, report, pause, hiring)")
 	step := flag.Int("step", 0, "con -agent -scene demo: paso al que salta (1 a 12); 0 = desde el principio")
 	seed := flag.Int64("seed", 1, "con -agent: semilla del azar de la partida/demo y del tráfico")
 	input := flag.String("input", "", "con -agent: guion de instrucciones (una por línea); ver gui/main.go")

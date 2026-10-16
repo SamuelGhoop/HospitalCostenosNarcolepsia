@@ -50,6 +50,8 @@ var scriptKeys = map[string]ebiten.Key{
 	"NumpadEnter": ebiten.KeyNumpadEnter,
 	"ArrowUp":     ebiten.KeyArrowUp,
 	"ArrowDown":   ebiten.KeyArrowDown,
+	"ArrowLeft":   ebiten.KeyArrowLeft,
+	"ArrowRight":  ebiten.KeyArrowRight,
 	"W":           ebiten.KeyW,
 	"S":           ebiten.KeyS,
 	"Shift":       ebiten.KeyShift,

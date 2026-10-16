@@ -38,3 +38,9 @@ var Fonts embed.FS
 //
 //go:embed pause/*.png pause/hitboxes.json
 var Pause embed.FS
+
+// Hiring tiene las imágenes de la bolsa de empleo y el portapapeles chiquito
+// del HUD (gui/assets/hiring/HIRING_ASSETS.md).
+//
+//go:embed hiring/*.png
+var Hiring embed.FS

@@ -11,15 +11,16 @@ import (
 // mouse. Las escenas de menú trabajan con este struct y no con Ebitengine
 // directo: así los tests pueden "apretar teclas" armando un input.
 type input struct {
-	up, down   bool // ↑ o W, ↓ o S
-	confirm    bool // Enter
-	space      bool // Espacio
-	back       bool // Esc
-	click      bool // clic izquierdo
-	rightClick bool // clic derecho
-	shift      bool // Shift apretado (en el juego, muestra todas las etiquetas)
-	mouse      image.Point
-	mouseMoved bool // el mouse se movió desde el tick anterior
+	up, down    bool // ↑ o W, ↓ o S
+	left, right bool // ← → (la bolsa de empleo: cambiar de hoja)
+	confirm     bool // Enter
+	space       bool // Espacio
+	back        bool // Esc
+	click       bool // clic izquierdo
+	rightClick  bool // clic derecho
+	shift       bool // Shift apretado (en el juego, muestra todas las etiquetas)
+	mouse       image.Point
+	mouseMoved  bool // el mouse se movió desde el tick anterior
 }
 
 // lastMouse es dónde estaba el mouse en el tick anterior.
@@ -38,6 +39,8 @@ func defaultReadInput() input {
 	in := input{
 		up:         key(ebiten.KeyArrowUp) || key(ebiten.KeyW),
 		down:       key(ebiten.KeyArrowDown) || key(ebiten.KeyS),
+		left:       key(ebiten.KeyArrowLeft),
+		right:      key(ebiten.KeyArrowRight),
 		confirm:    key(ebiten.KeyEnter) || key(ebiten.KeyNumpadEnter),
 		space:      key(ebiten.KeySpace),
 		back:       key(ebiten.KeyEscape),

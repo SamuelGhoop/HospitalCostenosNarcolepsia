@@ -27,7 +27,7 @@ func NewApp() (*App, error) {
 // la usa el backdoor de pruebas (RunAgent, agent.go): arranca directo en
 // la escena que pida -scene, no siempre en la portada.
 func loadAssets() error {
-	for _, load := range []func() error{loadFonts, loadPixelFont, loadSprites, loadStretcher, loadMap, loadTitle, loadPause} {
+	for _, load := range []func() error{loadFonts, loadPixelFont, loadSprites, loadStretcher, loadMap, loadTitle, loadPause, loadHiring} {
 		if err := load(); err != nil {
 			return err
 		}

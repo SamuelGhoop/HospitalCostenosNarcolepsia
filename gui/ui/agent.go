@@ -107,10 +107,16 @@ func buildAgentScene(cfg AgentConfig) (Scene, error) {
 			return nil, err
 		}
 		return newPauseScene(under), nil
+	case "hiring":
+		under, err := newGameSceneFn()
+		if err != nil {
+			return nil, err
+		}
+		return newHiringSceneOpen(under), nil
 	case "report":
 		return buildReportScene()
 	default:
-		return nil, fmt.Errorf("escena desconocida: %q (válidas: title, demo, game, report, pause)", cfg.Scene)
+		return nil, fmt.Errorf("escena desconocida: %q (válidas: title, demo, game, report, pause, hiring)", cfg.Scene)
 	}
 }
 
@@ -282,6 +288,8 @@ func (r *agentRunner) driveFrame() {
 		return input{
 			up:         justNow && (holdKey == ebiten.KeyArrowUp || holdKey == ebiten.KeyW),
 			down:       justNow && (holdKey == ebiten.KeyArrowDown || holdKey == ebiten.KeyS),
+			left:       justNow && holdKey == ebiten.KeyArrowLeft,
+			right:      justNow && holdKey == ebiten.KeyArrowRight,
 			confirm:    justNow && (holdKey == ebiten.KeyEnter || holdKey == ebiten.KeyNumpadEnter),
 			space:      justNow && holdKey == ebiten.KeySpace,
 			back:       justNow && holdKey == ebiten.KeyEscape,
@@ -416,6 +424,15 @@ type dumpGame struct {
 	Patients   []dumpPatient   `json:"patients"`
 	Staff      []dumpStaff     `json:"staff"`
 	Stretchers []dumpStretcher `json:"stretchers"`
+	Candidates []dumpCandidate `json:"candidates,omitempty"` // solo con la bolsa de empleo abierta
+}
+
+// dumpCandidate es una ficha de la bolsa de empleo en el dump.
+type dumpCandidate struct {
+	Name       string `json:"name"`
+	IsDoctor   bool   `json:"isDoctor"`
+	Cost       int    `json:"cost"`
+	Affordable bool   `json:"affordable"`
 }
 
 type dumpPatient struct {
@@ -457,6 +474,8 @@ func sceneName(s Scene) string {
 		return "report"
 	case *PauseScene:
 		return "pause"
+	case *HiringScene:
+		return "hiring"
 	case *CreditsScene:
 		return "credits"
 	default:
@@ -472,6 +491,11 @@ func (r *agentRunner) dumpState() dumpState {
 		d.Demo = &dumpDemo{Step: s.snap.Step, TotalSteps: s.snap.TotalSteps}
 	case *GameScene:
 		d.Game = s.dumpGame()
+	case *HiringScene: // la bolsa deja ver el juego de abajo tal como quedó, más sus candidatos
+		d.Game = s.under.dumpGame()
+		for _, c := range s.snap.Candidates {
+			d.Game.Candidates = append(d.Game.Candidates, dumpCandidate{Name: c.Name, IsDoctor: c.IsDoctor, Cost: c.Cost, Affordable: c.Affordable})
+		}
 	case *PauseScene: // la pausa deja ver la escena de abajo tal como quedó
 		switch under := s.under.(type) {
 		case *GameScene:

@@ -139,7 +139,11 @@ func (s *GameScene) update(in input) (Scene, error) {
 	case in.click && in.mouse.In(pauseButton):
 		return newPauseScene(s), nil
 	case in.click && in.mouse.In(hireButton):
-		s.say("Próximamente: la bolsa de empleo llega en F4")
+		if len(s.snap.Candidates) == 0 {
+			s.say("Ya contrataste a los 3 candidatos de hoy")
+		} else {
+			return newHiringScene(s), nil
+		}
 	case in.click:
 		s.click(in.mouse)
 	case in.rightClick:
@@ -163,7 +167,6 @@ func (s *GameScene) gameOverInput(in input) (Scene, error) {
 
 // Botones de abajo a la derecha (§9.1) y de los paneles.
 var (
-	hireButton    = image.Rect(990, 664, 1098, 708) // el portapapeles chiquito de CONTRATAR
 	reportButton  = image.Rect(1106, 672, 1186, 708)
 	pauseButton   = image.Rect(1194, 672, 1268, 708)
 	dayOverButton = image.Rect(520, 400, 760, 448)
@@ -259,12 +262,7 @@ func (s *GameScene) Draw(screen *ebiten.Image) {
 // drawButtons: CONTRATAR (un portapapeles chiquito: "Próximamente" hasta
 // F4), REPORTE y PAUSA, abajo a la derecha.
 func (s *GameScene) drawButtons(dst *ebiten.Image) {
-	panel(dst, hireButton, colWood)
-	paper := hireButton.Inset(6)
-	paper.Min.Y += 6
-	panel(dst, paper, colPaper)
-	fillRect(dst, image.Rect(hireButton.Min.X+30, hireButton.Min.Y-4, hireButton.Max.X-30, hireButton.Min.Y+8), colMetal) // el gancho
-	drawText(dst, "CONTRATAR", float64(paper.Min.X+(paper.Dx()-int(textWidth("CONTRATAR", smallFace)))/2), float64(paper.Min.Y+8), smallFace, colInk)
+	s.drawHireClipboard(dst)
 	for _, b := range []struct {
 		r    image.Rectangle
 		text string

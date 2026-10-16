@@ -119,7 +119,7 @@ func TestAgentDemoStep(t *testing.T) {
 // El guion valida los nombres de tecla contra scriptKeys: "hold" y "key"
 // comparten la lista. Esto documenta cuáles lee hoy el juego.
 func TestScriptKeysSonLasQueLeeElJuego(t *testing.T) {
-	want := []string{"Escape", "Space", "Enter", "NumpadEnter", "ArrowUp", "ArrowDown", "W", "S", "Shift", "C", "A"}
+	want := []string{"Escape", "Space", "Enter", "NumpadEnter", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "W", "S", "Shift", "C", "A"}
 	if len(scriptKeys) != len(want) {
 		t.Fatalf("scriptKeys tiene %d teclas, se esperaban %d", len(scriptKeys), len(want))
 	}
