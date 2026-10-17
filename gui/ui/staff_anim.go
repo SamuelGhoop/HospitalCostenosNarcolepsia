@@ -32,8 +32,9 @@ func (a *staffAnim) step(dx, dy float64, attending, pushing bool) {
 	switch {
 	case moving && pushing:
 		a.attended = false
-		a.keep(animPush)
-		a.flip = dx > 0 // la fila de empujar es "hacia la izquierda"; a la derecha se voltea
+		an, flip := pushAnimation(dx, dy) // lateral, hacia abajo o hacia arriba según el tramo
+		a.keep(an)
+		a.flip = flip
 	case moving:
 		a.attended = false // en la próxima parada puede volver a atender
 		an, flip := walkAnimation(dx, dy)

@@ -69,6 +69,28 @@ func TestWalkAnimation_PicksTheDirectionAndFlipsForTheRight(t *testing.T) {
 	}
 }
 
+// Empujar la camilla usa las mismas direcciones que caminar, pero con sus
+// propias filas (Samuel, 16-10: antes empujar siempre salía lateral, aunque
+// el tramo fuera vertical).
+func TestPushAnimation_PicksTheDirectionAndFlipsForTheRight(t *testing.T) {
+	tests := []struct {
+		dx, dy   float64
+		want     animation
+		wantFlip bool
+	}{
+		{-3, 1, animPush, false},
+		{3, -1, animPush, true}, // derecha = lateral volteada
+		{1, -3, animPushUp, false},
+		{0, 3, animPushDown, false},
+	}
+	for _, tt := range tests {
+		got, flip := pushAnimation(tt.dx, tt.dy)
+		if got != tt.want || flip != tt.wantFlip {
+			t.Errorf("pushAnimation(%v, %v) = (%d, %v); se esperaba (%d, %v)", tt.dx, tt.dy, got, flip, tt.want, tt.wantFlip)
+		}
+	}
+}
+
 // Pedido por Samuel: la rotación de 90° se aplica SOLO en la cama.
 func TestSpritePlacement_RotatesOnlyInsideTheBed(t *testing.T) {
 	bed := bedCell(zoneRoom101) // donde va el paciente acostado

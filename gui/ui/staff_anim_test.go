@@ -58,7 +58,9 @@ func TestStaffAnim_AttendsOnceWhenItStopsBesideThePatient(t *testing.T) {
 }
 
 // Quien empuja la camilla (el camillero, o el médico si no había camillero
-// libre) usa la animación de empujar mientras se mueve; parado, no.
+// libre) usa la animación de empujar mientras se mueve, en la fila que
+// corresponda a hacia dónde se mueve (lateral, abajo o arriba; antes del
+// 2026-10-17 siempre salía la lateral); parado, no.
 func TestStaffAnim_PushesWhileMovingTheStretcher(t *testing.T) {
 	a := &staffAnim{}
 	a.step(-3, 0, false, true) // yendo a la izquierda con la camilla
@@ -68,6 +70,14 @@ func TestStaffAnim_PushesWhileMovingTheStretcher(t *testing.T) {
 	a.step(3, 0, false, true) // y a la derecha: la fila se voltea
 	if a.anim != animPush || !a.flip {
 		t.Errorf("empujando a la derecha: %v volteado=%v; se esperaba empujar volteado", a.anim, a.flip)
+	}
+	a.step(0, -3, false, true) // subiendo
+	if a.anim != animPushUp || a.flip {
+		t.Errorf("empujando hacia arriba: %v volteado=%v; se esperaba empujar hacia arriba sin voltear", a.anim, a.flip)
+	}
+	a.step(0, 3, false, true) // bajando
+	if a.anim != animPushDown || a.flip {
+		t.Errorf("empujando hacia abajo: %v volteado=%v; se esperaba empujar hacia abajo sin voltear", a.anim, a.flip)
 	}
 	a.step(0, 0, false, true) // parado junto a la cama, todavía con la camilla: no es caminar
 	if a.anim != animIdle {

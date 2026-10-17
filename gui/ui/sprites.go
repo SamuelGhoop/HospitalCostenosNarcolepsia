@@ -28,7 +28,9 @@ const (
 	animWakeUp                      // despertarse
 	animWave                        // alta (saluda)
 	animAttend                      // atender (solo el médico: fila 5 de su hoja, ver staffRect)
-	animPush                        // empujar la camilla (solo el camillero: fila 5 de SU hoja)
+	animPush                        // empujar la camilla de lado (solo el camillero: fila 5 de SU hoja)
+	animPushDown                    // empujar la camilla hacia abajo (fila 6 de SU hoja, 2026-10-17)
+	animPushUp                      // empujar la camilla hacia arriba (fila 7 de SU hoja, 2026-10-17)
 )
 
 // animSpec dice cuántos cuadros tiene una animación, cuántos ticks dura
@@ -56,6 +58,8 @@ var animSpecs = [...]animSpec{
 	animWave:       {4, 9, false}, // en la demo saluda una sola vez
 	animAttend:     {4, 9, false}, // atiende una vez al llegar junto al paciente
 	animPush:       {4, 8, true},  // empuja la camilla al mismo ritmo que camina
+	animPushDown:   {4, 8, true},
+	animPushUp:     {4, 8, true},
 }
 
 // attendTicks: lo que dura atender (4 cuadros × 9 ticks).
@@ -69,13 +73,19 @@ func frameRect(a animation, i int) image.Rectangle {
 }
 
 // staffRect es el recorte en una hoja del personal: las 4 primeras filas
-// son las mismas del paciente (quieto y caminar) y la 5 es la propia de cada
-// hoja (atender en la del médico, empujar en la del camillero: la misma
-// fila 4, cada uno con la suya).
+// son las mismas del paciente (quieto y caminar) y de la 5 en adelante son
+// propias de cada hoja: atender en la del médico (fila 5), y en la del
+// camillero empujar de lado (fila 5), hacia abajo (fila 6) y hacia arriba
+// (fila 7; GAME_DESIGN §10.3, 2026-10-17).
 func staffRect(a animation, i int) image.Rectangle {
 	row := int(a)
-	if a == animAttend || a == animPush {
+	switch a {
+	case animAttend, animPush:
 		row = 4
+	case animPushDown:
+		row = 5
+	case animPushUp:
+		row = 6
 	}
 	x, y := i*cellWidth, row*cellHeight
 	return image.Rect(x, y, x+cellWidth, y+cellHeight)
@@ -111,6 +121,20 @@ func walkAnimation(dx, dy float64) (anim animation, flip bool) {
 		return animWalkUp, false
 	}
 	return animWalkDown, false
+}
+
+// pushAnimation elige la fila de empujar la camilla según hacia dónde se
+// movió más quien empuja (dx, dy): igual que walkAnimation, pero con las
+// filas propias de empujar (Samuel, 16-10: antes siempre salía la lateral,
+// aunque el tramo fuera vertical).
+func pushAnimation(dx, dy float64) (anim animation, flip bool) {
+	if math.Abs(dx) > math.Abs(dy) {
+		return animPush, dx > 0
+	}
+	if dy < 0 {
+		return animPushUp, false
+	}
+	return animPushDown, false
 }
 
 // spritePlacement calcula la GeoM (la transformación) con la que se dibuja

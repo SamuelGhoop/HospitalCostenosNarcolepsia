@@ -122,15 +122,22 @@ func doctorLayers(look game.Appearance, a animation, frame int) []layer {
 
 // orderlyLayers son las capas de un camillero: su hoja (uniforme, sin camisa
 // ni sombrero) y el pelo del paciente encima. En quieto y caminando el pelo
-// usa el mismo cuadro que el cuerpo; empujando la camilla (fila 5 de SU
-// hoja) la cabeza no se mueve distinto de caminar a la izquierda, así que
-// el pelo usa esa fila, columna por columna (GAME_DESIGN §10.3).
+// usa el mismo cuadro que el cuerpo; empujando la camilla (filas 5 a 7 de SU
+// hoja) la cabeza no se mueve distinto de caminar en esa misma dirección,
+// así que el pelo usa la fila de caminar que corresponda, columna por
+// columna (GAME_DESIGN §10.3; empujar hacia abajo y hacia arriba desde el
+// 2026-10-17).
 func orderlyLayers(look game.Appearance, a animation, frame int) []layer {
 	ls := []layer{{orderlySheets[look.SkinTone], staffRect(a, frame), nil}}
 	if look.Hair != game.Bald {
 		ha, hf := a, frame
-		if a == animPush {
-			ha, hf = animWalkLeft, frame
+		switch a {
+		case animPush:
+			ha = animWalkLeft
+		case animPushDown:
+			ha = animWalkDown
+		case animPushUp:
+			ha = animWalkUp
 		}
 		ls = append(ls, layer{hairSheets[look.Hair], frameRect(ha, hf), hairPalette[look.HairColor]})
 	}
