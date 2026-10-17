@@ -81,6 +81,9 @@ type actor struct {
 	attendAt  vec           // dónde atiende
 	carried   string        // a quién ya llevó en el traslado actual (la camilla puede llegar antes que el juego)
 	exiting   bool          // ya salió del juego: camina fuera de la pantalla y desaparece
+
+	restZone  zone // dónde descansa el personal libre (§10.8 punto 7): empieza en su sala
+	restTicks int  // ticks que le quedan ahí antes de cambiar de lugar (0 al principio: arranca en la sala sin esperar)
 }
 
 func (s *GameScene) actorOf(id string) *actor {
@@ -172,13 +175,20 @@ func (s *GameScene) sync() {
 		s.figures = append(s.figures, f)
 	}
 
-	for i, st := range s.snap.Staff {
+	for _, st := range s.snap.Staff {
 		present[st.ID] = true
 		a := s.actorOf(st.ID)
-		home := toVec(slot(zoneStaffRoom, i))
-		f := figure{id: st.ID, doctor: st.IsDoctor, look: st.Look, target: home}
+		f := figure{id: st.ID, doctor: st.IsDoctor, look: st.Look}
 		if _, seen := s.pos[st.ID]; !seen {
-			s.pos[st.ID] = home // el personal empieza en su sala
+			// El puesto es fijo por persona (s.standing.take), no por la
+			// posición en la foto: antes se usaba slot(zoneStaffRoom, i) con
+			// i = la posición en s.snap.Staff, y con más de 3 contratados (la
+			// sala solo tiene 3 puestos de pie) todos los que sobraban caían
+			// en el mismo lugar (aviso de Samuel, 2026-10-17). staffHomeTarget
+			// reparte también el desborde del pasillo 2 (§10.7 punto 7).
+			a.restZone = zoneStaffRoom
+			a.restTicks = restWanderTicks(s.wanderRNG()) // no deambula de una: se queda un rato en la sala
+			s.pos[st.ID] = toVec(staffHomeTarget(s.standing, st.ID))
 			s.staff[st.ID] = &staffAnim{}
 		}
 		if a.activity == game.GoingToReview && st.Activity != game.GoingToReview {
@@ -192,21 +202,26 @@ func (s *GameScene) sync() {
 		p, hasPatient := patients[st.PatientID]
 		switch {
 		case st.Activity == game.Carrying && hasPatient:
+			s.standing.release(st.ID, noZone) // suelta su puesto de reposo mientras trabaja
 			if a.carried != p.ID && s.carryOf(st.ID) == nil && s.carryOf(p.ID) == nil {
 				s.startCarry(st.ID, p, st.Left)
 				a.carried = p.ID // una sola camilla por traslado, aunque llegue antes que el juego
 			}
 			a.untimed()
 		case (st.Activity == game.GoingToPickUp || st.Activity == game.GoingToTransfer) && hasPatient:
+			s.standing.release(st.ID, noZone)
 			f.target = helperSpot(toVec(floorSpot(gameZone(p.Zone), s.lying.take(gameZone(p.Zone), p.ID))))
 			a.timed(st.Left)
 		case st.Activity == game.GoingToReview && hasPatient:
+			s.standing.release(st.ID, noZone)
 			f.target = toVec(wakeSpot(roomZone(p.Room))) // al lado de la cama (un puesto revisado: piso libre)
 			a.timed(st.Left)
 		case a.attend > 0:
+			s.standing.release(st.ID, noZone)
 			f.target = a.attendAt
 			a.untimed()
-		default:
+		default: // libre: deambula entre su sala y sus demás zonas (§10.8 punto 7)
+			f.target = toVec(s.staffRestSpot(a, st))
 			a.untimed()
 		}
 		s.figures = append(s.figures, f)
