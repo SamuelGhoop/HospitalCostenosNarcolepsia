@@ -31,6 +31,7 @@ type GameScene struct {
 	hud     hud
 	scenery scenery
 	door    mainDoor
+	wander  *rand.Rand // azar de interfaz del personal libre (staff_rest.go)
 
 	selected     string // paciente elegido para mandarle a alguien ("" = ninguno)
 	hover        string // personaje bajo el mouse

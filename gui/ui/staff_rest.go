@@ -137,24 +137,18 @@ func staffRestZoneSpot(book spotBook, z zone, id string) image.Point {
 	return slot(z, book.take(z, id))
 }
 
-// staffWanderRNG es el azar PROPIO DE LA INTERFAZ con el que el personal
-// libre decide a qué zona ir y cuánto se queda: nunca el de la partida
+// wanderRNG da el azar de deambular de esta escena (el campo wander de
+// GameScene). Es azar PROPIO DE LA INTERFAZ: nunca el de la partida
 // (game.Game.rng), para no cambiar la secuencia de los tests con semilla
 // fija del juego. Sale de seedSource, igual que el tráfico decorado
-// (traffic.go): con el backdoor de pruebas (-agent -seed N) es
-// determinista. Se vuelve a armar en cada partida nueva (se nota porque
-// cambia el puntero de la escena).
-var (
-	staffWanderRNG   *rand.Rand
-	staffWanderScene *GameScene
-)
-
-// wanderRNG da el azar de deambular de esta escena.
+// (traffic.go), así que con el backdoor (-agent -seed N) es determinista.
+// Se arma la primera vez que se pide, para que la secuencia de seedSource
+// no cambie según cuándo se cree la escena.
 func (s *GameScene) wanderRNG() *rand.Rand {
-	if staffWanderScene != s {
-		staffWanderRNG, staffWanderScene = rand.New(rand.NewSource(seedSource())), s
+	if s.wander == nil {
+		s.wander = rand.New(rand.NewSource(seedSource()))
 	}
-	return staffWanderRNG
+	return s.wander
 }
 
 // staffRestSpot es a dónde camina el personal libre (Activity Free, "la
