@@ -439,6 +439,7 @@ type Scene interface {
   - **En la demo**: al llegar al costado de la cama hace *Alta* (saluda) una sola vez y queda en *Quieto*. En la demo nadie se va del hospital, porque el modelo no tiene alta.
   - **En el modo juego**: cuando recibe el alta, hace despertarse → alta → camina hasta la puerta del lobby y sale del mapa.
 - La burbuja "Zzz" aparece solo cuando el paciente ya está acostado (en el piso o en la cama). El modelo lo marca dormido desde el ataque, pero en pantalla primero camina al sitio y se desploma.
+- **Ícono "falta el médico"** (hecho 2026-10-17, §12.8): sobre el paciente en cama sin revisar (`AwaitingReview`), a ×3 en (+169, +64) desde la esquina de arriba a la izquierda de su habitación (`gui/ui/need_doctor_icon.go`, ficha en `gui/assets/sprites/ICONS_ASSETS.md`). Hoja de 2 cuadros de 19×18, 0,4 s cada uno, en bucle; parpadea desde los 20 s de espera.
 - El personal y los personajes de eventos usan el mismo formato con sus animaciones (atender, empujar camilla…).
 - Las animaciones avanzan por ticks de `Update` (60/s), nunca con `time.Sleep`.
 
@@ -661,7 +662,7 @@ Samuel: *"Las animaciones ya están mejor así, ahora la animación de empujar l
 - ✅ **Empujar hacia arriba y hacia abajo** (hecho 2026-10-17): la hoja del camillero suma dos filas (6: empujar_abajo, 7: empujar_arriba; pasa a 64 × 168). Detalle en §10.3.
 - **Por qué bajan las estrellas** (Samuel eligió las tres opciones):
   - **Aviso con el motivo** cada vez que bajan, por ejemplo "−0,5 ★ P-003 lleva 20 s esperando revisión" o "−0,5 ★ P-005 se fue enojado". `game/` expone los cambios de reputación con su motivo como valores.
-  - **Ícono "falta el médico"** sobre el paciente que ya está en la cama pero sin revisar.
+  - ✅ **Ícono "falta el médico"** (hecho 2026-10-17): sobre el paciente que ya está en la cama pero sin revisar (`AwaitingReview`). Opción A (estetoscopio en un globo, colita hacia el paciente), aprobada por Samuel; ficha en `gui/assets/sprites/ICONS_ASSETS.md`. Parpadea desde los **20 s** de espera (constante de interfaz en `gui/ui/need_doctor_icon.go`, 10 s antes del −0,5 ★ de `firstWaitPenaltyAt`), reusando el parpadeo de la burbuja roja (`bubbleBlinkAfter`, `game_input.go`). Solo en el modo juego: la demo no distingue revisado de sin revisar.
   - **Más margen**: el primer −0,5 ★ llega a los **30 s** de espera en vez de 20 (§5.9; constante en `config.go`). Lo demás queda igual.
 - **Letra**: Press Start 2P en **toda** la interfaz, incluidos los rótulos del mapa, los IDs, los tooltips y los subtítulos de la demo. Reemplaza la regla de §9.3 de usarla solo en la portada, los créditos y el aviso.
 ---
