@@ -17,7 +17,8 @@ func reputationAt(g *game.Game, now *time.Duration, at time.Duration) int {
 }
 
 // §5.9: la partida arranca con 3 ★ (300 centésimas). Esperando: −0,5 a los
-// 20 s y −0,25 cada 10 s más; al irse enojado, −0,5 más.
+// 30 s (más margen desde el 2026-10-16, §12.8) y −0,25 cada 10 s más; al irse
+// enojado (45 s, sin cambiar), −0,5 más.
 func TestReputation_WaitingPenalties(t *testing.T) {
 	g := newGame(t)
 	collapse(t, g, "P-001", "Yeimy Padilla", hospital.Severe, game.Cafeteria)
@@ -28,11 +29,10 @@ func TestReputation_WaitingPenalties(t *testing.T) {
 		want int
 	}{
 		{0, 300},
-		{19900 * time.Millisecond, 300},
-		{20 * time.Second, 250},
-		{30 * time.Second, 225},
-		{40 * time.Second, 200},
-		{45 * time.Second, 150}, // se va enojado
+		{29900 * time.Millisecond, 300},
+		{30 * time.Second, 250},
+		{40 * time.Second, 225},
+		{45 * time.Second, 175}, // se va enojado antes de la siguiente penalización (50 s)
 	} {
 		if got := reputationAt(g, &now, c.at); got != c.want {
 			t.Errorf("a los %v: reputación = %d centésimas; se esperaban %d", c.at, got, c.want)
@@ -44,13 +44,13 @@ func TestReputation_WaitingPenalties(t *testing.T) {
 // (esperando revisión también baja) y la revisión la detiene.
 func TestReputation_PickUpDoesNotResetThePenaltyAndTheReviewStopsIt(t *testing.T) {
 	g := newGame(t)
-	reviewAt(t, g, hospital.Severe, 25*time.Second) // recogido a los 20 s, revisado a los 25 s
+	reviewAt(t, g, hospital.Severe, 35*time.Second) // recogido a los 30 s, revisado a los 35 s
 	if got := g.Snapshot().Reputation; got != 250 {
-		t.Errorf("revisado a los 25 s: reputación = %d; se esperaba 250 (−50 a los 20 s)", got)
+		t.Errorf("revisado a los 35 s: reputación = %d; se esperaba 250 (−50 a los 30 s)", got)
 	}
-	tickFor(g, 20*time.Second) // 45 s: revisado, ya no espera ni se va
+	tickFor(g, 20*time.Second) // 55 s: revisado, ya no espera ni se va
 	if got := g.Snapshot().Reputation; got != 250 {
-		t.Errorf("a los 45 s, ya revisado: reputación = %d; se esperaba 250", got)
+		t.Errorf("a los 55 s, ya revisado: reputación = %d; se esperaba 250", got)
 	}
 }
 

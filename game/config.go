@@ -107,10 +107,15 @@ const (
 )
 
 // Reputación (§5.9), en centésimas de estrella: 300 = 3 ★.
+//
+// firstWaitPenaltyAt subió de 20 a 30 s (decisión de Samuel, §12.8: en la
+// prueba del 16-10 "le bajaban las estrellas solas" sin darse cuenta; más
+// margen es una de las tres correcciones que eligió, junto con el aviso con
+// motivo de changeReputationLocked).
 const (
 	startReputation    = 300
 	maxReputation      = 500
-	firstWaitPenaltyAt = 20 * time.Second // esperando: la primera penalización a los 20 s…
+	firstWaitPenaltyAt = 30 * time.Second // esperando: la primera penalización a los 30 s…
 	firstWaitPenalty   = 50               // …de −0,5 ★…
 	waitPenaltyEvery   = 10 * time.Second // …y después una cada 10 s más…
 	nextWaitPenalty    = 25               // …de −0,25 ★
@@ -120,6 +125,10 @@ const (
 	dischargeBonus     = 10               // alta: +0,1 ★
 	wakeEarlyPenalty   = 25               // DESPERTAR antes de tiempo: −0,25 ★ (§5.7)
 )
+
+// maxReputationChanges: cuántos cambios de reputación recientes, con su
+// motivo, guarda la partida para la interfaz (mismo criterio que maxNotices).
+const maxReputationChanges = 5
 
 // Puntaje (§5.10).
 const (

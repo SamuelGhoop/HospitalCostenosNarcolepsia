@@ -16,7 +16,7 @@ func TestDefeat_LicenseLostAtZeroReputationFreezesTheGame(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for i := 0; i < 200; i++ { // 20 s: la primera penalización (−50) la deja en 0
+	for i := 0; i < 300; i++ { // 30 s: la primera penalización (−50) la deja en 0
 		g.Tick(tickInterval)
 	}
 
