@@ -163,6 +163,37 @@ func TestHiring_HireWithMoneyRemovesCandidateAndAddsStaff(t *testing.T) {
 	}
 }
 
+// BUG (prueba de Samuel del 17-10: "contratar no descuenta el dinero"):
+// Hire sí cobraba, pero la barra de arriba es la de la escena del juego,
+// que está en pausa debajo de la bolsa y no se refrescaba hasta cerrarla.
+// Tras contratar, la barra tiene que ir hacia la plata nueva y mostrar el
+// descuento en rojo con la bolsa todavía abierta.
+func TestHiring_HireUpdatesTheHUDWhileOpen(t *testing.T) {
+	s := openHiring(t)
+	cost := s.snap.Candidates[0].Cost
+	before := s.snap.Money
+
+	center := image.Pt((hiringHireButton.Min.X+hiringHireButton.Max.X)/2, (hiringHireButton.Min.Y+hiringHireButton.Max.Y)/2)
+	if _, err := s.update(input{click: true, mouse: center}); err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < moneyCountTicks; i++ { // deja terminar la cuenta de la barra
+		if _, err := s.update(input{}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if got, want := s.under.snap.Money, before-cost; got != want {
+		t.Errorf("la foto de la escena de abajo tiene $%d; se esperaban $%d", got, want)
+	}
+	if got, want := s.under.hud.shownMoney(), before-cost; got != want {
+		t.Errorf("la barra de arriba muestra $%d con la bolsa abierta; se esperaban $%d", got, want)
+	}
+	if len(s.under.hud.deltas) == 0 || s.under.hud.deltas[0].color != colHUDRed {
+		t.Error("la barra no muestra el descuento en rojo al contratar")
+	}
+}
+
 // Sin plata, CONTRATAR no hace nada: ni llama a Hire ni cambia la lista
 // (se revisa directo sobre hire(), sin un *game.Game real: el candidato sin
 // plata no debe ni intentar contratarse).

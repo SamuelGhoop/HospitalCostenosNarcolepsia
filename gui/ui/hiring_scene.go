@@ -86,6 +86,11 @@ func (s *HiringScene) Update() (Scene, error) { return s.update(readInput()) }
 
 func (s *HiringScene) update(in input) (Scene, error) {
 	s.snap = s.under.g.Snapshot() // Hire cambia la plata y la lista al toque, sin esperar al motor
+	// La barra de arriba es la de la escena del juego, que está en pausa
+	// debajo y no corre su Update: se le pasa la misma foto para que la
+	// plata cuente hacia abajo y salga el descuento en rojo al contratar.
+	s.under.snap = s.snap
+	s.under.hud.update(s.snap)
 	switch s.phase {
 	case hiringOpening:
 		s.ticks++
