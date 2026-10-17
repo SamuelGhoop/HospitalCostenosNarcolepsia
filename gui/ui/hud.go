@@ -221,6 +221,32 @@ func formatDelta(d int) string {
 // formatReputation escribe la reputación en décimas como en la maqueta: "3,7".
 func formatReputation(tenths int) string { return fmt.Sprintf("%d,%d", tenths/10, tenths%10) }
 
+// formatReputationChange es el aviso con motivo de un cambio de reputación
+// (§12.8, decisión de Samuel del 2026-10-16, para que no "le bajen las
+// estrellas solas"): "-0,5 ★ P-003 lleva 30 s esperando revisión" o "+0,1 ★
+// P-002: lo recogieron rápido". El signo es "-" (no "−": Press Start 2P no
+// tiene el signo menos tipográfico, se comprobó con sfnt.GlyphIndex), igual
+// que formatDelta con la plata; la estrella sí está en la fuente.
+func formatReputationChange(c game.ReputationChange) string {
+	return fmt.Sprintf("%s ★ %s", formatReputationStars(c.Delta), c.Reason)
+}
+
+// formatReputationStars es el delta en centésimas como estrellas con coma
+// decimal, sin ceros de más: -50 → "-0,5", -25 → "-0,25", +10 → "+0,1". Los
+// deltas de reputación son todos múltiplos de 5 centésimas (config.go), así
+// que nunca hace falta más de dos decimales.
+func formatReputationStars(hundredths int) string {
+	sign := "+"
+	if hundredths < 0 {
+		sign, hundredths = "-", -hundredths
+	}
+	frac := strings.TrimRight(fmt.Sprintf("%02d", hundredths%100), "0")
+	if frac == "" {
+		frac = "0"
+	}
+	return fmt.Sprintf("%s%d,%s", sign, hundredths/100, frac)
+}
+
 // hudDayLabel es el texto del recuadro del centro.
 func hudDayLabel(day int) string { return fmt.Sprintf("DÍA %d", day) }
 
@@ -242,8 +268,23 @@ type moneyDelta struct {
 }
 
 // offset es lo que lleva subido (negativo: hacia arriba) y su opacidad.
-func (d moneyDelta) offset() (rise float64, alpha float32) {
-	f := math.Min(1, float64(d.ticks)/deltaTicks)
+func (d moneyDelta) offset() (rise float64, alpha float32) { return fadeOffset(d.ticks) }
+
+// repChangeDelta es un aviso de reputación con su motivo (§12.8) que sube y
+// se desvanece igual que un moneyDelta, con los mismos tiempos.
+type repChangeDelta struct {
+	text  string
+	color color.RGBA
+	ticks int
+}
+
+func (d repChangeDelta) offset() (rise float64, alpha float32) { return fadeOffset(d.ticks) }
+
+// fadeOffset es lo que lleva subido (negativo: hacia arriba) y la opacidad
+// de algo que aparece y en deltaTicks sube deltaRise px mientras se
+// desvanece; lo comparten moneyDelta y repChangeDelta.
+func fadeOffset(ticks int) (rise float64, alpha float32) {
+	f := math.Min(1, float64(ticks)/deltaTicks)
 	return -deltaRise * f, float32(1 - f)
 }
 
@@ -259,6 +300,12 @@ type hud struct {
 	moneyFrom, moneyTo int
 	moneyTick          int
 	deltas             []moneyDelta
+	// Los avisos de reputación con motivo (§12.8): repSeen recuerda cuáles de
+	// Snapshot.ReputationChanges ya se mostraron (la cola se recorre entera
+	// en cada foto, como Notices con noticeSeen en game_scene.go), y
+	// repDeltas son los que todavía se ven, subiendo y desvaneciéndose.
+	repSeen   map[game.ReputationChange]bool
+	repDeltas []repChangeDelta
 }
 
 // repTenths es la reputación de la foto (en centésimas) en décimas,
@@ -271,6 +318,10 @@ func (h *hud) update(snap game.Snapshot) {
 		h.started = true
 		h.rep = repTenths(snap.Reputation)
 		h.moneyFrom, h.moneyTo, h.moneyTick = snap.Money, snap.Money, moneyCountTicks
+		h.repSeen = map[game.ReputationChange]bool{}
+		for _, c := range snap.ReputationChanges { // de antes de abrir la pantalla: no dejan aviso
+			h.repSeen[c] = true
+		}
 		return
 	}
 
@@ -308,6 +359,27 @@ func (h *hud) update(snap game.Snapshot) {
 		}
 	}
 	h.deltas = kept
+
+	// Reputación: cada cambio nuevo de la cola (§12.8) deja un aviso con su
+	// motivo, rojo si baja y verde si sube.
+	for _, c := range snap.ReputationChanges {
+		if h.repSeen[c] {
+			continue
+		}
+		h.repSeen[c] = true
+		clr := colHUDGreen
+		if c.Delta < 0 {
+			clr = colHUDRed
+		}
+		h.repDeltas = append(h.repDeltas, repChangeDelta{text: formatReputationChange(c), color: clr})
+	}
+	keptRep := h.repDeltas[:0]
+	for _, d := range h.repDeltas {
+		if d.ticks++; d.ticks < deltaTicks {
+			keptRep = append(keptRep, d)
+		}
+	}
+	h.repDeltas = keptRep
 }
 
 // shownMoney es la plata que se ve ahora.
@@ -383,6 +455,15 @@ func (h *hud) draw(dst *ebiten.Image, snap game.Snapshot) {
 		}
 	}
 	drawPixelText(dst, l.repText, l.rep.Min.X, l.rep.Min.Y, hudTextSize, []textLayer{{0, 0, repColor}}, 1)
+
+	// Los avisos de reputación con motivo (§12.8), debajo de las estrellas:
+	// cada uno sube y se desvanece a su propio ritmo, apilados por si hay
+	// más de uno a la vez.
+	for i, d := range h.repDeltas {
+		rise, alpha := d.offset()
+		y := l.stars.Max.Y + 6 + i*(hudTextSize+4) + int(math.Round(rise))
+		drawPixelText(dst, d.text, l.stars.Min.X, y, hudTextSize, append(outlined(2, colInk), textLayer{0, 0, d.color}), alpha)
+	}
 
 	// La plata, verde con contorno negro, y los cambios que suben.
 	drawImageAt(dst, hudImgs.money, l.moneyIcon.Min, nil)

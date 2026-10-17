@@ -221,6 +221,67 @@ func TestHUD_FormatsMoneyWithThousandsDots(t *testing.T) {
 	}
 }
 
+// §12.8: el aviso de un cambio de reputación es "-0,5 ★ <motivo>" o
+// "+0,1 ★ <motivo>", con coma decimal y el mismo signo "-" que usa
+// formatDelta para la plata (Press Start 2P no tiene el signo menos
+// tipográfico "−": se comprobó con sfnt.GlyphIndex antes de escribir esto).
+func TestFormatReputationChange_SignAndComma(t *testing.T) {
+	cases := []struct {
+		c    game.ReputationChange
+		want string
+	}{
+		{game.ReputationChange{Delta: -50, Reason: "P-003 lleva 30 s esperando revisión"}, "-0,5 ★ P-003 lleva 30 s esperando revisión"},
+		{game.ReputationChange{Delta: -25, Reason: "P-003 lleva 40 s esperando revisión"}, "-0,25 ★ P-003 lleva 40 s esperando revisión"},
+		{game.ReputationChange{Delta: +10, Reason: "P-002: lo recogieron rápido"}, "+0,1 ★ P-002: lo recogieron rápido"},
+	}
+	for _, c := range cases {
+		if got := formatReputationChange(c.c); got != c.want {
+			t.Errorf("formatReputationChange(%+v) = %q; se esperaba %q", c.c, got, c.want)
+		}
+	}
+}
+
+// Cada ReputationChange nuevo de la foto deja un aviso que sube y se
+// desvanece, rojo si baja y verde si sube (mismos tiempos que la plata); los
+// que ya estaban en la primera foto no dejan nada (como con la plata).
+func TestHUDReputationChanges_ShowFadeAndColor(t *testing.T) {
+	var h hud
+	first := game.Snapshot{Reputation: 300, Money: 2000, ReputationChanges: []game.ReputationChange{
+		{Delta: -50, Reason: "viejo, de antes de abrir la pantalla"},
+	}}
+	h.update(first)
+	if len(h.repDeltas) != 0 {
+		t.Fatalf("la primera foto dejó %d avisos de reputación; se esperaban 0", len(h.repDeltas))
+	}
+
+	down := game.Snapshot{Reputation: 250, Money: 2000, ReputationChanges: append(first.ReputationChanges,
+		game.ReputationChange{Delta: -50, Reason: "P-003 lleva 30 s esperando revisión"})}
+	h.update(down)
+	if len(h.repDeltas) != 1 || h.repDeltas[0].text != "-0,5 ★ P-003 lleva 30 s esperando revisión" || h.repDeltas[0].color != colHUDRed {
+		t.Fatalf("al bajar: avisos %+v; se esperaba uno rojo con el motivo", h.repDeltas)
+	}
+
+	// El mismo cambio otra vez (sigue en la foto, como Notices) no duplica el aviso.
+	h.update(down)
+	if len(h.repDeltas) != 1 {
+		t.Fatalf("el mismo cambio en dos fotos dejó %d avisos; se esperaba 1 (no se duplica)", len(h.repDeltas))
+	}
+
+	up := game.Snapshot{Reputation: 260, Money: 2000, ReputationChanges: append(down.ReputationChanges,
+		game.ReputationChange{Delta: +10, Reason: "P-002: lo recogieron rápido"})}
+	h.update(up)
+	if len(h.repDeltas) != 2 || h.repDeltas[1].color != colHUDGreen {
+		t.Fatalf("al subir: avisos %+v; se esperaba un segundo, verde", h.repDeltas)
+	}
+
+	for tick := 0; tick < deltaTicks; tick++ {
+		h.update(up)
+	}
+	if len(h.repDeltas) != 0 {
+		t.Errorf("después de 1 s quedan %d avisos de reputación; se esperaban 0", len(h.repDeltas))
+	}
+}
+
 // Medidas de la maqueta en una pantalla de 1280: la barra mide 42 px con su
 // borde; a la izquierda, desde 17 px, las estrellas ×3 y la plata; en el
 // centro el DÍA; a la derecha, hasta 1263 px, el reloj, la hora y la barra

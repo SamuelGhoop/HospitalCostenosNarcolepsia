@@ -416,15 +416,16 @@ type dumpDemo struct {
 // dumpGame es la foto del modo juego, con la posición en pantalla que usa
 // la interfaz (la misma con la que dibuja, redondeada igual que al dibujar).
 type dumpGame struct {
-	Clock      string          `json:"clock"`
-	Day        int             `json:"day"`
-	Money      int             `json:"money"`
-	Reputation int             `json:"reputation"`
-	Notices    []string        `json:"notices"`
-	Patients   []dumpPatient   `json:"patients"`
-	Staff      []dumpStaff     `json:"staff"`
-	Stretchers []dumpStretcher `json:"stretchers"`
-	Candidates []dumpCandidate `json:"candidates,omitempty"` // solo con la bolsa de empleo abierta
+	Clock             string                  `json:"clock"`
+	Day               int                     `json:"day"`
+	Money             int                     `json:"money"`
+	Reputation        int                     `json:"reputation"`
+	ReputationChanges []game.ReputationChange `json:"reputationChanges"` // con su motivo (§12.8)
+	Notices           []string                `json:"notices"`
+	Patients          []dumpPatient           `json:"patients"`
+	Staff             []dumpStaff             `json:"staff"`
+	Stretchers        []dumpStretcher         `json:"stretchers"`
+	Candidates        []dumpCandidate         `json:"candidates,omitempty"` // solo con la bolsa de empleo abierta
 }
 
 // dumpCandidate es una ficha de la bolsa de empleo en el dump.
@@ -511,11 +512,12 @@ func (r *agentRunner) dumpState() dumpState {
 // de cada uno sale de s.pos, la misma que usa Draw.
 func (s *GameScene) dumpGame() *dumpGame {
 	g := &dumpGame{
-		Clock:      s.snap.Clock,
-		Day:        s.snap.Day,
-		Money:      s.snap.Money,
-		Reputation: s.snap.Reputation,
-		Notices:    append([]string(nil), s.snap.Notices...),
+		Clock:             s.snap.Clock,
+		Day:               s.snap.Day,
+		Money:             s.snap.Money,
+		Reputation:        s.snap.Reputation,
+		ReputationChanges: append([]game.ReputationChange(nil), s.snap.ReputationChanges...),
+		Notices:           append([]string(nil), s.snap.Notices...),
 	}
 	for _, p := range s.snap.Patients {
 		at := s.pos[p.ID]
