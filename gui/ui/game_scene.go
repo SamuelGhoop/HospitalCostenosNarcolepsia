@@ -221,6 +221,7 @@ func (s *GameScene) Draw(screen *ebiten.Image) {
 	}
 	drawPalmCrowns(screen)
 	drawBlankets(screen, s.snap.Rooms, lyingIn)
+	drawNeedDoctorIcons(screen, s.snap.Patients, s.ticks)
 
 	for _, o := range roomBadges(s.snap.Rooms) {
 		drawOverlay(screen, o)
