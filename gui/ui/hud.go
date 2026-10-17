@@ -90,18 +90,54 @@ var (
 // hudIconScale: los iconos se dibujan ×3 (1 px de la maqueta = 3 px).
 const hudIconScale = 3
 
-// iconImage pinta las primeras cols columnas de un mapa de píxeles ×3.
-func iconImage(m []string, cols int) *image.RGBA {
-	img := image.NewRGBA(image.Rect(0, 0, len(m[0])*hudIconScale, len(m)*hudIconScale))
+// Medidas de la placa de un aviso de reputación (§12.8): fondo crema con
+// borde de 2 px, como los avisos del juego (drawNotices en game_scene.go,
+// panel() en theme.go), debajo de las estrellas.
+const (
+	repIconScale   = 2 // la estrella del aviso, más chica que la de arriba (×2, no ×3)
+	repPlatePadX   = 6 // margen de la placa a los lados del texto
+	repPlatePadY   = 4 // margen de la placa arriba y abajo del contenido
+	repIconGap     = 4 // separación entre el número, el ícono y el motivo
+	repPlateGapY   = 6 // de la sombra de la barra a la primera placa (para no tocarla)
+	repPlateRowGap = 4 // entre una placa y la siguiente, apiladas hacia abajo
+)
+
+// repPlateRect es el rectángulo de la placa del aviso de reputación
+// i-ésimo (0 es el más viejo que sigue en pantalla): alineada a la
+// izquierda bajo las estrellas (starsMinX), apilada debajo de las
+// anteriores sin encimarlas, con su tope en top0 (0: arranca justo en
+// top0; i > 0: debajo de la anterior). El ancho crece con el texto, así el
+// motivo nunca se corta.
+//
+// top0 lo calcula quien dibuja (hud.draw): como mínimo, debajo del borde y
+// la sombra de la barra (nunca los toca); si ya hay avisos del juego
+// dibujados ahí (drawNotices, game_scene.go: errores, altas), debajo de
+// ellos, para no encimarse con "P-xxx se fue enojado", que deja los dos
+// avisos a la vez.
+func repPlateRect(starsMinX, top0, i int, amount, reason string) image.Rectangle {
+	iconW, iconH := repIconScale*len(hudStar[0]), repIconScale*len(hudStar)
+	plateH := iconH + 2*repPlatePadY
+	contentW := pixelTextWidth(amount, hudTextSize) + repIconGap + iconW + repIconGap + pixelTextWidth(reason, hudTextSize)
+	plateW := contentW + 2*repPlatePadX
+	top := top0 + i*(plateH+repPlateRowGap)
+	return image.Rect(starsMinX, top, starsMinX+plateW, top+plateH)
+}
+
+// iconImage pinta las primeras cols columnas de un mapa de píxeles,
+// escalado entero por scale (nearest, sin suavizado: así se dibujan las
+// estrellas grandes de arriba, ×hudIconScale, y la chiquita de los avisos
+// de reputación, con otra escala).
+func iconImage(m []string, cols, scale int) *image.RGBA {
+	img := image.NewRGBA(image.Rect(0, 0, len(m[0])*scale, len(m)*scale))
 	for y, row := range m {
 		for x := 0; x < cols && x < len(row); x++ {
 			c, ok := hudPalette[row[x]]
 			if !ok {
 				continue // '.'
 			}
-			for dy := 0; dy < hudIconScale; dy++ {
-				for dx := 0; dx < hudIconScale; dx++ {
-					img.SetRGBA(x*hudIconScale+dx, y*hudIconScale+dy, c)
+			for dy := 0; dy < scale; dy++ {
+				for dx := 0; dx < scale; dx++ {
+					img.SetRGBA(x*scale+dx, y*scale+dy, c)
 				}
 			}
 		}
@@ -226,7 +262,13 @@ func formatReputation(tenths int) string { return fmt.Sprintf("%d,%d", tenths/10
 // estrellas solas"): "-0,5 ★ P-003 lleva 30 s esperando revisión" o "+0,1 ★
 // P-002: lo recogieron rápido". El signo es "-" (no "−": Press Start 2P no
 // tiene el signo menos tipográfico, se comprobó con sfnt.GlyphIndex), igual
-// que formatDelta con la plata; la estrella sí está en la fuente.
+// que formatDelta con la plata.
+//
+// El "★" de en medio **no se dibuja**: a ese tamaño, en Press Start 2P sale
+// como un cuadro sin forma de estrella (la fuente no trae ese glifo). Queda
+// solo como separador de datos entre el número y el motivo: draw() lo parte
+// con strings.Cut y dibuja ahí, en su lugar, el ícono de estrella chiquito
+// de hudImgs.starSmall, teñido de rojo o verde.
 func formatReputationChange(c game.ReputationChange) string {
 	return fmt.Sprintf("%s ★ %s", formatReputationStars(c.Delta), c.Reason)
 }
@@ -403,17 +445,36 @@ func (h *hud) flashColor() color.RGBA {
 
 // Las imágenes de los iconos, hechas la primera vez que se dibuja la barra.
 var hudImgs struct {
-	star, starEmpty, money, clock *ebiten.Image
+	star, starEmpty, money, clock, starSmall *ebiten.Image
 }
 
 func hudImages() {
 	if hudImgs.star != nil {
 		return
 	}
-	hudImgs.star = ebiten.NewImageFromImage(iconImage(hudStar, len(hudStar[0])))
-	hudImgs.starEmpty = ebiten.NewImageFromImage(iconImage(hudStarEmpty, len(hudStar[0])))
-	hudImgs.money = ebiten.NewImageFromImage(iconImage(hudMoneyIcon, len(hudMoneyIcon[0])))
-	hudImgs.clock = ebiten.NewImageFromImage(iconImage(hudClockIcon, len(hudClockIcon[0])))
+	hudImgs.star = ebiten.NewImageFromImage(iconImage(hudStar, len(hudStar[0]), hudIconScale))
+	hudImgs.starEmpty = ebiten.NewImageFromImage(iconImage(hudStarEmpty, len(hudStar[0]), hudIconScale))
+	hudImgs.money = ebiten.NewImageFromImage(iconImage(hudMoneyIcon, len(hudMoneyIcon[0]), hudIconScale))
+	hudImgs.clock = ebiten.NewImageFromImage(iconImage(hudClockIcon, len(hudClockIcon[0]), hudIconScale))
+	// La estrella chiquita de los avisos de reputación (§12.8): la misma
+	// forma de arriba, más chica (×2 en vez de ×3), sin teñir todavía (se
+	// tiñe de rojo o verde al dibujarla, igual que el destello de las
+	// estrellas grandes).
+	hudImgs.starSmall = ebiten.NewImageFromImage(iconImage(hudStar, len(hudStar[0]), repIconScale))
+}
+
+// fadeAlpha multiplica la opacidad de c por alpha (0 a 1). Devuelve NRGBA
+// (no premultiplicado) porque fillRect espera un color "derecho", igual que
+// la tilde que se desvanece en drawPixelText (pixelfont.go).
+func fadeAlpha(c color.RGBA, alpha float32) color.NRGBA {
+	return color.NRGBA{c.R, c.G, c.B, uint8(float32(c.A) * alpha)}
+}
+
+// panelFaded es panel() (theme.go) pero con la placa y el borde
+// desvaneciéndose: lo usan los avisos de reputación, que se van solos.
+func panelFaded(dst *ebiten.Image, r image.Rectangle, bg color.RGBA, alpha float32) {
+	fillRect(dst, r, fadeAlpha(bg, alpha))
+	outline(dst, r, fadeAlpha(colInk, alpha))
 }
 
 // drawImageAt dibuja img con su esquina en at, teñida con tint si no es nil.
@@ -427,8 +488,10 @@ func drawImageAt(dst, img *ebiten.Image, at image.Point, tint *color.RGBA) {
 }
 
 // draw dibuja la barra con lo que muestra ahora y la hora, el día y el
-// turno de la foto.
-func (h *hud) draw(dst *ebiten.Image, snap game.Snapshot) {
+// turno de la foto. repMinTop es el Y libre que deja drawNotices
+// (game_scene.go) debajo de sus avisos del juego, si hay: los avisos de
+// reputación con motivo nunca empiezan más arriba de ahí.
+func (h *hud) draw(dst *ebiten.Image, snap game.Snapshot, repMinTop int) {
 	hudImages()
 	l := layoutHUD(formatReputation(h.rep), formatMoney(h.shownMoney()), hudDayLabel(snap.Day), snap.Clock)
 
@@ -456,13 +519,39 @@ func (h *hud) draw(dst *ebiten.Image, snap game.Snapshot) {
 	}
 	drawPixelText(dst, l.repText, l.rep.Min.X, l.rep.Min.Y, hudTextSize, []textLayer{{0, 0, repColor}}, 1)
 
-	// Los avisos de reputación con motivo (§12.8), debajo de las estrellas:
-	// cada uno sube y se desvanece a su propio ritmo, apilados por si hay
-	// más de uno a la vez.
+	// Los avisos de reputación con motivo (§12.8): una placa crema con
+	// borde negro, igual que los avisos del juego, **debajo del todo** de
+	// la barra (nunca toca su borde ni su sombra) y debajo de los avisos
+	// del juego si los hay (repMinTop; no se encima con ellos), alineada a
+	// la izquierda bajo las estrellas. Cada una se apila debajo de la
+	// anterior y se desvanece sola. El número y el motivo van separados por
+	// el ícono de estrella chiquito (no el glifo "★": a este tamaño, en
+	// Press Start 2P sale como un cuadro sin forma de estrella).
+	//
+	// A diferencia del "+$450" de la plata, la placa **no sube**: solo se
+	// desvanece en su sitio. Si subiera los 24 px de fadeOffset volvería a
+	// meterse debajo de la barra (el bug que se está arreglando), porque su
+	// placa ya arranca pegada al borde de abajo, sin margen arriba.
+	barBottom := hudHeight + 2*hudBorder // debajo del borde de 3 px y la sombra de 3 px
+	top0 := barBottom + repPlateGapY
+	if m := repMinTop + repPlateGapY; m > top0 {
+		top0 = m
+	}
 	for i, d := range h.repDeltas {
-		rise, alpha := d.offset()
-		y := l.stars.Max.Y + 6 + i*(hudTextSize+4) + int(math.Round(rise))
-		drawPixelText(dst, d.text, l.stars.Min.X, y, hudTextSize, append(outlined(2, colInk), textLayer{0, 0, d.color}), alpha)
+		_, alpha := d.offset()
+		amount, reason, _ := strings.Cut(d.text, " ★ ")
+		rect := repPlateRect(l.stars.Min.X, top0, i, amount, reason)
+		panelFaded(dst, rect, colHUDPaper, alpha)
+
+		iconW, iconH := repIconScale*len(hudStar[0]), repIconScale*len(hudStar)
+		textY := rect.Min.Y + repPlatePadY + (iconH-hudTextSize)/2
+		x := rect.Min.X + repPlatePadX
+		drawPixelText(dst, amount, x, textY, hudTextSize, []textLayer{{0, 0, d.color}}, alpha)
+		x += pixelTextWidth(amount, hudTextSize) + repIconGap
+		iconTint := color.RGBA{d.color.R, d.color.G, d.color.B, uint8(255 * alpha)}
+		drawImageAt(dst, hudImgs.starSmall, image.Pt(x, rect.Min.Y+repPlatePadY), &iconTint)
+		x += iconW + repIconGap
+		drawPixelText(dst, reason, x, textY, hudTextSize, []textLayer{{0, 0, d.color}}, alpha)
 	}
 
 	// La plata, verde con contorno negro, y los cambios que suben.

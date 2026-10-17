@@ -243,9 +243,14 @@ func (s *GameScene) Draw(screen *ebiten.Image) {
 		}
 	}
 
-	s.hud.draw(screen, s.snap)
+	// Los avisos del juego (errores, altas) van primero para saber dónde
+	// terminan: los avisos de reputación con motivo (hud.go, §12.8) no se
+	// pueden encimar con ellos (los dos salen pegados a la izquierda, bajo
+	// la barra, y "P-xxx se fue enojado" deja un Notice Y un cambio de
+	// reputación al mismo tiempo).
+	noticesBottom := s.drawNotices(screen)
+	s.hud.draw(screen, s.snap, noticesBottom)
 	s.drawButtons(screen)
-	s.drawNotices(screen)
 	if s.hover != "" && !s.shift {
 		if f, ok := s.figure(s.hover); ok {
 			s.drawTooltip(screen, f)
@@ -275,10 +280,10 @@ func (s *GameScene) drawButtons(dst *ebiten.Image) {
 // noticeShowTicks: cuánto se ve un aviso del juego (6 s).
 const noticeShowTicks = 360
 
-// drawNotices: los avisos del juego (errores del modelo, altas) en la
-// esquina de arriba a la izquierda, debajo de la barra, unos segundos; y
-// el aviso de la escena, si hay.
-func (s *GameScene) drawNotices(dst *ebiten.Image) {
+// noticeLines son los avisos del juego que se ven ahora: hasta 3 de
+// Snapshot.Notices (errores del modelo, altas) de los últimos 6 s, y el
+// aviso de la escena, si hay.
+func (s *GameScene) noticeLines() []string {
 	var lines []string
 	for _, n := range s.snap.Notices {
 		if s.ticks-s.noticeSeen[n] < noticeShowTicks {
@@ -291,13 +296,23 @@ func (s *GameScene) drawNotices(dst *ebiten.Image) {
 	if s.messageTicks > 0 {
 		lines = append(lines, s.message)
 	}
+	return lines
+}
+
+// drawNotices dibuja los avisos del juego en la esquina de arriba a la
+// izquierda, debajo de la barra, apilados hacia abajo. Devuelve el Y libre
+// justo debajo del último (o, si no hay ninguno, debajo de la barra): ahí
+// empiezan los avisos de reputación con motivo (hud.go, §12.8), para que no
+// se encimen con estos.
+func (s *GameScene) drawNotices(dst *ebiten.Image) int {
 	y := hudHeight + 2*hudBorder + 8
-	for _, l := range lines {
+	for _, l := range s.noticeLines() {
 		r := textBox(l, 12, y, smallFace)
 		panel(dst, r, colPaper)
 		drawText(dst, l, float64(r.Min.X+4), float64(r.Min.Y+2), smallFace, colInk)
 		y = r.Max.Y + 4
 	}
+	return y
 }
 
 // drawDayOver: a las 20:00 termina el turno (la nómina y el reporte del día

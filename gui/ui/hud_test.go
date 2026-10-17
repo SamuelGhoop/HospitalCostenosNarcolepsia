@@ -82,7 +82,7 @@ func TestHUDIcons_UseTheMockupPalette(t *testing.T) {
 // Cada píxel del mapa se dibuja como un cuadrado de 3×3 con su color; el
 // '.' queda transparente.
 func TestHUDIcons_DrawAtTimesThree(t *testing.T) {
-	img := iconImage(hudClockIcon, len(hudClockIcon[0]))
+	img := iconImage(hudClockIcon, len(hudClockIcon[0]), hudIconScale)
 	if b := img.Bounds(); b.Dx() != 3*len(hudClockIcon[0]) || b.Dy() != 3*len(hudClockIcon) {
 		t.Fatalf("el reloj mide %v; se esperaba ×3", b.Size())
 	}
@@ -204,6 +204,44 @@ func TestHUDMoney_CountsUpAndShowsTheChange(t *testing.T) {
 	h.update(game.Snapshot{Reputation: 300, Money: 1250})
 	if n := len(h.deltas); n != 1 || h.deltas[0].text != "-$1.200" || h.deltas[0].color != colHUDRed {
 		t.Errorf("al pagar: cambios %+v; se esperaba \"-$1.200\" en rojo", h.deltas)
+	}
+}
+
+// La placa de un aviso de reputación va alineada a la izquierda bajo las
+// estrellas, arranca justo en top0 (que pone hud.draw: nunca más arriba del
+// borde y la sombra de la barra, ni de los avisos del juego si los hay), y
+// cada una se apila debajo de la anterior sin encimarla.
+func TestRepPlateRect_LeftAlignedAtTop0AndStacked(t *testing.T) {
+	const starsMinX = 17
+	const top0 = 51 // p.ej. hudHeight + 2*hudBorder + repPlateGapY, sin avisos del juego encima
+
+	r0 := repPlateRect(starsMinX, top0, 0, "-0,5", "P-003 lleva 30 s esperando revisión")
+	if r0.Min.X != starsMinX {
+		t.Errorf("la placa no arranca bajo las estrellas: Min.X = %d; se esperaba %d", r0.Min.X, starsMinX)
+	}
+	if r0.Min.Y != top0 {
+		t.Errorf("la primera placa no arranca en top0: Min.Y = %d; se esperaba %d", r0.Min.Y, top0)
+	}
+
+	r1 := repPlateRect(starsMinX, top0, 1, "+0,1", "P-002: lo recogieron rápido")
+	if r1.Min.X != starsMinX {
+		t.Errorf("la segunda placa no queda alineada con la primera: Min.X = %d", r1.Min.X)
+	}
+	if r1.Min.Y < r0.Max.Y {
+		t.Errorf("las placas se enciman: la segunda empieza en %d y la primera termina en %d", r1.Min.Y, r0.Max.Y)
+	}
+
+	// Si hay avisos del juego encima (drawNotices), top0 baja y la placa la sigue.
+	lower := repPlateRect(starsMinX, top0+40, 0, "-0,5", "P-003 lleva 30 s esperando revisión")
+	if lower.Min.Y != top0+40 {
+		t.Errorf("la placa no bajó con top0: Min.Y = %d; se esperaba %d", lower.Min.Y, top0+40)
+	}
+
+	// Un motivo más largo deja una placa más ancha (el texto nunca se corta).
+	short := repPlateRect(starsMinX, top0, 0, "-0,5", "corto")
+	long := repPlateRect(starsMinX, top0, 0, "-0,5", "un motivo bastante más largo que el anterior")
+	if long.Dx() <= short.Dx() {
+		t.Errorf("la placa no creció con un motivo más largo: corta %d, larga %d", short.Dx(), long.Dx())
 	}
 }
 
