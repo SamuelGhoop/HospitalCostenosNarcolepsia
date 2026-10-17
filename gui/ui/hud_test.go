@@ -3,6 +3,7 @@ package ui
 import (
 	"image"
 	"image/color"
+	"math"
 	"os"
 	"regexp"
 	"strconv"
@@ -312,11 +313,30 @@ func TestHUDReputationChanges_ShowFadeAndColor(t *testing.T) {
 		t.Fatalf("al subir: avisos %+v; se esperaba un segundo, verde", h.repDeltas)
 	}
 
-	for tick := 0; tick < deltaTicks; tick++ {
+	for tick := 0; tick < repShowTicks; tick++ {
 		h.update(up)
 	}
 	if len(h.repDeltas) != 0 {
-		t.Errorf("después de 1 s quedan %d avisos de reputación; se esperaban 0", len(h.repDeltas))
+		t.Errorf("después de 4 s quedan %d avisos de reputación; se esperaban 0", len(h.repDeltas))
+	}
+}
+
+// Prueba de Samuel del 17-10: el motivo es una frase larga y en 1 s no se
+// alcanza a leer. El aviso se queda opaco 3 s y se desvanece en el último.
+func TestHUDReputationChanges_StayReadableBeforeFading(t *testing.T) {
+	cases := []struct {
+		ticks int
+		want  float32
+	}{
+		{0, 1},
+		{repHoldTicks - 1, 1},                // casi 3 s: todavía opaco
+		{repHoldTicks + repFadeTicks/2, 0.5}, // a mitad del desvanecido
+		{repShowTicks, 0},                    // a los 4 s ya no se ve
+	}
+	for _, c := range cases {
+		if got := (repChangeDelta{ticks: c.ticks}).alpha(); math.Abs(float64(got-c.want)) > 0.01 {
+			t.Errorf("a los %d ticks la opacidad es %.2f; se esperaba %.2f", c.ticks, got, c.want)
+		}
 	}
 }
 

@@ -312,19 +312,34 @@ type moneyDelta struct {
 // offset es lo que lleva subido (negativo: hacia arriba) y su opacidad.
 func (d moneyDelta) offset() (rise float64, alpha float32) { return fadeOffset(d.ticks) }
 
-// repChangeDelta es un aviso de reputación con su motivo (§12.8) que sube y
-// se desvanece igual que un moneyDelta, con los mismos tiempos.
+// Tiempos del aviso de reputación, en ticks. El motivo es una frase larga
+// ("P-003 lleva 30 s esperando revisión") que en el segundo del "+$450" no
+// se alcanza a leer (prueba de Samuel del 17-10): se queda opaco 3 s y se
+// desvanece en el último.
+const (
+	repHoldTicks = 180                         // 3 s opaco…
+	repFadeTicks = 60                          // …y 1 s desvaneciéndose
+	repShowTicks = repHoldTicks + repFadeTicks // lo que dura en total
+)
+
+// repChangeDelta es un aviso de reputación con su motivo (§12.8). No sube
+// como el de la plata: se queda en su sitio y se desvanece al final.
 type repChangeDelta struct {
 	text  string
 	color color.RGBA
 	ticks int
 }
 
-func (d repChangeDelta) offset() (rise float64, alpha float32) { return fadeOffset(d.ticks) }
+// alpha es la opacidad del aviso: 1 durante repHoldTicks y después baja
+// en línea recta hasta 0 en repFadeTicks.
+func (d repChangeDelta) alpha() float32 {
+	f := float64(d.ticks-repHoldTicks) / repFadeTicks
+	return float32(1 - math.Max(0, math.Min(1, f)))
+}
 
 // fadeOffset es lo que lleva subido (negativo: hacia arriba) y la opacidad
 // de algo que aparece y en deltaTicks sube deltaRise px mientras se
-// desvanece; lo comparten moneyDelta y repChangeDelta.
+// desvanece (el "+$450" de la plata).
 func fadeOffset(ticks int) (rise float64, alpha float32) {
 	f := math.Min(1, float64(ticks)/deltaTicks)
 	return -deltaRise * f, float32(1 - f)
@@ -417,7 +432,7 @@ func (h *hud) update(snap game.Snapshot) {
 	}
 	keptRep := h.repDeltas[:0]
 	for _, d := range h.repDeltas {
-		if d.ticks++; d.ticks < deltaTicks {
+		if d.ticks++; d.ticks < repShowTicks {
 			keptRep = append(keptRep, d)
 		}
 	}
@@ -538,7 +553,7 @@ func (h *hud) draw(dst *ebiten.Image, snap game.Snapshot, repMinTop int) {
 		top0 = m
 	}
 	for i, d := range h.repDeltas {
-		_, alpha := d.offset()
+		alpha := d.alpha()
 		amount, reason, _ := strings.Cut(d.text, " ★ ")
 		rect := repPlateRect(l.stars.Min.X, top0, i, amount, reason)
 		panelFaded(dst, rect, colHUDPaper, alpha)
