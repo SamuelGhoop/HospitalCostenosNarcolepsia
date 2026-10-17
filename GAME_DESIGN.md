@@ -266,11 +266,12 @@ La demo no cambia: sigue el round-robin real de la Sección 6 (sección 4).
 - **Cómo quedó (F4, 2026-10-15)**: la nómina se paga en el `Tick` de las 20:00, justo después de los +500 del día completado, y no al pulsar SIGUIENTE DÍA. Así el reporte del día (`Game.DayReport()`) ya muestra la plata después de pagar cuando sale la pantalla de fin de día.
 
 ### 5.9 Reputación (0–5)
-- Más de **20 s** de espera (`Collapsed`, `InHallway` o esperando revisión): **−0,5**, y luego **−0,25** cada 10 s más. Se mide con el cronómetro de espera (5.4), así que no vuelve a empezar cuando el paciente cambia de estado.
-- Se va enojado: **−0,5**, además de lo anterior.
+- Más de **30 s** de espera (`Collapsed`, `InHallway` o esperando revisión): **−0,5**, y luego **−0,25** cada 10 s más. *(Antes 20 s; subió a 30 el 2026-10-16, §12.8: en la prueba del 16-10 a Samuel "le bajaban las estrellas solas" sin darse cuenta.)* Se mide con el cronómetro de espera (5.4), así que no vuelve a empezar cuando el paciente cambia de estado.
+- Se va enojado (45 s sin revisión, sin cambiar): **−0,5**, además de lo anterior.
 - Recogido en menos de **10 s** desde el desplome: **+0,1**. Alta: **+0,1**. Tope 5.
 - Para la derrota por colapso (5.10) cuentan **solo** los `Collapsed` y los `InHallway`; los que esperan revisión no.
 - En el código la reputación se guarda como **entero en centésimas de estrella** (300 = 3 ★). Así sumar 0,1 y restar 0,25 no acumula errores de redondeo.
+- **Cada cambio con su motivo** (2026-10-16, §12.8): `game.ReputationChange{Delta, Reason}` (Delta en centésimas, Reason en español con el ID del paciente: "P-003 lleva 30 s esperando revisión", "P-005 se fue enojado", "P-002: lo recogieron rápido"). `Snapshot.ReputationChanges` trae los últimos (como `Notices`, tope `maxReputationChanges` = 5); solo se registra el motivo si `reason != ""` (los llamados internos de los tests que no le importan a la interfaz pasan ""). La interfaz los muestra como avisos cerca de las estrellas, rojos si bajan y verdes si suben, con el signo tipográfico "−".
 
 ### 5.10 Derrota y puntaje
 - Pierde con: reputación en 0 ("¡PERDIÓ LA LICENCIA!"), quiebra al pagar la nómina ("¡QUIEBRA!") o **5 o más** pacientes `Collapsed` + `InHallway` a la vez ("¡HOSPITAL COLAPSADO!").
