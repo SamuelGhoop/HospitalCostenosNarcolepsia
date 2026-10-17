@@ -32,19 +32,20 @@ type Game struct {
 	clock  clock
 	paused bool
 
-	staff                     []*StaffMember    // todo el personal, en orden de contratación
-	doctorCount, orderlyCount int               // para los IDs: D-01, D-02… y C-01, C-02…
-	patients                  []*patient        // los pacientes de la partida, en orden de llegada
-	patientCount              int               // para los IDs: P-001, P-002…
-	nextArrival               time.Duration     // cuánto falta para que aparezca el paciente siguiente
-	notes                     map[string]string // ID del paciente → cómo sale en el Shift Report: "(alta)"
-	lastAssignErr             string            // último error de AssignRoom (consulta 5.3); "" si no hubo
-	money                     int               // plata del hospital, en pesos
-	reputation                int               // en centésimas de estrella: 300 = 3 ★ (§5.9)
-	over                      GameOver          // NotOver mientras la partida sigue
-	score                     int               // puntaje acumulado (§5.10)
-	episodeTimes              map[string]string // ID del episodio → hora del juego ("14:15"), §3.2
-	notices                   []string          // últimos avisos para la interfaz, del más viejo al más nuevo
+	staff                     []*StaffMember     // todo el personal, en orden de contratación
+	doctorCount, orderlyCount int                // para los IDs: D-01, D-02… y C-01, C-02…
+	patients                  []*patient         // los pacientes de la partida, en orden de llegada
+	patientCount              int                // para los IDs: P-001, P-002…
+	nextArrival               time.Duration      // cuánto falta para que aparezca el paciente siguiente
+	notes                     map[string]string  // ID del paciente → cómo sale en el Shift Report: "(alta)"
+	lastAssignErr             string             // último error de AssignRoom (consulta 5.3); "" si no hubo
+	money                     int                // plata del hospital, en pesos
+	reputation                int                // en centésimas de estrella: 300 = 3 ★ (§5.9)
+	over                      GameOver           // NotOver mientras la partida sigue
+	score                     int                // puntaje acumulado (§5.10)
+	episodeTimes              map[string]string  // ID del episodio → hora del juego ("14:15"), §3.2
+	notices                   []string           // últimos avisos para la interfaz, del más viejo al más nuevo
+	repChanges                []ReputationChange // últimos cambios de reputación con su motivo (§5.9, §12.8)
 
 	// Contratación y nómina (§5.8 y §6, F4).
 	candidates         []*candidate // los candidatesPerDay candidatos de la bolsa de empleo de hoy

@@ -166,7 +166,7 @@ func (g *Game) wakeUpLocked(pt *patient) {
 		g.money += dischargeFee
 		g.dayDischargeIncome += dischargeFee // para el Shift Report diario (§5.8, F4)
 		g.score += dischargePoints
-		g.changeReputationLocked(+dischargeBonus)
+		g.changeReputationLocked(+dischargeBonus, fmt.Sprintf("%s se fue de alta", pt.p.ID()))
 		g.leaveLocked(pt, "(alta)")
 		return
 	}
@@ -203,7 +203,7 @@ func (g *Game) WakeEarly(patientID string) error {
 	if err := g.h.WakePatient(pt.p); err != nil { // lo despierta y libera la cama
 		return err
 	}
-	g.changeReputationLocked(-wakeEarlyPenalty)
+	g.changeReputationLocked(-wakeEarlyPenalty, fmt.Sprintf("%s: lo despertaron antes de tiempo", pt.p.ID()))
 	g.wanderAgainLocked(pt, awakeDuration(g.rng, pt.p.Level())/2)
 	return nil
 }
@@ -220,7 +220,7 @@ func (g *Game) leaveAngryLocked(pt *patient) {
 		}
 	}
 	g.cancelJobsForLocked(pt)
-	g.changeReputationLocked(-angryPenalty)
+	g.changeReputationLocked(-angryPenalty, fmt.Sprintf("%s se fue enojado", pt.p.ID()))
 	g.noticeLocked(fmt.Sprintf("%s se fue enojado", pt.p))
 	g.leaveLocked(pt, "(se fue enojado)")
 }

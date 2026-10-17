@@ -8,22 +8,23 @@ import "time"
 // se arma con g.mu tomado y, una vez devuelta, la goroutine de la interfaz
 // la puede leer sin candado aunque el motor siga avanzando la partida.
 type Snapshot struct {
-	Day        int
-	Clock      string  // hora de juego, por ejemplo "14:15"
-	Progress   float64 // cuánto va del turno, de 0 a 1
-	Paused     bool
-	DayOver    bool // ya son las 20:00 (la nómina y el Shift Report llegan en F4)
-	Rooms      []RoomView
-	Staff      []StaffMemberView // en orden de contratación
-	Patients   []GamePatientView // en orden de llegada
-	Candidates []CandidateView   // los 3 de la bolsa de empleo de hoy (§6, F4)
-	Notices    []string          // últimos avisos, del más viejo al más nuevo: "08:12 …"
-	DoorOpen   bool              // la puerta del hospital está abierta: alguien la va a cruzar (§5.3)
-	Money      int               // plata del hospital, en pesos
-	Reputation int               // en centésimas de estrella (300 = 3 ★); la interfaz la muestra como "3,00 ★"
-	GameOver   GameOver          // NotOver mientras la partida sigue
-	Score      int               // puntaje acumulado (§5.10)
-	FinalScore int               // puntaje final, solo con la partida perdida; 0 mientras sigue
+	Day               int
+	Clock             string  // hora de juego, por ejemplo "14:15"
+	Progress          float64 // cuánto va del turno, de 0 a 1
+	Paused            bool
+	DayOver           bool // ya son las 20:00 (la nómina y el Shift Report llegan en F4)
+	Rooms             []RoomView
+	Staff             []StaffMemberView  // en orden de contratación
+	Patients          []GamePatientView  // en orden de llegada
+	Candidates        []CandidateView    // los 3 de la bolsa de empleo de hoy (§6, F4)
+	Notices           []string           // últimos avisos, del más viejo al más nuevo: "08:12 …"
+	DoorOpen          bool               // la puerta del hospital está abierta: alguien la va a cruzar (§5.3)
+	Money             int                // plata del hospital, en pesos
+	Reputation        int                // en centésimas de estrella (300 = 3 ★); la interfaz la muestra como "3,00 ★"
+	ReputationChanges []ReputationChange // últimos cambios de reputación con su motivo, del más viejo al más nuevo (§12.8)
+	GameOver          GameOver           // NotOver mientras la partida sigue
+	Score             int                // puntaje acumulado (§5.10)
+	FinalScore        int                // puntaje final, solo con la partida perdida; 0 mientras sigue
 }
 
 // StaffMemberView es la foto de un miembro del personal en el modo juego.
@@ -70,6 +71,8 @@ func (g *Game) Snapshot() Snapshot {
 		// Copia: si se pasara g.notices tal cual, la interfaz compartiría el
 		// arreglo de fondo con el juego mientras el motor le agrega avisos.
 		Notices: append([]string(nil), g.notices...),
+		// Mismo motivo: copia de g.repChanges.
+		ReputationChanges: append([]ReputationChange(nil), g.repChanges...),
 	}
 	if g.over != NotOver {
 		snap.FinalScore = g.finalScoreLocked()

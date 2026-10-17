@@ -164,7 +164,7 @@ func (g *Game) pickUpLocked(s *StaffMember, pt *patient) {
 	g.episodeTimes[history[len(history)-1].ID()] = g.clock.String()
 
 	if pt.waited < quickPickUpWithin { // §5.9: recogido rápido
-		g.changeReputationLocked(+quickPickUpBonus)
+		g.changeReputationLocked(+quickPickUpBonus, fmt.Sprintf("%s: lo recogieron rápido", pt.p.ID()))
 	}
 
 	// Sin cama, RegisterEpisode no da error: el modelo lo deja dormido en el
