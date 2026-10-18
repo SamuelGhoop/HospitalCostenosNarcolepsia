@@ -40,6 +40,19 @@ type GameScene struct {
 	messageTicks int
 	noticeSeen   map[string]int // avisos del juego → tick en que aparecieron
 	ticks        int
+
+	// Los paneles del fin del día y del Game Over abren y cierran animados,
+	// como la bolsa de empleo (anim.go, pedido de Samuel el 2026-10-17):
+	// nil mientras no hace falta ninguno; se crean la primera vez que
+	// snap.DayOver o snap.GameOver es verdad y se vuelven nil cuando
+	// terminan de cerrar (así, al día siguiente o en una partida nueva,
+	// vuelven a abrir desde cero). gameOverNext es la acción pendiente
+	// (NUEVA PARTIDA o MENÚ) que se hace al terminar de cerrar el Game
+	// Over; el fin de día siempre termina en StartNextDay, así que no le
+	// hace falta guardar nada.
+	dayOverAnim  *animPanel
+	gameOverAnim *animPanel
+	gameOverNext func() (Scene, error)
 }
 
 // NewGameScene arranca una partida nueva (NUEVA PARTIDA): el azar de la
@@ -117,15 +130,10 @@ func (s *GameScene) update(in input) (Scene, error) {
 
 	// Los paneles del fin del día y de la derrota se llevan la entrada.
 	if s.snap.GameOver != game.NotOver {
-		return s.gameOverInput(in)
+		return s.updateGameOver(in)
 	}
 	if s.snap.DayOver {
-		if in.confirm || in.space || (in.click && in.mouse.In(dayOverButton)) {
-			if err := s.g.StartNextDay(); err != nil {
-				s.say(err.Error())
-			}
-		}
-		return s, nil
+		return s.updateDayOver(in)
 	}
 
 	s.shift = in.shift
@@ -153,17 +161,101 @@ func (s *GameScene) update(in input) (Scene, error) {
 	return s, nil
 }
 
-// gameOverInput: con la partida perdida, NUEVA PARTIDA o MENÚ.
-func (s *GameScene) gameOverInput(in input) (Scene, error) {
-	switch {
-	case in.click && in.mouse.In(newGameButton), in.confirm:
-		s.onQuit()
-		return newGameSceneFn()
-	case in.click && in.mouse.In(menuButton), in.back:
-		s.onQuit()
-		return NewTitleScene(), nil
+// panelAnimFrom es desde dónde aparecen el panel del fin de día y el de
+// Game Over: del botón REPORTE del HUD (son los dos "un reporte" de cómo
+// quedó el turno o la partida; GAME_DESIGN §9.4), pedido de Samuel el
+// 2026-10-17.
+func panelAnimFrom() vec {
+	c := reportButton.Min.Add(reportButton.Max).Div(2)
+	return vec{float64(c.X), float64(c.Y)}
+}
+
+// Tiempos y escala mínima de estos dos paneles: los mismos que la bolsa de
+// empleo y la pausa (hiringOpenTicks/hiringCloseTicks, pauseOpenTicks/
+// pauseCloseTicks), con otro nombre porque cada escena guarda los suyos.
+const (
+	panelOpenTicks  = 13 // 0,22 s
+	panelCloseTicks = 11 // 0,18 s
+	panelMinScale   = 0.167
+)
+
+// dayOverOpenCenter y gameOverOpenCenter son el centro de cada panel ya
+// abierto (el centro de su caja en drawDayOver/drawGameOver).
+var (
+	dayOverOpenCenter  = vec{640, 355}
+	gameOverOpenCenter = vec{640, 365}
+)
+
+// updateDayOver: a las 20:00 termina el turno. El panel abre animado la
+// primera vez que se ve DayOver, y SIGUIENTE DÍA (o Espacio/Enter) arranca
+// el cierre; StartNextDay se llama al terminar de cerrar, no al hacer
+// clic (igual que la bolsa de empleo con CONTRATAR, pero acá la acción
+// sale de la escena, no del panel).
+func (s *GameScene) updateDayOver(in input) (Scene, error) {
+	if s.dayOverAnim == nil {
+		// El primer tick que se ve DayOver arranca a abrir en 0: no avanza
+		// la animación todavía (el tick que crea el panel no es el primero
+		// que ya lo mueve, igual que la bolsa de empleo, donde abrir y
+		// crear la escena son dos pasos separados).
+		s.dayOverAnim = newAnimPanel(panelOpenTicks, panelCloseTicks, panelAnimFrom(), dayOverOpenCenter, panelMinScale)
+		return s, nil
+	}
+	if !s.dayOverAnim.acceptsInput() {
+		if s.dayOverAnim.step() {
+			s.dayOverAnim = nil // listo para abrir de cero el día que vuelva a terminar
+			if err := s.g.StartNextDay(); err != nil {
+				s.say(err.Error())
+			}
+		}
+		return s, nil
+	}
+	if in.confirm || in.space || (in.click && in.mouse.In(dayOverButton)) {
+		s.dayOverAnim.startClose()
 	}
 	return s, nil
+}
+
+// updateGameOver: la partida se perdió. Mismo patrón que updateDayOver,
+// pero la acción pendiente (NUEVA PARTIDA o MENÚ) sí depende de qué
+// botón se usó, así que se guarda en gameOverNext.
+func (s *GameScene) updateGameOver(in input) (Scene, error) {
+	if s.gameOverAnim == nil {
+		s.gameOverAnim = newAnimPanel(panelOpenTicks, panelCloseTicks, panelAnimFrom(), gameOverOpenCenter, panelMinScale)
+		return s, nil // igual que updateDayOver: el tick que crea el panel no lo mueve todavía
+	}
+	if !s.gameOverAnim.acceptsInput() {
+		if s.gameOverAnim.step() {
+			return s.gameOverNext()
+		}
+		return s, nil
+	}
+	switch {
+	case in.click && in.mouse.In(newGameButton), in.confirm:
+		s.gameOverNext = func() (Scene, error) { s.onQuit(); return newGameSceneFn() }
+		s.gameOverAnim.startClose()
+	case in.click && in.mouse.In(menuButton), in.back:
+		s.gameOverNext = func() (Scene, error) { s.onQuit(); return NewTitleScene(), nil }
+		s.gameOverAnim.startClose()
+	}
+	return s, nil
+}
+
+// dayOverAnimOrOpen y gameOverAnimOrOpen dan la animación del panel, o una
+// ya quieta y abierta si Draw se llama antes de que update la haya creado
+// (no debería pasar en el juego real, donde Update siempre corre antes que
+// Draw, pero sí en un test que dibuje sin pasar por update primero).
+func (s *GameScene) dayOverAnimOrOpen() *animPanel {
+	if s.dayOverAnim == nil {
+		return &animPanel{phase: panelOpen, to: dayOverOpenCenter}
+	}
+	return s.dayOverAnim
+}
+
+func (s *GameScene) gameOverAnimOrOpen() *animPanel {
+	if s.gameOverAnim == nil {
+		return &animPanel{phase: panelOpen, to: gameOverOpenCenter}
+	}
+	return s.gameOverAnim
 }
 
 // Botones de abajo a la derecha (§9.1) y de los paneles.
@@ -318,35 +410,39 @@ func (s *GameScene) drawNotices(dst *ebiten.Image) int {
 }
 
 // drawDayOver: a las 20:00 termina el turno (la nómina y el reporte del día
-// llegan en F4).
+// llegan en F4). El panel abre y cierra animado (drawAnimatedPanel,
+// anim.go), igual que la bolsa de empleo.
 func (s *GameScene) drawDayOver(dst *ebiten.Image) {
-	fillRect(dst, image.Rect(0, 0, ScreenWidth, ScreenHeight), pauseDim)
-	box := image.Rect(400, 240, 880, 470)
-	panel(dst, box, colPaper)
-	title := fmt.Sprintf("FIN DEL DÍA %d", s.snap.Day)
-	drawPixelText(dst, title, ScreenWidth/2-pixelTextWidth(title, 24)/2, 280, 24, []textLayer{{0, 0, colInk}}, 1)
-	score := fmt.Sprintf("Puntaje: %d", s.snap.Score)
-	drawText(dst, score, float64(ScreenWidth/2)-textWidth(score, textFace)/2, 340, textFace, colMuted)
-	panel(dst, dayOverButton, colBlue)
-	drawText(dst, "SIGUIENTE DÍA", float64(dayOverButton.Min.X+(dayOverButton.Dx()-int(textWidth("SIGUIENTE DÍA", boldFace)))/2), float64(dayOverButton.Min.Y+12), boldFace, colWhite)
+	drawAnimatedPanel(dst, s.dayOverAnimOrOpen(), pauseDim.A, func(c *ebiten.Image) {
+		box := image.Rect(400, 240, 880, 470)
+		panel(c, box, colPaper)
+		title := fmt.Sprintf("FIN DEL DÍA %d", s.snap.Day)
+		drawPixelText(c, title, ScreenWidth/2-pixelTextWidth(title, 24)/2, 280, 24, []textLayer{{0, 0, colInk}}, 1)
+		score := fmt.Sprintf("Puntaje: %d", s.snap.Score)
+		drawText(c, score, float64(ScreenWidth/2)-textWidth(score, textFace)/2, 340, textFace, colMuted)
+		panel(c, dayOverButton, colBlue)
+		drawText(c, "SIGUIENTE DÍA", float64(dayOverButton.Min.X+(dayOverButton.Dx()-int(textWidth("SIGUIENTE DÍA", boldFace)))/2), float64(dayOverButton.Min.Y+12), boldFace, colWhite)
+	})
 }
 
 // drawGameOver: la partida se perdió (§5.10): el motivo, el puntaje final y
-// los días; NUEVA PARTIDA o MENÚ.
+// los días; NUEVA PARTIDA o MENÚ. El panel abre y cierra animado, igual
+// que el fin de día.
 func (s *GameScene) drawGameOver(dst *ebiten.Image) {
-	fillRect(dst, image.Rect(0, 0, ScreenWidth, ScreenHeight), pauseDim)
-	box := image.Rect(340, 220, 940, 510)
-	panel(dst, box, colPaper)
-	title := s.snap.GameOver.String()
-	drawPixelText(dst, title, ScreenWidth/2-pixelTextWidth(title, 24)/2, 260, 24, append(outlined(2, colInk), textLayer{0, 0, colHUDRed}), 1)
-	for i, l := range []string{fmt.Sprintf("Puntaje final: %d", s.snap.FinalScore), fmt.Sprintf("Días: %d", s.snap.Day)} {
-		drawText(dst, l, float64(ScreenWidth/2)-textWidth(l, textFace)/2, float64(320+i*34), textFace, colInk)
-	}
-	for _, b := range []struct {
-		r    image.Rectangle
-		text string
-	}{{newGameButton, "NUEVA PARTIDA"}, {menuButton, "MENÚ"}} {
-		panel(dst, b.r, colBlue)
-		drawText(dst, b.text, float64(b.r.Min.X+(b.r.Dx()-int(textWidth(b.text, boldFace)))/2), float64(b.r.Min.Y+12), boldFace, colWhite)
-	}
+	drawAnimatedPanel(dst, s.gameOverAnimOrOpen(), pauseDim.A, func(c *ebiten.Image) {
+		box := image.Rect(340, 220, 940, 510)
+		panel(c, box, colPaper)
+		title := s.snap.GameOver.String()
+		drawPixelText(c, title, ScreenWidth/2-pixelTextWidth(title, 24)/2, 260, 24, append(outlined(2, colInk), textLayer{0, 0, colHUDRed}), 1)
+		for i, l := range []string{fmt.Sprintf("Puntaje final: %d", s.snap.FinalScore), fmt.Sprintf("Días: %d", s.snap.Day)} {
+			drawText(c, l, float64(ScreenWidth/2)-textWidth(l, textFace)/2, float64(320+i*34), textFace, colInk)
+		}
+		for _, b := range []struct {
+			r    image.Rectangle
+			text string
+		}{{newGameButton, "NUEVA PARTIDA"}, {menuButton, "MENÚ"}} {
+			panel(c, b.r, colBlue)
+			drawText(c, b.text, float64(b.r.Min.X+(b.r.Dx()-int(textWidth(b.text, boldFace)))/2), float64(b.r.Min.Y+12), boldFace, colWhite)
+		}
+	})
 }

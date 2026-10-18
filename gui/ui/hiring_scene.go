@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"image"
 	"image/color"
-	"math"
 	"strings"
 
 	"github.com/hajimehoshi/ebiten/v2"
@@ -206,15 +205,14 @@ func (s *HiringScene) pageOffset() int {
 
 // openness es cuánto se ve la bolsa: 0 cerrada (del tamaño del
 // portapapeles del HUD), 1 abierta (a su tamaño, centrada). Abrir es
-// ease-out (1 − (1 − t)³); cerrar, ease-in al revés (1 − t³).
+// ease-out; cerrar, ease-in (anim.go: easeOutOpenness/easeInOpenness, las
+// mismas fórmulas que reusan la pausa, el fin de día y el Game Over).
 func (s *HiringScene) openness() float64 {
 	switch s.phase {
 	case hiringOpening:
-		t := float64(s.ticks) / float64(hiringOpenTicks)
-		return 1 - math.Pow(1-t, 3)
+		return easeOutOpenness(s.ticks, hiringOpenTicks)
 	case hiringClosing:
-		t := float64(s.ticks) / float64(hiringCloseTicks)
-		return 1 - math.Pow(t, 3)
+		return easeInOpenness(s.ticks, hiringCloseTicks)
 	default:
 		return 1
 	}
@@ -222,14 +220,10 @@ func (s *HiringScene) openness() float64 {
 
 // hiringTransform es la escala y el centro de la bolsa con esa openness
 // (HIRING_ASSETS.md): el punto p del tablero completo (dibujado en su sitio
-// final) queda en centro + (p − (640, 360)) × escala.
+// final) queda en centro + (p − (640, 360)) × escala. clipboardTransform
+// (anim.go) hace la misma cuenta para los demás paneles animados.
 func hiringTransform(o float64) (scale float64, center vec) {
-	scale = hiringMinScale + (1-hiringMinScale)*o
-	center = vec{
-		hiringClosedCenter.x + (hiringOpenCenter.x-hiringClosedCenter.x)*o,
-		hiringClosedCenter.y + (hiringOpenCenter.y-hiringClosedCenter.y)*o,
-	}
-	return
+	return clipboardTransform(o, hiringMinScale, hiringClosedCenter, hiringOpenCenter)
 }
 
 // ─── Medidas e imágenes ────────────────────────────────────────────────

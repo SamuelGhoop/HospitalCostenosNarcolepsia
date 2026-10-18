@@ -135,6 +135,43 @@ func bubbleFor(state hospital.PatientState) (txt string, bg color.RGBA, ok bool)
 
 // ─── Ayudantes de dibujo ───────────────────────────────────────────────
 
+// panelContentCanvas es el lienzo de 1280×720 donde cada panel animado
+// (pausa, fin de día, Game Over) dibuja su contenido en su sitio final,
+// antes de escalarlo y centrarlo como una sola pieza (drawAnimatedPanel).
+// Se reusa entre los tres porque nunca están abiertos a la vez (uno
+// siempre tapa al que había antes de abrirse), igual que hiringBoardCanvas
+// con la bolsa de empleo (hiring_scene.go).
+var panelContentCanvasImg *ebiten.Image
+
+func panelContentCanvas() *ebiten.Image {
+	if panelContentCanvasImg == nil {
+		panelContentCanvasImg = ebiten.NewImage(ScreenWidth, ScreenHeight)
+	}
+	return panelContentCanvasImg
+}
+
+// drawAnimatedPanel oscurece la pantalla (hasta dimAlpha, con la openness
+// de a) y dibuja el contenido de content —en su sitio final, a tamaño
+// completo— escalado y centrado según a.transform() (anim.go): el mismo
+// truco de "dibujar el tablero completo... y ponerla en pantalla con
+// escala s" que ya usaba la bolsa de empleo (hiring_scene.go), factorizado
+// para que la pausa, el fin de día y el Game Over lo reusen.
+func drawAnimatedPanel(screen *ebiten.Image, a *animPanel, dimAlpha uint8, content func(dst *ebiten.Image)) {
+	o := a.openness()
+	fillRect(screen, image.Rect(0, 0, ScreenWidth, ScreenHeight), color.RGBA{0, 0, 0, uint8(float64(dimAlpha) * o)})
+
+	canvas := panelContentCanvas()
+	canvas.Clear()
+	content(canvas)
+
+	scale, center := a.transform()
+	op := &ebiten.DrawImageOptions{Filter: ebiten.FilterNearest}
+	op.GeoM.Translate(-float64(ScreenWidth)/2, -float64(ScreenHeight)/2)
+	op.GeoM.Scale(scale, scale)
+	op.GeoM.Translate(center.x, center.y)
+	screen.DrawImage(canvas, op)
+}
+
 // fillRect pinta un rectángulo sólido (sin suavizado: pixel art nítido).
 func fillRect(dst *ebiten.Image, r image.Rectangle, c color.Color) {
 	vector.FillRect(dst, float32(r.Min.X), float32(r.Min.Y), float32(r.Dx()), float32(r.Dy()), c, false)

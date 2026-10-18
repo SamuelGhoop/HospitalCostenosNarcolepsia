@@ -118,11 +118,41 @@ type plainScene struct{ updates int }
 func (p *plainScene) Update() (Scene, error) { p.updates++; return p, nil }
 func (p *plainScene) Draw(*ebiten.Image)     {}
 
-// choosePause baja hasta la opción o en la pausa, la confirma con Enter y
-// avanza hasta que termina la espera del cursor. Devuelve lo que devolvió
+// openPause espera a que termine de abrir (anim en panelOpen), lista para
+// recibir teclado y mouse.
+func openPause(t *testing.T, p *PauseScene) {
+	t.Helper()
+	for i := 0; p.anim.phase != panelOpen; i++ {
+		if i > pauseOpenTicks {
+			t.Fatalf("la pausa no terminó de abrir en %d ticks", pauseOpenTicks)
+		}
+		if _, err := p.update(input{}); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+// finishClose avanza hasta que la pausa termina de cerrar (deja de
+// devolverse a sí misma) y devuelve lo que devolvió ese último tick.
+func finishClose(t *testing.T, p *PauseScene) (Scene, error) {
+	t.Helper()
+	var next Scene = p
+	var err error
+	for i := 0; next == Scene(p) && err == nil; i++ {
+		if i > pauseCloseTicks+1 {
+			t.Fatalf("la pausa no terminó de cerrar en %d ticks", pauseCloseTicks)
+		}
+		next, err = p.update(input{})
+	}
+	return next, err
+}
+
+// choosePause abre la pausa, baja hasta la opción o, la confirma con Enter,
+// espera el cursor y deja que termine de cerrar. Devuelve lo que devolvió
 // la pausa en ese último tick.
 func choosePause(t *testing.T, p *PauseScene, o option) (Scene, error) {
 	t.Helper()
+	openPause(t, p)
 	for i := 0; p.menu.selected != o; i++ {
 		if i > len(pauseOptions) {
 			t.Fatalf("no se pudo llegar a %v con ↓", o)
@@ -135,7 +165,10 @@ func choosePause(t *testing.T, p *PauseScene, o option) (Scene, error) {
 	for i := 0; i < confirmTicks && next == Scene(p) && err == nil; i++ {
 		next, err = p.update(input{})
 	}
-	return next, err
+	if err != nil || next != Scene(p) || p.anim.phase != panelClosing {
+		return next, err // AJUSTES no cierra: sigue en la pausa, sin animación de cierre
+	}
+	return finishClose(t, p)
 }
 
 // Esc abre la pausa sobre una escena que se puede pausar (la demo; el juego
@@ -198,25 +231,67 @@ func TestApp_PausedSceneIsNotUpdated(t *testing.T) {
 	}
 }
 
-// Con la pausa abierta, Esc la cierra al instante (sin esperar al cursor)
-// y vuelve a la MISMA escena, no a una nueva.
-func TestPause_EscResumesTheSameSceneAtOnce(t *testing.T) {
+// La animación de abrir de la pausa: openness en 0, a mitad de camino (≈
+// 0,5, con el margen de la curva ease-out) y en 1 cuando ya está abierta;
+// mientras no llegue a 1 no acepta teclado ni mouse (igual que la bolsa de
+// empleo).
+func TestPause_OpenAnimationPhasesAndOpenness(t *testing.T) {
 	g := &fakeGame{}
 	p := newPauseScene(g)
+	if p.anim.phase != panelOpening || p.anim.openness() != 0 {
+		t.Fatalf("recién creada: fase %v, openness %v; se esperaba abriendo en 0", p.anim.phase, p.anim.openness())
+	}
+	if p.anim.acceptsInput() {
+		t.Error("recién creada acepta entrada; mientras abre no debería")
+	}
+	for i := 0; i < pauseOpenTicks/2; i++ {
+		p.update(input{})
+	}
+	if o := p.anim.openness(); o <= 0 || o >= 1 {
+		t.Errorf("a mitad de abrir: openness %v; se esperaba entre 0 y 1", o)
+	}
+	if next, _ := p.update(input{down: true}); next != Scene(p) || p.menu.selected != optResume {
+		t.Error("mientras abre, una tecla movió el menú; no debería aceptar entrada")
+	}
+	openPause(t, p)
+	if p.anim.openness() != 1 {
+		t.Errorf("abierta: openness %v; se esperaba 1", p.anim.openness())
+	}
+}
+
+// Con la pausa abierta, Esc arranca el cierre (sin esperar al cursor) y,
+// al terminar de cerrar (no antes: mientras anima no acepta nada más),
+// vuelve a la MISMA escena, no a una nueva.
+func TestPause_EscClosesThenResumesTheSameScene(t *testing.T) {
+	g := &fakeGame{}
+	p := newPauseScene(g)
+	openPause(t, p)
+
 	next, err := p.update(input{back: true})
+	if err != nil || next != Scene(p) || p.anim.phase != panelClosing {
+		t.Fatalf("Esc no arrancó el cierre: (%T, %v), fase %v", next, err, p.anim.phase)
+	}
+	for i := 0; i < pauseCloseTicks-1; i++ { // todavía cerrando: sigue siendo la pausa
+		if next, _ = p.update(input{}); next != Scene(p) {
+			t.Fatalf("tick %d de %d: ya volvió; debía esperar a terminar de cerrar", i, pauseCloseTicks)
+		}
+	}
+	next, err = p.update(input{})
 	if err != nil || next != Scene(g) {
-		t.Fatalf("Esc devolvió (%T, %v); se esperaba el mismo juego", next, err)
+		t.Fatalf("al terminar de cerrar devolvió (%T, %v); se esperaba el mismo juego", next, err)
 	}
 	if g.resumed != 1 {
 		t.Errorf("onResume se llamó %d veces; se esperaba 1", g.resumed)
 	}
 }
 
-// REANUDAR con Enter espera los 0,45 s del cursor y vuelve a la misma
-// escena.
-func TestPause_ResumeWaitsForTheCursor(t *testing.T) {
+// REANUDAR con Enter espera los 0,45 s del cursor, arranca el cierre y
+// vuelve a la misma escena solo al terminar de cerrar.
+func TestPause_ResumeWaitsForTheCursorThenCloses(t *testing.T) {
 	g := &fakeGame{}
 	p := newPauseScene(g)
+	openPause(t, p)
+
 	if next, _ := p.update(input{confirm: true}); next != Scene(p) {
 		t.Fatal("REANUDAR salió de una; debía esperar al cursor")
 	}
@@ -225,21 +300,29 @@ func TestPause_ResumeWaitsForTheCursor(t *testing.T) {
 			t.Fatalf("REANUDAR salió a los %d ticks; debía esperar %d", i, confirmTicks)
 		}
 	}
-	if next, _ := p.update(input{}); next != Scene(g) || g.resumed != 1 {
-		t.Errorf("a los %d ticks: %T y onResume %d veces; se esperaba el juego y 1", confirmTicks, next, g.resumed)
+	if _, err := p.update(input{}); err != nil { // el confirmTicks-ésimo: dispara REANUDAR
+		t.Fatal(err)
+	}
+	if p.anim.phase != panelClosing {
+		t.Fatalf("a los %d ticks de confirmar, fase %v; se esperaba cerrando", confirmTicks, p.anim.phase)
+	}
+	next, err := finishClose(t, p)
+	if err != nil || next != Scene(g) || g.resumed != 1 {
+		t.Errorf("al terminar de cerrar: (%T, %v) y onResume %d veces; se esperaba el juego y 1", next, err, g.resumed)
 	}
 }
 
-// Mientras se confirma una opción el menú ya no escucha: Esc no cierra la
-// pausa a mitad de SALIR AL MENÚ.
+// Mientras se confirma una opción el menú ya no escucha: Esc no arranca el
+// cierre a mitad de SALIR AL MENÚ.
 func TestPause_EscIsIgnoredWhileConfirming(t *testing.T) {
 	g := &fakeGame{}
 	p := newPauseScene(g)
+	openPause(t, p)
 	p.update(input{down: true})
 	p.update(input{down: true}) // SALIR AL MENÚ
 	p.update(input{confirm: true})
-	if next, _ := p.update(input{back: true}); next != Scene(p) || g.resumed != 0 {
-		t.Errorf("Esc confirmando SALIR AL MENÚ: %T y onResume %d veces; se esperaba seguir en la pausa", next, g.resumed)
+	if next, _ := p.update(input{back: true}); next != Scene(p) || p.anim.phase == panelClosing || g.resumed != 0 {
+		t.Errorf("Esc confirmando SALIR AL MENÚ: %T, fase %v, onResume %d veces; se esperaba seguir en la pausa sin cerrar", next, p.anim.phase, g.resumed)
 	}
 }
 
@@ -302,7 +385,11 @@ func TestPause_DemoAutoAdvanceFreezesAndContinues(t *testing.T) {
 	if !ok {
 		t.Fatalf("la escena es %T; se esperaba la pausa", a.scene)
 	}
-	next, _ := p.update(input{back: true})
+	p.update(input{back: true}) // arranca el cierre; la demo sigue congelada hasta que termine
+	next, err := finishClose(t, p)
+	if err != nil {
+		t.Fatal(err)
+	}
 	a.scene = next
 	for i := before; i < autoAdvanceTicks-1; i++ {
 		a.update(false)
