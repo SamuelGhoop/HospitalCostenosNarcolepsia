@@ -18,6 +18,14 @@ import (
 func newTestGameScene(t *testing.T) *GameScene {
 	t.Helper()
 	needFonts(t)
+	// seedSource da la semilla del cosmético (scenery, wanderRNG...): sin
+	// fijarla acá salía de time.Now().UnixNano() y el test de deambular del
+	// personal libre (staff_rest.go) fallaba de vez en cuando. Se restaura
+	// al terminar el test para no afectar a los demás (ni al juego normal
+	// ni al backdoor -seed, que la fija por su cuenta en agent.go).
+	old := seedSource
+	seedSource = func() int64 { return 42 }
+	t.Cleanup(func() { seedSource = old })
 	g, err := game.New(rand.New(rand.NewSource(7)), rand.New(rand.NewSource(8)), rand.New(rand.NewSource(9)))
 	if err != nil {
 		t.Fatal(err)
