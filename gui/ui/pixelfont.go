@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"image"
 	"image/color"
+	"strings"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/text/v2"
@@ -146,4 +147,54 @@ func drawPixelText(dst *ebiten.Image, s string, x, y int, size float64, layers [
 // por letra (es monoespaciada).
 func pixelTextWidth(s string, size float64) int {
 	return len([]rune(s)) * int(size)
+}
+
+// wrapTwoLines parte s en dos renglones por palabras, para que cada uno
+// quepa en maxWidth: el primero se llena con todas las palabras que
+// entren, y el resto queda en el segundo (que puede seguir sin caber, si
+// una sola palabra ya es más ancha que maxWidth: no hay por dónde
+// partirla). Si s ya cabe entera, devuelve un solo renglón. La usan los
+// subtítulos de la demo (demo_scene.go) y el nombre del candidato de la
+// bolsa de empleo (hiring_scene.go), que antes tenían cada uno su propia
+// copia de este mismo partido por palabras.
+func wrapTwoLines(s string, maxWidth int, size float64) []string {
+	if pixelTextWidth(s, size) <= maxWidth {
+		return []string{s}
+	}
+	words := strings.Fields(s)
+	if len(words) == 0 {
+		return []string{s}
+	}
+	line1 := words[0]
+	i := 1
+	for i < len(words) {
+		grown := line1 + " " + words[i]
+		if pixelTextWidth(grown, size) > maxWidth {
+			break
+		}
+		line1 = grown
+		i++
+	}
+	if i >= len(words) {
+		return []string{line1}
+	}
+	return []string{line1, strings.Join(words[i:], " ")}
+}
+
+// truncateWithEllipsis recorta s a lo que quepa en maxWidth, cambiando el
+// final por "…" si hizo falta cortarla. La usan las filas del reporte
+// (report_scene.go), que no tienen cómo partirse en dos renglones sin
+// desordenar la columna.
+func truncateWithEllipsis(s string, maxWidth int, size float64) string {
+	if pixelTextWidth(s, size) <= maxWidth {
+		return s
+	}
+	runes := []rune(s)
+	for n := len(runes) - 1; n > 0; n-- {
+		cut := string(runes[:n]) + "…"
+		if pixelTextWidth(cut, size) <= maxWidth {
+			return cut
+		}
+	}
+	return "…"
 }

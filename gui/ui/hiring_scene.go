@@ -271,32 +271,7 @@ func fitCandidateName(name string, maxWidth int) (lines []string, size float64) 
 	if pixelTextWidth(name, 16) <= maxWidth {
 		return []string{name}, 16
 	}
-	return wrapNameInTwoLines(name, maxWidth, 16), 16
-}
-
-// wrapNameInTwoLines llena el primer renglón con todas las palabras que
-// quepan en maxWidth y deja el resto en el segundo. Si una sola palabra ya
-// no cabe (no pasa con los nombres de §7), se deja como está: no hay por
-// dónde partirla.
-func wrapNameInTwoLines(name string, maxWidth int, size float64) []string {
-	words := strings.Fields(name)
-	if len(words) == 0 {
-		return []string{name}
-	}
-	line1 := words[0]
-	i := 1
-	for i < len(words) {
-		grown := line1 + " " + words[i]
-		if pixelTextWidth(grown, size) > maxWidth {
-			break
-		}
-		line1 = grown
-		i++
-	}
-	if i >= len(words) {
-		return []string{line1}
-	}
-	return []string{line1, strings.Join(words[i:], " ")}
+	return wrapTwoLines(name, maxWidth, 16), 16
 }
 
 // drawCandidateName dibuja el nombre del candidato con fitCandidateName, con

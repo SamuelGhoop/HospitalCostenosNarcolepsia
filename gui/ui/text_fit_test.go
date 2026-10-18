@@ -79,9 +79,11 @@ func TestRoomBadges_FitTheRoom(t *testing.T) {
 }
 
 // TestDemoSubtitles_FitTheBox: la barra de abajo de la demo (drawSubtitles)
-// muestra, con textFace, la llamada real al modelo y su resultado; algunas
-// son las más largas de toda la interfaz (varias llamadas encadenadas con
-// "·"). Deben caber en el ancho de la barra, no solo de la pantalla.
+// muestra, con textFace a 16 px, la llamada real al modelo y su resultado;
+// algunas son las más largas de toda la interfaz (varias llamadas
+// encadenadas con "·"). Desde el 2026-10-17 se parten en hasta dos
+// renglones (wrapTwoLines, pixelfont.go); el test pide que CADA renglón
+// quepa en el ancho de la barra, no la frase entera de una sola vez.
 func TestDemoSubtitles_FitTheBox(t *testing.T) {
 	needFonts(t)
 	box := demoSubtitleBoxWidth()
@@ -96,23 +98,20 @@ func TestDemoSubtitles_FitTheBox(t *testing.T) {
 		if strings.HasPrefix(s, "ESPACIO") {
 			face = smallFace // el hint de la esquina usa smallFace
 		}
-		if w := textWidth(s, face); w >= float64(box) {
-			t.Errorf("%q mide %.0f px; la barra de la demo mide %d px de ancho útil", s, w, box)
+		for _, line := range wrapTwoLines(s, box, face.Size) {
+			if w := textWidth(line, face); w >= float64(box) {
+				t.Errorf("%q (de %q) mide %.0f px; la barra de la demo mide %d px de ancho útil", line, s, w, box)
+			}
 		}
 	}
-}
-
-// demoSubtitleBoxWidth: el ancho útil de la barra de subtítulos de la demo
-// (drawSubtitles), de x hasta el borde derecho de la caja.
-func demoSubtitleBoxWidth() int {
-	box := demoSubtitleBox()
-	return box.Max.X - 12 - (box.Min.X + 12)
 }
 
 // TestReportRows_FitThePaper: las filas del Shift Report (report_scene.go)
 // van con textFace desde x=92 hasta el borde derecho del papel (1208). La
 // fila de episodios es la más larga: ID, hora, paciente, ubicación y
-// destino de un extremo a otro del hospital.
+// destino de un extremo a otro del hospital. Desde el 2026-10-17, si no
+// cabe entera se recorta con "…" (truncateWithEllipsis) en vez de
+// achicarse: el test pide que el resultado quepa.
 func TestReportRows_FitThePaper(t *testing.T) {
 	needFonts(t)
 	const paperRight = 1208
@@ -120,7 +119,8 @@ func TestReportRows_FitThePaper(t *testing.T) {
 	avail := paperRight - rowX
 	row := fmt.Sprintf("%s %s  %s %s · %s → %s",
 		"EP-01", "2026-10-20 14:15", "P-001", "Wilfrido Berrío", "pasillo 2, segundo piso", "habitación 103")
-	if w := textWidth(row, textFace); w >= float64(avail) {
-		t.Errorf("la fila de episodio mide %.0f px; el papel deja %d px de ese punto al borde", w, avail)
+	fitted := truncateWithEllipsis(row, avail, textFace.Size)
+	if w := textWidth(fitted, textFace); w >= float64(avail) {
+		t.Errorf("la fila de episodio recortada (%q) mide %.0f px; el papel deja %d px de ese punto al borde", fitted, w, avail)
 	}
 }

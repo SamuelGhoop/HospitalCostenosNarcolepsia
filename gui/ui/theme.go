@@ -70,21 +70,26 @@ var (
 // ancho), mientras que Go Mono, aun siendo monoespaciada, deja la letra
 // más angosta que su cuadro (una X a 16 px medía unos 9-10 px). Por eso no
 // basta con copiar los tamaños de Go Mono: con el mismo número de puntos,
-// Press Start 2P sale ~60 % más ancha, y los textos largos (la llamada al
-// modelo de la barra de la demo, las filas del reporte) se salían de su
-// caja o de la pantalla. Los tamaños bajaron para compensarlo:
-//   - smallFace 14→8 (rótulos del mapa y del HUD, que ya se miden con su
+// Press Start 2P sale ~60 % más ancha.
+//
+// El 2026-10-08 textFace había bajado a 8 px para que los textos largos
+// (la llamada al modelo de la barra de la demo, las filas del reporte)
+// cupieran enteros en una sola línea. Prueba de Samuel el 2026-10-17: a
+// 1280×720 eso se lee muy chico. textFace vuelve a 16 px (de nuevo igual
+// de ancho que boldFace, como antes del 10-08) y los textos largos que no
+// cabían ya se parten en dos renglones (wrapTwoLines, demo_scene.go) o se
+// recortan con "…" (truncateWithEllipsis, report_scene.go) en vez de
+// seguir achicando toda la letra.
+//   - smallFace 8 (rótulos del mapa y del HUD, que ya se miden con su
 //     propia fuente: caben igual o con más aire).
-//   - textFace 16→8 (el texto "normal": la llamada y el resultado de cada
-//     paso de la demo pueden pasar de 80 caracteres; a 16 px eso ya no
-//     cabía ni en el ancho de la pantalla).
-//   - boldFace 20→16 (títulos y botones cortos y ya centrados con
-//     textWidth, como "SIGUIENTE DÍA": a 20 no entraban en su botón).
+//   - textFace 16 (el texto "normal").
+//   - boldFace 16 (títulos y botones cortos y ya centrados con
+//     textWidth).
 //
 // Los tres siguen en múltiplos de 8 px, como pide Press Start 2P para
 // verse nítida.
 var (
-	textFace  *text.GoTextFace // texto normal (8 px: líneas largas del reporte y de la demo)
+	textFace  *text.GoTextFace // texto normal (16 px)
 	smallFace *text.GoTextFace // rótulos pequeños (8 px)
 	boldFace  *text.GoTextFace // títulos y botones (16 px; ya no hay un peso "negrita" propio)
 )
@@ -95,7 +100,7 @@ func loadFonts() error {
 	if err := loadPixelFont(); err != nil {
 		return err
 	}
-	textFace = pixelFace(8)
+	textFace = pixelFace(16)
 	smallFace = pixelFace(8)
 	boldFace = pixelFace(16)
 	return nil

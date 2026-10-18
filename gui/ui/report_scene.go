@@ -55,6 +55,7 @@ func (s *ReportScene) Draw(screen *ebiten.Image) {
 	panel(screen, paper, colPaper)
 
 	c := column{dst: screen, x: 92, y: 68}
+	const paperRight = 1208 // paper.Max.X: hasta ahí llega una fila antes de recortarse
 	r := s.report
 	title := s.title
 	if title == "" {
@@ -68,7 +69,7 @@ func (s *ReportScene) Draw(screen *ebiten.Image) {
 		c.indented("(nadie: todos los dormidos tienen cama)", textFace, colMuted)
 	}
 	for _, p := range r.Hallway {
-		c.indented(fmt.Sprintf("%s %s (%s)", p.ID, p.Name, p.Location), textFace, colInk)
+		c.indentedFit(fmt.Sprintf("%s %s (%s)", p.ID, p.Name, p.Location), textFace, colInk, paperRight)
 	}
 	c.gap(8)
 
@@ -83,7 +84,7 @@ func (s *ReportScene) Draw(screen *ebiten.Image) {
 			if e.Room != 0 {
 				destination = fmt.Sprintf("habitación %d", e.Room)
 			}
-			c.indented(fmt.Sprintf("   %s %s  %s %s · %s → %s", e.ID, e.Time, e.PatientID, e.PatientName, e.Location, destination), textFace, colInk)
+			c.indentedFit(fmt.Sprintf("   %s %s  %s %s · %s → %s", e.ID, e.Time, e.PatientID, e.PatientName, e.Location, destination), textFace, colInk, paperRight)
 		}
 	}
 	c.gap(8)
@@ -94,7 +95,7 @@ func (s *ReportScene) Draw(screen *ebiten.Image) {
 		if len(room.Occupants) > 0 {
 			occupants = strings.Join(room.Occupants, ", ")
 		}
-		c.indented(fmt.Sprintf("%d  %-10v %s", room.Number, room.State, occupants), textFace, colInk)
+		c.indentedFit(fmt.Sprintf("%d  %-10v %s", room.Number, room.State, occupants), textFace, colInk, paperRight)
 	}
 	if r.LastAssignError != "" {
 		c.indented("Último error de AssignRoom:", textFace, colMuted)
@@ -104,7 +105,7 @@ func (s *ReportScene) Draw(screen *ebiten.Image) {
 
 	c.line("5.4  Reporte de severidad (pacientes Severe)", boldFace, colInk)
 	for _, sv := range r.Severe {
-		c.indented(fmt.Sprintf("%-6s %-18s %d episodio(s) hoy", sv.PatientID, sv.PatientName, sv.Episodes), textFace, colInk)
+		c.indentedFit(fmt.Sprintf("%-6s %-18s %d episodio(s) hoy", sv.PatientID, sv.PatientName, sv.Episodes), textFace, colInk, paperRight)
 	}
 
 	// Pie: el botón del modo juego todavía deshabilitado.
@@ -134,6 +135,16 @@ func (c *column) indented(s string, face *text.GoTextFace, clr color.Color) {
 	c.x += 20
 	c.line(s, face, clr)
 	c.x -= 20
+}
+
+// indentedFit escribe una línea con sangría, recortada con "…"
+// (truncateWithEllipsis) si no cabe entre su x y right: con textFace a
+// 16 px, las filas largas del reporte (episodios, habitaciones,
+// severidad) ya no entran siempre enteras, y acá no hay cómo partirlas en
+// dos renglones sin desordenar la columna.
+func (c *column) indentedFit(s string, face *text.GoTextFace, clr color.Color, right int) {
+	avail := right - int(c.x) - 20
+	c.indented(truncateWithEllipsis(s, avail, face.Size), face, clr)
 }
 
 // gap deja un espacio vertical extra.

@@ -3,12 +3,14 @@ package ui
 import (
 	"fmt"
 	"image"
+	"image/color"
 	"math"
 	"math/rand"
 	"slices"
 	"sort"
 
 	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/hajimehoshi/ebiten/v2/text/v2"
 
 	"github.com/SamuelGhoop/HospitalCostenosNarcolepsia/game"
 	"github.com/SamuelGhoop/HospitalCostenosNarcolepsia/hospital"
@@ -404,9 +406,34 @@ func (s *DemoScene) drawHUD(dst *ebiten.Image) {
 
 // demoSubtitleBox es la caja de la barra de abajo de la demo: la usan el
 // dibujo y el test que comprueba que la llamada y el resultado de cada
-// paso (los textos más largos de toda la interfaz) caben en su ancho.
+// paso (los textos más largos de toda la interfaz) caben en su ancho, ya
+// partidos en dos renglones (drawSubtitleLines). Creció hacia arriba desde
+// la medida de antes del 2026-10-17 (y 594→710) para dejar sitio a textFace
+// a 16 px en dos renglones por bloque, sin tapar más mapa del necesario.
 func demoSubtitleBox() image.Rectangle {
-	return image.Rect(12, 594, ScreenWidth-12, ScreenHeight-10)
+	return image.Rect(12, 520, ScreenWidth-12, ScreenHeight-10)
+}
+
+// demoSubtitleBoxWidth: el ancho útil de la barra de subtítulos de la demo
+// (drawSubtitles), de x hasta el borde derecho de la caja.
+func demoSubtitleBoxWidth() int {
+	box := demoSubtitleBox()
+	return box.Max.X - 12 - (box.Min.X + 12)
+}
+
+// demoSubtitleLineGap: cuánto baja el segundo renglón de un bloque (llamada
+// o resultado) respecto del primero.
+const demoSubtitleLineGap = 20
+
+// drawSubtitleLines dibuja s partido en hasta dos renglones (wrapTwoLines)
+// con la esquina de arriba a la izquierda en (x, y) y devuelve el y donde
+// seguiría el próximo bloque.
+func drawSubtitleLines(dst *ebiten.Image, s string, x, y float64, maxWidth int, face *text.GoTextFace, c color.Color) float64 {
+	lines := wrapTwoLines(s, maxWidth, face.Size)
+	for i, line := range lines {
+		drawText(dst, line, x, y+float64(i)*demoSubtitleLineGap, face, c)
+	}
+	return y + float64(len(lines))*demoSubtitleLineGap
 }
 
 // drawSubtitles: la barra de abajo con lo que pasó en el último paso, la
@@ -416,22 +443,25 @@ func (s *DemoScene) drawSubtitles(dst *ebiten.Image) {
 	panel(dst, box, colPaper)
 	x := float64(box.Min.X + 12)
 	top := float64(box.Min.Y)
+	maxWidth := demoSubtitleBoxWidth()
 
 	step := s.snap.Last
 	if step.Number == 0 {
 		drawText(dst, "Demostración del escenario obligatorio de la Sección 6 del enunciado.", x, top+10, boldFace, colInk)
-		drawText(dst, "Cada paso hace la llamada REAL al modelo (paquete hospital) y muestra lo que respondió.", x, top+44, textFace, colMuted)
-		drawText(dst, "Presiona ESPACIO o haz clic para dar el primer paso.", x, top+72, textFace, colBlueDark)
+		y := drawSubtitleLines(dst, "Cada paso hace la llamada REAL al modelo (paquete hospital) y muestra lo que respondió.", x, top+44, maxWidth, textFace, colMuted)
+		drawSubtitleLines(dst, "Presiona ESPACIO o haz clic para dar el primer paso.", x, y+10, maxWidth, textFace, colBlueDark)
 		return
 	}
 
-	drawText(dst, fmt.Sprintf("%d. %s", step.Number, step.Subtitle), x, top+8, boldFace, colInk)
-	drawText(dst, step.Call, x, top+42, textFace, colBlueDark)
+	y := top + 8
+	drawText(dst, fmt.Sprintf("%d. %s", step.Number, step.Subtitle), x, y, boldFace, colInk)
+	y += 32
+	y = drawSubtitleLines(dst, step.Call, x, y, maxWidth, textFace, colBlueDark)
 	result := colGreenDark
 	if step.Err != nil {
 		result = colRedDark // el error previsto del paso 8
 	}
-	drawText(dst, "→ "+step.Result, x, top+72, textFace, result)
+	drawSubtitleLines(dst, "→ "+step.Result, x, y+10, maxWidth, textFace, result)
 
 	if s.demo.Done() {
 		hint := "ESPACIO: ver el Shift Report"
