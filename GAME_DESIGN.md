@@ -208,6 +208,7 @@ La demo es un **tipo aparte**, `game.Demo`, con métodos `Next()`, `Skip()`, `Sn
 
 ### 5.3 Llegada de pacientes
 - Intervalo día 1: aleatorio entre **18 y 25 s**; cada día ×0,9 (mínimo **8 s**). Máximo **10** pacientes simultáneos en el mapa.
+- **Horas pico** (2026-10-17, §12.9: a Samuel la jugabilidad le pareció "un poco aburrida"; inspirado en Diner Dash). Ese intervalo se multiplica según la hora del turno (`rushBands` en `game/config.go`, fácil de ajustar): **08:00–10:00** tranquilo ×1,3; **10:00–12:00 PICO** ×0,5; **12:00–15:00** normal ×1; **15:00–17:30 PICO** ×0,5; **17:30–20:00** ×0,9. El mínimo de 8 s (arriba) manda siempre, aunque el factor empuje más abajo. `Snapshot.RushHour` dice si es pico ahora mismo, y al **entrar** a uno sale el aviso "¡Hora pico! Llegan más pacientes" (como los demás Notices).
 - Nivel: **Mild 40 %**, **Moderate 35 %**, **Severe 25 %**. IDs consecutivos (P-001, P-002…) porque `AdmitPatient` rechaza IDs repetidos.
 - Aparecen en la **calle**, caminan unos **4 s** por la acera y `AdmitPatient` se llama al cruzar la puerta del lobby. Hay peatones y carros decorativos.
 - Si el mapa está lleno cuando toca una llegada, se sortea otro intervalo.
@@ -264,6 +265,7 @@ La demo no cambia: sigue el round-robin real de la Sección 6 (sección 4).
 - Contratar cuesta un día de salario por adelantado.
 - (Opcional, fase final) **Ampliar**: comprar la habitación 104 por $2.500 con `AddRoom`.
 - **Cómo quedó (F4, 2026-10-15)**: la nómina se paga en el `Tick` de las 20:00, justo después de los +500 del día completado, y no al pulsar SIGUIENTE DÍA. Así el reporte del día (`Game.DayReport()`) ya muestra la plata después de pagar cuando sale la pantalla de fin de día.
+- **Racha de atención** (2026-10-17, §12.9: pedido de Samuel, inspirado en Diner Dash, porque la jugabilidad le pareció "un poco aburrida"). Cada revisión con menos de `firstWaitPenaltyAt` (30 s) de espera sube una racha en 1. El pago de la revisión se multiplica por `1 + 0,25 × min(racha anterior, 4)` (hasta ×2), redondeado al peso más cercano (`streakStep`/`streakMaxSteps` en `config.go`). La racha vuelve a 0 cuando cae una penalización de espera (5.9), cuando alguien se va enojado o al terminar el día. `Snapshot.Streak` (la racha actual) y `Snapshot.StreakMultiplier` (en centésimas: 100, 125… 200) la muestran; `DayReport.BestStreak` guarda la racha más alta del día, aunque algo la haya roto antes de cerrar el turno.
 
 ### 5.9 Reputación (0–5)
 - Más de **30 s** de espera (`Collapsed`, `InHallway` o esperando revisión): **−0,5**, y luego **−0,25** cada 10 s más. *(Antes 20 s; subió a 30 el 2026-10-16, §12.8: en la prueba del 16-10 a Samuel "le bajaban las estrellas solas" sin darse cuenta.)* Se mide con el cronómetro de espera (5.4), así que no vuelve a empezar cuando el paciente cambia de estado.
@@ -668,6 +670,11 @@ Samuel: *"Las animaciones ya están mejor así, ahora la animación de empujar l
   - **Más margen**: el primer −0,5 ★ llega a los **30 s** de espera en vez de 20 (§5.9; constante en `config.go`). Lo demás queda igual.
 - **Letra**: Press Start 2P en **toda** la interfaz, incluidos los rótulos del mapa, los IDs, los tooltips y los subtítulos de la demo. Reemplaza la regla de §9.3 de usarla solo en la portada, los créditos y el aviso.
 - ✅ **Pedido del 2026-10-17**: *"cuando contrato gente solo hay 3 espacios donde aparece el personal, entonces aparecen 4 en el mismo lugar"* (los puestos de la sala, §10.7 punto 7) y *"que el personal no esté tan quieto"* (deambular, §10.8 punto 13). Hecho el mismo día.
+
+### 12.9 Pedido de Samuel (2026-10-17): la jugabilidad "un poco aburrida"
+Samuel sintió la jugabilidad **"un poco aburrida"** y pidió dos cambios inspirados en Diner Dash, solo en `game/` (lo visual en la barra queda para otro builder):
+- ✅ **Horas pico** (§5.3): el intervalo de llegadas varía según la hora del turno (`rushBands` en `config.go`), con dos picos (10:00–12:00 y 15:00–17:30) que lo reducen a la mitad. `Snapshot.RushHour` y el aviso "¡Hora pico! Llegan más pacientes" al entrar a uno.
+- ✅ **Racha de atención** (§5.8): revisar rápido (menos de 30 s de espera) sube una racha que multiplica el pago hasta ×2; se rompe con una penalización de espera, al irse alguien enojado o al cerrar el día. `Snapshot.Streak`, `Snapshot.StreakMultiplier` y `DayReport.BestStreak`.
 ---
 
 ## 13. Notas para la sustentación
