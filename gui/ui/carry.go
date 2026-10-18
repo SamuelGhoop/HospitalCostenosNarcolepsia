@@ -149,17 +149,22 @@ func overlapsAny(r image.Rectangle, rs []image.Rectangle) bool {
 // busca el sitio libre más cercano fuera del camino, sin encimarse con
 // nadie. Así la recepción, donde a ×3 no cabe un pasillo libre con los 5
 // pacientes esperando, no se queda sin puestos.
-func (s *DemoScene) dodgesFor(o *carryOrder) map[string]vec {
+//
+// Función libre (no solo de la demo, GAME_DESIGN §10.8): el modo juego
+// también la usa, con destOf = el puesto final de cada uno (f.target), al
+// arrancar un traslado (startCarry, game_world.go). En la demo destOf es
+// s.destination, que además mira la coreografía y los dodges anteriores.
+func dodgesFor(figures []figure, destOf func(figure) vec, o *carryOrder) map[string]vec {
 	lane := carryLane(o.plan)
 	var bodies []image.Rectangle // dónde están (o van a estar) los demás
-	for _, f := range s.figures {
+	for _, f := range figures {
 		if f.id != o.pusher && f.id != o.patient {
-			bodies = append(bodies, figureBodyAt(f, s.destination(f)))
+			bodies = append(bodies, figureBodyAt(f, destOf(f)))
 		}
 	}
 	dodge := map[string]vec{}
-	for _, f := range s.figures {
-		at := s.destination(f)
+	for _, f := range figures {
+		at := destOf(f)
 		if f.id == o.pusher || f.id == o.patient || (f.patient && f.room != 0 && at == bedCell(roomZone(f.room))) {
 			continue
 		}
@@ -179,6 +184,12 @@ func (s *DemoScene) dodgesFor(o *carryOrder) map[string]vec {
 		}
 	}
 	return dodge
+}
+
+// dodgesFor (método): la de la demo, con su destino (coreografía y dodges
+// en curso incluidos).
+func (s *DemoScene) dodgesFor(o *carryOrder) map[string]vec {
+	return dodgesFor(s.figures, s.destination, o)
 }
 
 // feetRectAt es la huella de los pies de alguien con el cuadro en at.

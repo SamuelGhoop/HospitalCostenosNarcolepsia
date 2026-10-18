@@ -122,6 +122,7 @@ func (s *DemoScene) advance() error {
 // ruta por las puertas, la animación de cada paciente avanza según cuánto
 // se movió, y la coreografía pasa a la siguiente fase cuando todos llegaron.
 func (s *DemoScene) animate() {
+	s.beginTick() // congela las posiciones de arranque: la reserva de celdas no depende del orden de la lista
 	// El traslado en camilla de la fase actual, si hay: lo mueve stepCarry.
 	var order *carryOrder
 	if s.choreo != nil {

@@ -18,6 +18,11 @@ import (
 // gameZone es la zona del mapa de una zona del juego.
 func gameZone(z game.Zone) zone { return zoneFor(z.String()) }
 
+// maxCatchUpSpeed: lo más rápido que puede caminar quien recupera el tiempo
+// perdido esperando una celda ocupada (GAME_DESIGN §10.8). Mismo tope que
+// usa la camilla (carry.go) para no arrancar de golpe.
+const maxCatchUpSpeed = 6.0
+
 // drawnState es el estado con el que se dibuja un paciente del juego: el
 // desplomado y el del pasillo, dormidos en el piso; el que espera revisión
 // y el revisado, en la cama; los demás, despiertos. (El modelo no se entera
@@ -280,7 +285,47 @@ func (s *GameScene) startCarry(pusher string, p game.GamePatientView, left time.
 	if ticks > 0 {
 		speed = math.Max(1, math.Min(6, dist/ticks))
 	}
-	s.others = append(s.others, &carrying{order: &carryOrder{pusher: pusher, patient: p.ID, room: room, plan: plan}, speed: speed})
+	order := &carryOrder{pusher: pusher, patient: p.ID, room: room, plan: plan}
+	s.others = append(s.others, &carrying{order: order, speed: speed})
+}
+
+// gameDodges recalcula, en cada tick, quién se tiene que hacer a un lado
+// para dejar pasar una camilla en curso (dodgesFor, carry.go): a diferencia
+// de la demo (una sola camilla a la vez, el dodge se calcula una vez al
+// arrancar el traslado), en el juego puede haber varias camillas y alguien
+// puede quedar parado en el camino de una después de que ya arrancó (el
+// personal libre deambulando, un paciente que recién llegó a su puesto), así
+// que se revisa en cada tick, antes de mover a nadie.
+func (s *GameScene) gameDodges() {
+	dodging := map[string]bool{}
+	for _, c := range s.others {
+		for id, to := range dodgesFor(s.figures, func(f figure) vec { return f.target }, c.order) {
+			// Si ya se había hecho a un lado, se queda en ese mismo sitio: si
+			// cada tick buscara un sitio nuevo desde su puesto de siempre, el
+			// destino cambiaría de a poco (porque buscar de nuevo con los
+			// demás ya corridos puede dar un sitio distinto) y en vez de un
+			// paso al costado se vería caminando de un lado a otro del mapa.
+			if _, already := s.dodge[id]; !already {
+				s.dodge[id] = to
+			}
+			dodging[id] = true
+		}
+	}
+	for id := range s.dodge {
+		if !dodging[id] {
+			delete(s.dodge, id) // ya pasó la camilla (o ya no le tapa el camino): vuelve a su puesto
+		}
+	}
+}
+
+// destination es a dónde tiene que caminar un personaje ahora mismo: su
+// puesto final, o el sitio al que se hizo a un lado para dejar pasar una
+// camilla (dodgesFor, startCarry).
+func (s *GameScene) destination(f figure) vec {
+	if to, ok := s.dodge[f.id]; ok {
+		return to
+	}
+	return f.target
 }
 
 // stillFeetExcept son las huellas de los pies de los que están quietos en su
@@ -313,6 +358,7 @@ func (s *GameScene) routeLeft(id string, from vec) float64 {
 // animate hace un tick de movimiento: los traslados en camilla y, los
 // demás, hacia su destino (a su paso o al ritmo que marca el juego).
 func (s *GameScene) animate() {
+	s.beginTick() // congela las posiciones de arranque: la reserva de celdas no depende del orden de la lista
 	before := map[string]vec{}
 	for id, p := range s.pos {
 		before[id] = p
@@ -325,16 +371,30 @@ func (s *GameScene) animate() {
 		}
 	}
 	s.others = kept
+	s.gameDodges()
 
 	for _, f := range s.figures {
 		old := before[f.id]
 		a := s.actorOf(f.id)
 		pa, isPatient := s.anims[f.id]
+		dest := s.destination(f)
 		if !s.inCarry(f.id) && !(isPatient && pa.holdsStill()) {
-			next := s.nextWaypoint(f.id, old, f.target)
+			next := s.nextWaypoint(f.id, old, dest)
 			speed := speedOf(f)
-			if a.ticksLeft > 0 {
-				speed = math.Max(0.5, s.routeLeft(f.id, old)/float64(a.ticksLeft))
+			// Si next no se movió de old porque el próximo paso está ocupado
+			// (nextWaypoint lo hizo esperar), el crono de la caminata cronometrada
+			// se congela también: así, cuando se libera, recupera el tiempo
+			// repartiendo lo que falta entre los ticks que quedan (un poco más
+			// rápido, GAME_DESIGN §10.8), en vez de un salto grande por haber
+			// perdido ticks del crono sin moverse.
+			waiting := old != dest && next == old
+			if a.ticksLeft > 0 && !waiting {
+				// El tope (igual que el de la camilla, carry.go) evita que
+				// recuperar el tiempo perdido esperando se vea como un salto: si
+				// quedan pocos ticks y de pronto hay mucho camino (por ejemplo,
+				// porque tuvo que rodear a alguien), mejor llegar un poco tarde
+				// que teletransportarse.
+				speed = math.Max(0.5, math.Min(maxCatchUpSpeed, s.routeLeft(f.id, old)/float64(a.ticksLeft)))
 				a.ticksLeft--
 			}
 			s.pos[f.id] = moveToward(old, next, speed)

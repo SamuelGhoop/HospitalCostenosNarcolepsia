@@ -93,6 +93,25 @@ func scaleRect(r image.Rectangle) image.Rectangle {
 	return image.Rect(r.Min.X*spriteScale, r.Min.Y*spriteScale, r.Max.X*spriteScale, r.Max.Y*spriteScale)
 }
 
+// visibleBody es lo que de verdad se ve del cuerpo de f con el cuadro en
+// at: acostado en su cama (ya rotado), acostado en el piso (horizontal,
+// sin lo transparente de arriba) o de pie/caminando (sin lo transparente
+// de los costados). La usan tanto la reserva de celdas al caminar
+// (world.go) como el test de que nadie comparte cuerpo con otro
+// (overlap_test.go): las dos tienen que mirar la misma forma.
+func visibleBody(f figure, at vec) image.Rectangle {
+	p := image.Pt(int(math.Round(at.x)), int(math.Round(at.y)))
+	switch {
+	case f.patient && f.room != 0 && at == bedCell(roomZone(f.room)):
+		cell := bedCell(roomZone(f.room))
+		return bedBody.Add(image.Pt(int(cell.x), int(cell.y)))
+	case f.patient && f.state == hospital.AsleepInHallway:
+		return floorBody.Add(p)
+	default:
+		return standingBody.Add(p)
+	}
+}
+
 // Lo que se VE del cuerpo dentro de su cuadro (medido en la hoja: lo demás
 // del cuadro es transparente). Es lo que no puede tocar un mueble.
 var (
