@@ -44,8 +44,37 @@ func staffHomeSpot(i int) image.Point {
 // quien llega), así nadie se encima del puesto del que ya estaba (el bug
 // de Samuel: antes se usaba la posición de la foto, que no es estable ni
 // respeta cuántos puestos hay de verdad).
+//
+// Si la sala ya no tiene puestos, el desborde usa el MISMO book que el
+// cupo general del pasillo 2 (staffRestZoneSpot/slot) para elegir el
+// punto: las dos maneras de llegar al pasillo 2 (sin puesto en la sala, o
+// deambulando mientras está libre) comparten el índice, así nunca eligen
+// el mismo punto para dos personas distintas (pedido de Samuel,
+// 2026-10-17: "evita que los personajes... se puedan poner en el mismo
+// lugar al mismo tiempo"; antes se repartía con un índice de la sala, que
+// no tenía nada que ver con el que ya estuviera usando el pasillo 2 por su
+// cuenta, y dos podían coincidir en el mismo puesto físico).
 func staffHomeTarget(book spotBook, id string) image.Point {
-	return staffHomeSpot(book.take(zoneStaffRoom, id))
+	s := spotsOf(zoneStaffRoom).standing
+	if i := book.take(zoneStaffRoom, id); i < len(s) {
+		return s[i]
+	}
+	book.release(id, zoneHallway2) // no le hace falta el puesto (inexistente) de la sala que tomó de más
+	return staffOverflowSpot(book.take(zoneHallway2, id))
+}
+
+// staffOverflowSpot es el i-ésimo puesto del desborde del pasillo 2 (mismo
+// respaldo que slot/floorSpot: si no hay tantos, se repite el último).
+func staffOverflowSpot(i int) image.Point {
+	o := staffOverflowSpots()
+	switch {
+	case i < len(o):
+		return o[i]
+	case len(o) > 0:
+		return o[len(o)-1]
+	default:
+		return zones[zoneHallway2].rect.Min
+	}
 }
 
 // staffOverflowCache guarda staffOverflowSpots: se calcula una sola vez,
