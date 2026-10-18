@@ -66,6 +66,7 @@ type HiringScene struct {
 // abrir desde el portapapeles del HUD.
 func newHiringScene(under *GameScene) *HiringScene {
 	under.onPause()
+	playSound(sfxOpen)
 	s := &HiringScene{under: under, phase: hiringOpening}
 	s.snap = under.g.Snapshot()
 	return s
@@ -140,6 +141,7 @@ func (s *HiringScene) update(in input) (Scene, error) {
 // startClose arranca la animación de cerrar (si no estaba ya cerrando).
 func (s *HiringScene) startClose() {
 	if s.phase != hiringClosing {
+		playSound(sfxClose)
 		s.phase, s.ticks = hiringClosing, 0
 	}
 }
@@ -161,6 +163,7 @@ func (s *HiringScene) page(dir int) {
 	if n < 0 || n >= len(s.snap.Candidates) {
 		return
 	}
+	playSound(sfxClick)
 	s.pendingPage, s.pageTicks = n, hiringPageTicks
 }
 
@@ -184,6 +187,7 @@ func (s *HiringScene) hire() {
 		s.under.say(err.Error())
 		return
 	}
+	playSound(sfxHire)
 	s.snap = s.under.g.Snapshot()
 	s.clampIndex()
 }

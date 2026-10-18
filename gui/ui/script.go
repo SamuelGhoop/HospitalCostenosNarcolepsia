@@ -57,6 +57,7 @@ var scriptKeys = map[string]ebiten.Key{
 	"Shift":       ebiten.KeyShift,
 	"C":           ebiten.KeyC,
 	"A":           ebiten.KeyA,
+	"M":           ebiten.KeyM,
 }
 
 // ParseScript lee el guion de path, una instrucción por línea (las líneas

@@ -93,8 +93,12 @@ type animPanel struct {
 	minScale              float64
 }
 
-// newAnimPanel arranca abriendo desde from hasta to.
+// newAnimPanel arranca abriendo desde from hasta to, con el sonido de
+// "se abre un portapapeles" (sound.go, GAME_DESIGN §10.11: la pausa, el
+// reporte, el fin de día y el Game Over comparten este constructor, así
+// que comparten el sonido sin que cada escena tenga que pedirlo).
 func newAnimPanel(openTicks, closeTicks int, from, to vec, minScale float64) *animPanel {
+	playSound(sfxOpen)
 	return &animPanel{phase: panelOpening, openTicks: openTicks, closeTicks: closeTicks, from: from, to: to, minScale: minScale}
 }
 
@@ -118,9 +122,11 @@ func (a *animPanel) step() (finishedClosing bool) {
 	return false
 }
 
-// startClose arranca el cierre (si no estaba ya cerrando).
+// startClose arranca el cierre (si no estaba ya cerrando), con el sonido
+// de "se cierra" (sound.go).
 func (a *animPanel) startClose() {
 	if a.phase != panelClosing {
+		playSound(sfxClose)
 		a.phase, a.ticks = panelClosing, 0
 	}
 }

@@ -394,6 +394,7 @@ La demo no cambia: sigue el round-robin real de la Sección 6 (sección 4).
 ### 9.5 Ajustes (pendiente: F6)
 - Se guardan en un **JSON aparte** de la partida y se abren desde la portada y desde la pausa.
 - Opciones: pantalla completa, etiquetas siempre visibles, subtítulos de la demo y volumen (solo si se agrega sonido).
+- ✅ **Silencio (hecho 2026-10-17, §10.11)**: mientras no exista la pantalla de Ajustes, el volumen se controla con la tecla **M**, que silencia y vuelve a activar el sonido con un aviso corto "SONIDO: NO"/"SONIDO: SÍ" (1,5 s, arriba al centro). Funciona en cualquier escena, igual que Esc. El backdoor de pruebas (`-agent`, §10.9) nunca suena, con M o sin M.
 
 ---
 
@@ -544,7 +545,7 @@ salga. `gui/main.go`, `gui/ui/agent.go`, `gui/ui/agent_hooks.go` y `gui/ui/scrip
   | `dump ruta.json` | el estado que dibuja la escena (ver abajo), en ese momento. |
   | `quit` | termina la corrida ahí mismo. |
 
-  Los nombres de tecla válidos son justo las que lee alguna escena del juego (`scriptKeys` en `script.go`): `Escape`, `Space`, `Enter`, `NumpadEnter`, `ArrowUp`, `ArrowDown`, `ArrowLeft`, `ArrowRight`, `W`, `S`, `Shift`, `C`, `A`. Un nombre que no esté ahí es un error claro al cargar el guion.
+  Los nombres de tecla válidos son justo las que lee alguna escena del juego (`scriptKeys` en `script.go`): `Escape`, `Space`, `Enter`, `NumpadEnter`, `ArrowUp`, `ArrowDown`, `ArrowLeft`, `ArrowRight`, `W`, `S`, `Shift`, `C`, `A`, `M`. Un nombre que no esté ahí es un error claro al cargar el guion. `M` (silencio, §10.11) no suena nada en `-agent` igual que cualquier otra tecla: el backdoor nunca arma el reproductor.
 
 - **Determinismo** (GAME_DESIGN §11: "los tests llaman `Tick` a mano"; esto es lo mismo). `-agent` reemplaza tres relojes de prueba:
   1. `seedSource` (`gui/ui/seed.go`): en vez de la hora, da `-seed` fija. La usan `NewGameScene`, `newGameScene` (tráfico) y `NewDemoScene` (tráfico).
@@ -570,6 +571,36 @@ Pedido de Samuel: *"hazle así animados los menús como el de contratar que me g
 - **Mientras anima no acepta entrada** (ni teclado ni mouse), igual que la bolsa: un clic en SIGUIENTE DÍA, REANUDAR, NUEVA PARTIDA, etc. mientras el panel todavía se mueve no hace nada.
 - **La acción pasa al terminar de cerrar**, no al elegirla: `StartNextDay`, `Game.Resume`/`onQuit` o `newGameSceneFn` se llaman en el tick en que `animPanel.step()` devuelve `true`, no en el clic que arrancó el cierre. En el fin de día y el Game Over, `GameScene` guarda la animación en curso (`dayOverAnim`, `gameOverAnim`, nil mientras no hace falta ninguna) y, en el Game Over, la acción pendiente en `gameOverNext` (NUEVA PARTIDA o MENÚ), porque a diferencia del fin de día (que siempre termina en `StartNextDay`) depende de qué botón se usó.
 - **Tests**: fases (abriendo/abierto/cerrando), *openness* en 0, a mitad de camino y en 1, que no se acepte entrada mientras anima y que la acción pase justo al terminar de cerrar (`gui/ui/pause_scene_test.go`, `gui/ui/game_scene_overlay_test.go`; estos últimos prueban `updateDayOver`/`updateGameOver` directo, sin pasar por `GameScene.update`, para no depender de hacer que la partida de prueba llegue de verdad a las 20:00 o a una derrota: esas reglas ya se prueban en `game/` y en `game_scene_test.go`).
+- ✅ **El Shift Report también (hecho 2026-10-17)**: el reporte de mitad de partida (botón REPORTE del HUD) y el de la demo (`ReportScene`, `gui/ui/report_scene.go`) reusan el mismo `animPanel`: abre desde el botón REPORTE en el modo juego o desde el centro en la demo, y Espacio o clic arrancan el cierre; la vuelta a la portada o a la partida pasa al terminar de cerrar, no al apretar la tecla. Debajo del portapapeles se ve la partida en pausa (o un fondo liso en la demo). Tests de fases iguales a los de la pausa en `gui/ui/report_scene_test.go`.
+
+### 10.11 Sonido (hecho, 2026-10-17)
+Pedido de Samuel: *"añade sonidos acordes, que la vida está ahí"*. Generado por código, sin archivos de audio ni licencias que revisar: `gui/sfx` sintetiza cada efecto como PCM de 16 bits a **44100 Hz** con ondas cuadrada, triangular o ruido y una envolvente ADSR corta (`gui/sfx/synth.go`: `Tone`, con `LowPass`, `Concat` y `Mix` para armar los más complejos); `gui/ui/sound.go` es el único archivo de `gui/ui` que importa `ebiten/audio` y los manda a sonar.
+
+- **Tabla de efectos** (50 a 600 ms, volumen moderado):
+
+  | Efecto | Qué es | Cuándo suena |
+  |---|---|---|
+  | `click` | blip corto y agudo | botón o menú confirmado (portada, pausa, HUD, bolsa de empleo, fin de día, Game Over) |
+  | `open` | barrido hacia arriba | se abre un portapapeles (bolsa, pausa, reporte, fin de día, Game Over) |
+  | `close` | barrido hacia abajo | se cierra un portapapeles |
+  | `hire` | caja registradora: dos blips + ruido corto | al contratar a un candidato |
+  | `coin` | dos notas ascendentes; con racha, la 2ª sube un semitono por punto (hasta 4) | cobro de una revisión o alta: `Snapshot.Money` sube |
+  | `streakLost` | dos notas descendentes cortas | la racha de atención vuelve a 0 |
+  | `starDown` | barrido descendente grave | un `Snapshot.ReputationChanges` nuevo con `Delta` negativo |
+  | `starUp` | barrido ascendente | un `ReputationChanges` nuevo con `Delta` positivo |
+  | `collapse` | golpe sordo: ruido pasado por un pasabajos + un tono grave | un paciente pasa a `Collapsed` |
+  | `rush` | alerta de dos tonos | `Snapshot.RushHour` pasa a cierto |
+  | `dayEnd` | fanfarria de 4 notas | `Snapshot.DayOver` pasa a cierto |
+  | `gameOver` | 3 notas descendentes tristes | `Snapshot.GameOver` deja de ser `NotOver` |
+  | `snore` (muy bajo) | tono grave suave | un paciente pasa a `AwaitingReview` (se acaba de dormir en una cama) |
+
+- **Cuándo suenan**: `gui/ui/sound_events.go` (`gameSoundEvents`, función pura, con tabla de casos en `sound_events_test.go`) compara la foto anterior con la nueva y devuelve qué efectos tocan; `soundTracker` la llama cada tick desde `GameScene.update` y le pasa el resultado a `playSound`/`playCoin` (`sound.go`). Nada de reglas de juego en `gui/ui`: solo se comparan los valores de dos `Snapshot`, igual que ya hacía `hud.update` para animar la barra. `click`, `open`, `hire` y `close` salen de los puntos de la interfaz que los disparan (`menu.update` al confirmar, `newAnimPanel`/`animPanel.startClose` en `anim.go`, los botones de `GameScene` y `HiringScene`), no de la foto.
+- **Que no se apile**: cada efecto tiene su propio cupo de `soundCooldownTicks` (3 ticks, ~0,05 s): mientras no se agote, `playSound`/`playCoin` no vuelven a sonar ese mismo efecto, aunque la foto lo pida de nuevo.
+- **Silencio** (tecla **M**, §9.5): `soundOn` en falso hace que `playSound` no haga nada, sin tocar el cupo.
+- **El backdoor de pruebas (`-agent`) nunca suena** (ya lo decía §10.9): `initSound()` solo la llama `NewApp` (el modo normal); `loadAssets()`, que sí usa `-agent`, no la llama, así `soundPlayer` se queda en `nil` y `playSound` no hace nada (`TestAgentMode_NeverCreatesAPlayer`, `sound_test.go`).
+- **Si el dispositivo de audio no se puede abrir** (o algo más sale mal armando el contexto), `initSound()` se recupera del pánico con `recover()` y deja `soundPlayer` en `nil`: el juego sigue, sin sonido y sin caerse.
+- **Tests**: la síntesis es pura (`gui/sfx/synth_test.go`, `effects_test.go`: largo correcto, sin recorte, empieza y termina en silencio, el filtro suaviza, la racha sube el tono de `coin` y se topa en 4); el detector de eventos, con una tabla de casos (`gui/ui/sound_events_test.go`); que con el sonido apagado o sin reproductor no sea nada ni truene (`sound_test.go`); que `-agent` nunca arme el reproductor; y la tecla M (`TestApp_MTogglesSound`, `app.go`).
+- **Cómo probarlo**: `cd gui && go run .` — contratar, revisar o dar de alta rápido (racha), dejar pasar la hora pico, dejar que alguien se desplome, terminar el día o perder, y apretar M para silenciar. No hay captura que lo muestre: es sonido.
 
 ---
 
@@ -688,6 +719,7 @@ Samuel sintió la jugabilidad **"un poco aburrida"** y pidió dos cambios inspir
 - ✅ **Horas pico** (§5.3): el intervalo de llegadas varía según la hora del turno (`rushBands` en `config.go`), con dos picos (10:00–12:00 y 15:00–17:30) que lo reducen a la mitad. `Snapshot.RushHour` y el aviso "¡Hora pico! Llegan más pacientes" al entrar a uno.
 - ✅ **Racha de atención** (§5.8): revisar rápido (menos de 30 s de espera) sube una racha que multiplica el pago hasta ×2; se rompe con una penalización de espera, al irse alguien enojado o al cerrar el día. `Snapshot.Streak`, `Snapshot.StreakMultiplier` y `DayReport.BestStreak`.
 - ✅ **Lo visual en la barra (hecho 2026-10-17)**: "RACHA ×1,5" junto a la plata (solo con racha ≥ 1, con un salto de unos px cuando sube y un parpadeo corto cuando se pierde) y "HORA PICO" parpadeando suave junto al reloj mientras `RushHour` sea cierto, sin encimarse con el DÍA ni la barra del turno; "Mejor racha: N" en el panel de fin de día (`gui/ui/hud.go`, `gui/ui/game_scene.go`).
+- ✅ **Sonido (hecho 2026-10-17, §10.11)**: pedido aparte de Samuel el mismo día ("añade sonidos acordes, que la vida está ahí"); `coin` usa la racha para subir el tono de la segunda nota, así la racha también se "siente" en el oído, no solo en la barra.
 ---
 
 ## 13. Notas para la sustentación

@@ -143,9 +143,11 @@ func (m *menu) update(in input, boxes hitboxes) (chosen option, done bool) {
 	case in.down:
 		m.move(+1)
 	case in.confirm:
+		playSound(sfxClick)
 		m.confirming = confirmTicks
 	case in.click:
 		if o, over := boxes.at(in.mouse); over && m.enabled(o) {
+			playSound(sfxClick)
 			m.confirming = confirmTicks
 		}
 	}

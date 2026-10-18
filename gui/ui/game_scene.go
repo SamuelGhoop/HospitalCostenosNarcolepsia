@@ -41,6 +41,11 @@ type GameScene struct {
 	noticeSeen   map[string]int // avisos del juego → tick en que aparecieron
 	ticks        int
 
+	// sound compara la foto de antes con la de ahora y toca lo que
+	// corresponda (sound_events.go, pedido de Samuel el 2026-10-17: "añade
+	// sonidos acordes, que la vida está ahí").
+	sound soundTracker
+
 	// Los paneles del fin del día y del Game Over abren y cierran animados,
 	// como la bolsa de empleo (anim.go, pedido de Samuel el 2026-10-17):
 	// nil mientras no hace falta ninguno; se crean la primera vez que
@@ -113,6 +118,7 @@ func (s *GameScene) Update() (Scene, error) { return s.update(readInput()) }
 func (s *GameScene) update(in input) (Scene, error) {
 	s.ticks++
 	s.snap = s.g.Snapshot()
+	s.sound.update(s.snap)
 	s.scenery.update()
 	s.hud.update(s.snap)
 	if s.messageTicks > 0 {
@@ -143,14 +149,17 @@ func (s *GameScene) update(in input) (Scene, error) {
 	}
 	switch {
 	case in.click && in.mouse.In(reportButton):
+		playSound(sfxClick)
 		s.g.Pause() // el reporte va con la partida en pausa
 		return newReportScene(s.g.Report(), fmt.Sprintf("REPORTE DEL TURNO — DÍA %d", s.snap.Day), s), nil
 	case in.click && in.mouse.In(pauseButton):
+		playSound(sfxClick)
 		return newPauseScene(s), nil
 	case in.click && in.mouse.In(hireButton):
 		if len(s.snap.Candidates) == 0 {
 			s.say("Ya contrataste a los 3 candidatos de hoy")
 		} else {
+			playSound(sfxClick)
 			return newHiringScene(s), nil
 		}
 	case in.click:
@@ -210,6 +219,7 @@ func (s *GameScene) updateDayOver(in input) (Scene, error) {
 		return s, nil
 	}
 	if in.confirm || in.space || (in.click && in.mouse.In(dayOverButton)) {
+		playSound(sfxClick)
 		s.dayOverAnim.startClose()
 	}
 	return s, nil
@@ -231,9 +241,11 @@ func (s *GameScene) updateGameOver(in input) (Scene, error) {
 	}
 	switch {
 	case in.click && in.mouse.In(newGameButton), in.confirm:
+		playSound(sfxClick)
 		s.gameOverNext = func() (Scene, error) { s.onQuit(); return newGameSceneFn() }
 		s.gameOverAnim.startClose()
 	case in.click && in.mouse.In(menuButton), in.back:
+		playSound(sfxClick)
 		s.gameOverNext = func() (Scene, error) { s.onQuit(); return NewTitleScene(), nil }
 		s.gameOverAnim.startClose()
 	}
