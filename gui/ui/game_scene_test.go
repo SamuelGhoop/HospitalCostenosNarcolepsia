@@ -276,8 +276,28 @@ func TestGameScene_ReportPausesAndComesBack(t *testing.T) {
 	if !ok || !s.g.Snapshot().Paused {
 		t.Fatalf("REPORTE llevó a %T con la partida en pausa=%v", next, s.g.Snapshot().Paused)
 	}
-	if back, _ := r.update(input{space: true}); back != Scene(s) || s.g.Snapshot().Paused {
-		t.Errorf("al cerrar el reporte volvió a %T con la pausa=%v; se esperaba la partida andando", back, s.g.Snapshot().Paused)
+	// El reporte abre animado desde el botón REPORTE (§10.10): mientras
+	// abre, Espacio no hace nada.
+	for i := 0; r.anim.phase != panelOpen; i++ {
+		if i > reportOpenTicks {
+			t.Fatalf("el reporte no terminó de abrir en %d ticks", reportOpenTicks)
+		}
+		r.update(input{})
+	}
+	var back Scene = r
+	var err error
+	for i := 0; back == Scene(r); i++ {
+		if i > reportOpenTicks+reportCloseTicks+1 {
+			t.Fatalf("el reporte no terminó de cerrar en %d ticks", reportCloseTicks)
+		}
+		in := input{}
+		if i == 0 {
+			in.space = true // arranca el cierre; se termina de cerrar solo
+		}
+		back, err = r.update(in)
+	}
+	if err != nil || back != Scene(s) || s.g.Snapshot().Paused {
+		t.Errorf("al cerrar el reporte volvió a (%T, %v) con la pausa=%v; se esperaba la partida andando", back, err, s.g.Snapshot().Paused)
 	}
 }
 

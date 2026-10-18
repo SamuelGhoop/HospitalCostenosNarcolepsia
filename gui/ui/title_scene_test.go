@@ -90,7 +90,9 @@ func TestCredits_LinesAndGoingBack(t *testing.T) {
 	}
 }
 
-// Al terminar la demo, el Shift Report vuelve a la portada con Espacio o clic.
+// Al terminar la demo, el Shift Report vuelve a la portada con Espacio o
+// clic: arranca a cerrarse animado (§10.10) y llega a la portada al
+// terminar, no de una.
 func TestReport_GoesBackToTheTitle(t *testing.T) {
 	d := game.NewDemo()
 	if err := d.Skip(); err != nil {
@@ -101,8 +103,22 @@ func TestReport_GoesBackToTheTitle(t *testing.T) {
 		t.Errorf("sin tocar nada el reporte llevó a %T", next)
 	}
 	for _, in := range []input{{space: true}, {click: true}} {
-		if next, _ := NewReportScene(d.Report()).update(in); reflect.TypeOf(next) != reflect.TypeOf(&TitleScene{}) {
-			t.Errorf("con %+v el reporte llevó a %T; se esperaba la portada", in, next)
+		r := NewReportScene(d.Report())
+		for i := 0; r.anim.phase != panelOpen; i++ { // mientras abre no acepta Espacio ni clic
+			r.update(input{})
+		}
+		next, err := r.update(in)
+		if err != nil || next != Scene(r) || r.anim.phase != panelClosing {
+			t.Fatalf("con %+v el reporte no arrancó a cerrarse: (%T, %v), fase %v", in, next, err, r.anim.phase)
+		}
+		for i := 0; next == Scene(r) && err == nil; i++ {
+			if i > reportCloseTicks+1 {
+				t.Fatalf("con %+v el reporte no terminó de cerrar en %d ticks", in, reportCloseTicks)
+			}
+			next, err = r.update(input{})
+		}
+		if err != nil || reflect.TypeOf(next) != reflect.TypeOf(&TitleScene{}) {
+			t.Errorf("con %+v el reporte llevó a (%T, %v); se esperaba la portada", in, next, err)
 		}
 	}
 }

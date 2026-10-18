@@ -144,7 +144,7 @@ func (s *GameScene) update(in input) (Scene, error) {
 	switch {
 	case in.click && in.mouse.In(reportButton):
 		s.g.Pause() // el reporte va con la partida en pausa
-		return &ReportScene{report: s.g.Report(), title: fmt.Sprintf("REPORTE DEL TURNO — DÍA %d", s.snap.Day), back: s}, nil
+		return newReportScene(s.g.Report(), fmt.Sprintf("REPORTE DEL TURNO — DÍA %d", s.snap.Day), s), nil
 	case in.click && in.mouse.In(pauseButton):
 		return newPauseScene(s), nil
 	case in.click && in.mouse.In(hireButton):

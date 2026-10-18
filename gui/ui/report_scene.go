@@ -14,47 +14,107 @@ import (
 
 // ReportScene es el Shift Report: las cuatro consultas de la Sección 5 en
 // un portapapeles, como el menú de la pantalla de inicio de la maqueta.
+//
+// Desde el 2026-10-17 (§10.10, "hazle así animados los menús") abre y
+// cierra con la misma animación de portapapeles que la pausa y la bolsa
+// de empleo: en el modo juego desde el botón REPORTE del HUD, en la demo
+// desde el centro de la pantalla (que no tiene HUD). Mientras anima no
+// acepta Espacio ni clic, y la vuelta a la portada o a la partida se hace
+// al terminar de cerrar, no al apretar la tecla.
 type ReportScene struct {
 	report game.Report
 	title  string // "" = el de la demo
 	back   Scene  // a dónde vuelve; nil = la portada (la demo)
+	anim   *animPanel
 }
 
-// NewReportScene muestra un Report ya calculado por el paquete game.
+// Tiempos y centro abierto del Shift Report: los mismos de la pausa y los
+// paneles del juego (panelOpenTicks/panelCloseTicks, game_scene.go), con
+// su propio nombre porque cada escena guarda los suyos.
+const (
+	reportOpenTicks  = 13 // 0,22 s
+	reportCloseTicks = 11 // 0,18 s
+	reportMinScale   = 0.167
+)
+
+// reportOpenCenter es el centro del portapapeles abierto (el board de
+// Draw: 48..1232 × 28..704).
+var reportOpenCenter = vec{640, 366}
+
+// reportAnimFrom: desde el botón REPORTE del HUD si vuelve al modo juego
+// (back no es nil); desde el centro de la pantalla en la demo, igual que
+// pauseAnimFrom.
+func reportAnimFrom(back Scene) vec {
+	if back != nil {
+		c := reportButton.Min.Add(reportButton.Max).Div(2)
+		return vec{float64(c.X), float64(c.Y)}
+	}
+	return vec{640, 360}
+}
+
+// NewReportScene muestra un Report ya calculado por el paquete game (la
+// demo y el backdoor de pruebas: no vuelven a ningún lado más que a la
+// portada).
 func NewReportScene(r game.Report) *ReportScene {
-	return &ReportScene{report: r}
+	return newReportScene(r, "", nil)
 }
 
-// Update: Espacio o clic vuelven a la portada o, en el modo juego, a la
-// partida (que sigue: el reporte la tenía en pausa).
+// newReportScene arma el reporte con back (nil en la demo) y arranca
+// abriendo desde reportAnimFrom.
+func newReportScene(r game.Report, title string, back Scene) *ReportScene {
+	return &ReportScene{report: r, title: title, back: back,
+		anim: newAnimPanel(reportOpenTicks, reportCloseTicks, reportAnimFrom(back), reportOpenCenter, reportMinScale)}
+}
+
+// Update: Espacio o clic arrancan el cierre; al terminar, vuelve a la
+// portada o, en el modo juego, a la partida (que sigue: el reporte la
+// tenía en pausa).
 func (s *ReportScene) Update() (Scene, error) { return s.update(readInput()) }
 
 func (s *ReportScene) update(in input) (Scene, error) {
+	if !s.anim.acceptsInput() { // abriendo o cerrando: no se le hace caso a Espacio ni al clic
+		if s.anim.step() { // terminó de cerrar: ahí es cuando se vuelve de verdad
+			if s.back == nil {
+				return NewTitleScene(), nil
+			}
+			if p, ok := s.back.(pausable); ok {
+				p.onResume()
+			}
+			return s.back, nil
+		}
+		return s, nil
+	}
 	if in.space || in.click {
-		if s.back == nil {
-			return NewTitleScene(), nil
-		}
-		if p, ok := s.back.(pausable); ok {
-			p.onResume()
-		}
-		return s.back, nil
+		s.anim.startClose()
 	}
 	return s, nil
 }
 
-// Draw dibuja el portapapeles con las cuatro consultas.
+// Draw dibuja, debajo, la partida en pausa (o un fondo liso en la demo, que
+// no tiene nada detrás) y, encima, el portapapeles con las cuatro
+// consultas, oscurecido y escalado según la animación (drawAnimatedPanel,
+// anim.go).
 func (s *ReportScene) Draw(screen *ebiten.Image) {
-	screen.Fill(colSand)
+	if s.back != nil {
+		s.back.Draw(screen)
+	} else {
+		screen.Fill(colSand)
+	}
+	drawAnimatedPanel(screen, s.anim, pauseDim.A, s.drawPanel)
+}
 
+// drawPanel dibuja el contenido del portapapeles en su sitio final; lo
+// escala y lo centra drawAnimatedPanel.
+func (s *ReportScene) drawPanel(dst *ebiten.Image) {
 	board := image.Rect(48, 28, 1232, 704)
-	fillRect(screen, board.Add(image.Pt(6, 6)), colWoodDark) // sombra
-	panel(screen, board, colWood)
-	panel(screen, image.Rect(540, 12, 740, 44), colMetal) // gancho
+	fillRect(dst, board.Add(image.Pt(6, 6)), colWoodDark) // sombra
+	panel(dst, board, colWood)
+	panel(dst, image.Rect(540, 12, 740, 44), colMetal) // gancho
 	paper := image.Rect(72, 56, 1208, 680)
-	fillRect(screen, paper.Add(image.Pt(4, 4)), colPaperShade)
-	panel(screen, paper, colPaper)
+	fillRect(dst, paper.Add(image.Pt(4, 4)), colPaperShade)
+	panel(dst, paper, colPaper)
 
-	c := column{dst: screen, x: 92, y: 68}
+	c := column{dst: dst, x: 92, y: 68}
 	const paperRight = 1208 // paper.Max.X: hasta ahí llega una fila antes de recortarse
 	r := s.report
 	title := s.title
@@ -110,11 +170,11 @@ func (s *ReportScene) Draw(screen *ebiten.Image) {
 
 	// Pie: el botón del modo juego todavía deshabilitado.
 	button := image.Rect(92, 612, 372, 648)
-	panel(screen, button, colLightGray)
-	drawText(screen, "¡AHORA TE TOCA!", float64(button.Min.X+16), float64(button.Min.Y+6), boldFace, colMuted)
-	drawText(screen, "(modo juego: próximamente)", float64(button.Max.X+16), float64(button.Min.Y+10), textFace, colMuted)
+	panel(dst, button, colLightGray)
+	drawText(dst, "¡AHORA TE TOCA!", float64(button.Min.X+16), float64(button.Min.Y+6), boldFace, colMuted)
+	drawText(dst, "(modo juego: próximamente)", float64(button.Max.X+16), float64(button.Min.Y+10), textFace, colMuted)
 	hint := "ESPACIO o clic: volver a la portada"
-	drawText(screen, hint, float64(paper.Max.X-20)-textWidth(hint, smallFace), 656, smallFace, colMuted)
+	drawText(dst, hint, float64(paper.Max.X-20)-textWidth(hint, smallFace), 656, smallFace, colMuted)
 }
 
 // column escribe líneas de texto una debajo de otra.
