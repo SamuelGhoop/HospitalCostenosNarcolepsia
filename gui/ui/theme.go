@@ -1,16 +1,12 @@
 package ui
 
 import (
-	"bytes"
-	"fmt"
 	"image"
 	"image/color"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/text/v2"
 	"github.com/hajimehoshi/ebiten/v2/vector"
-	"golang.org/x/image/font/gofont/gomono"
-	"golang.org/x/image/font/gofont/gomonobold"
 
 	"github.com/SamuelGhoop/HospitalCostenosNarcolepsia/hospital"
 )
@@ -63,29 +59,45 @@ var (
 	colBubbleBed      = colBlue      // #2f6fd6 "Zzz" dormido en cama
 )
 
-// Fuentes. Go Mono viene dentro de golang.org/x/image, así que no hay
-// archivos que buscar, y trae tildes, ñ y símbolos como → · …
-// Se cambiará por Press Start 2P cuando llegue a gui/assets/fonts/.
+// Fuentes. Desde el 2026-10-17 (prueba de Samuel, §12.8) TODA la interfaz
+// usa Press Start 2P (antes solo la portada, los créditos y el aviso, y el
+// resto Go Mono): los rótulos del mapa, los IDs, los tooltips, los avisos,
+// los subtítulos de la demo, los botones, la pausa, el reporte y el Game
+// Over.
+//
+// Press Start 2P es un tipo "de letrero": cada letra ocupa un cuadro
+// cuadrado de su tamaño completo (un carácter a 16 px mide 16 px de
+// ancho), mientras que Go Mono, aun siendo monoespaciada, deja la letra
+// más angosta que su cuadro (una X a 16 px medía unos 9-10 px). Por eso no
+// basta con copiar los tamaños de Go Mono: con el mismo número de puntos,
+// Press Start 2P sale ~60 % más ancha, y los textos largos (la llamada al
+// modelo de la barra de la demo, las filas del reporte) se salían de su
+// caja o de la pantalla. Los tamaños bajaron para compensarlo:
+//   - smallFace 14→8 (rótulos del mapa y del HUD, que ya se miden con su
+//     propia fuente: caben igual o con más aire).
+//   - textFace 16→8 (el texto "normal": la llamada y el resultado de cada
+//     paso de la demo pueden pasar de 80 caracteres; a 16 px eso ya no
+//     cabía ni en el ancho de la pantalla).
+//   - boldFace 20→16 (títulos y botones cortos y ya centrados con
+//     textWidth, como "SIGUIENTE DÍA": a 20 no entraban en su botón).
+//
+// Los tres siguen en múltiplos de 8 px, como pide Press Start 2P para
+// verse nítida.
 var (
-	textFace  *text.GoTextFace // texto normal (16 px)
-	smallFace *text.GoTextFace // rótulos pequeños (14 px)
-	boldFace  *text.GoTextFace // títulos (20 px)
+	textFace  *text.GoTextFace // texto normal (8 px: líneas largas del reporte y de la demo)
+	smallFace *text.GoTextFace // rótulos pequeños (8 px)
+	boldFace  *text.GoTextFace // títulos y botones (16 px; ya no hay un peso "negrita" propio)
 )
 
 // loadFonts prepara las fuentes. Devuelve error en vez de hacer panic: así
 // main decide qué hacer si algo falla.
 func loadFonts() error {
-	regular, err := text.NewGoTextFaceSource(bytes.NewReader(gomono.TTF))
-	if err != nil {
-		return fmt.Errorf("cargando Go Mono: %w", err)
+	if err := loadPixelFont(); err != nil {
+		return err
 	}
-	bold, err := text.NewGoTextFaceSource(bytes.NewReader(gomonobold.TTF))
-	if err != nil {
-		return fmt.Errorf("cargando Go Mono Bold: %w", err)
-	}
-	textFace = &text.GoTextFace{Source: regular, Size: 16}
-	smallFace = &text.GoTextFace{Source: regular, Size: 14}
-	boldFace = &text.GoTextFace{Source: bold, Size: 20}
+	textFace = pixelFace(8)
+	smallFace = pixelFace(8)
+	boldFace = pixelFace(16)
 	return nil
 }
 
@@ -142,8 +154,16 @@ func panel(dst *ebiten.Image, r image.Rectangle, bg color.Color) {
 	outline(dst, r, colInk)
 }
 
-// drawText escribe s con su esquina superior izquierda en (x, y).
+// drawText escribe s con su esquina superior izquierda en (x, y). Como toda
+// la interfaz usa Press Start 2P, si face es una de sus caras (pixelFace)
+// pasa por drawPixelText para que las mayúsculas con tilde (Á, É, Í, Ó, Ú,
+// Ñ) lleven su tilde dibujada a mano encima (pixelfont.go, GAME_DESIGN
+// §10.5): una sola pasada, sin contorno ni sombra.
 func drawText(dst *ebiten.Image, s string, x, y float64, face text.Face, c color.Color) {
+	if pf, ok := face.(*text.GoTextFace); ok {
+		drawPixelText(dst, s, int(x), int(y), pf.Size, []textLayer{{0, 0, c}}, 1)
+		return
+	}
 	op := &text.DrawOptions{}
 	op.GeoM.Translate(x, y)
 	op.ColorScale.ScaleWithColor(c)

@@ -27,10 +27,22 @@ type overlay struct {
 }
 
 // textBox es la caja de un rótulo de texto con su esquina en (left, top).
+// Esta caja no es solo para dibujar: figureOverlays la usa para que
+// zoneLabelBox y spotFree (spots.go) reserven espacio y no monten un
+// rótulo sobre otro ni sobre un mueble.
+//
+// Desde Press Start 2P (2026-10-17, GAME_DESIGN §9.3) el relleno vertical
+// subió de 4 a 12: esa fuente no tiene descendente (HDescent da 0, por
+// como está hecho el TTF) y su HAscent es igual al tamaño en px, así que a
+// 8 px la caja medía 12 px de alto contra los ~20 de Go Mono a 14. Con
+// +4 esa caja más baja dejaba demasiado cerca dos puestos que antes no se
+// tocaban (el test TestDemo_NobodyWalksThroughWallsOrFurniture lo pescó:
+// P-001 y la camilla C-01 acababan quietos uno encima del otro en el paso
+// 11). +12 devuelve la caja a los ~20 px de antes sin agrandar la letra.
 func textBox(s string, left, top int, face text.Face) image.Rectangle {
 	m := face.Metrics()
 	w := int(textWidth(s, face)) + 8
-	h := int(m.HAscent+m.HDescent) + 4
+	h := int(m.HAscent+m.HDescent) + 12
 	return image.Rect(left, top, left+w, top+h)
 }
 

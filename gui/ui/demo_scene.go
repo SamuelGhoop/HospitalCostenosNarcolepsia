@@ -402,10 +402,17 @@ func (s *DemoScene) drawHUD(dst *ebiten.Image) {
 	drawText(dst, hint, ScreenWidth-12-textWidth(hint, smallFace), 10, smallFace, colLightGray)
 }
 
+// demoSubtitleBox es la caja de la barra de abajo de la demo: la usan el
+// dibujo y el test que comprueba que la llamada y el resultado de cada
+// paso (los textos más largos de toda la interfaz) caben en su ancho.
+func demoSubtitleBox() image.Rectangle {
+	return image.Rect(12, 594, ScreenWidth-12, ScreenHeight-10)
+}
+
 // drawSubtitles: la barra de abajo con lo que pasó en el último paso, la
 // llamada real al modelo y lo que respondió (en rojo si fue un error).
 func (s *DemoScene) drawSubtitles(dst *ebiten.Image) {
-	box := image.Rect(12, 594, ScreenWidth-12, ScreenHeight-10)
+	box := demoSubtitleBox()
 	panel(dst, box, colPaper)
 	x := float64(box.Min.X + 12)
 	top := float64(box.Min.Y)
