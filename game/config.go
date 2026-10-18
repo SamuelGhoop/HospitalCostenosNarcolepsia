@@ -141,6 +141,17 @@ const (
 	dischargeFee   = 200              // el alta paga aparte
 )
 
+// Racha de atención (§5.8, pedido de Samuel del 2026-10-17, §12.8: la
+// jugabilidad estaba "un poco aburrida", como en Diner Dash). Cada revisión
+// con menos de firstWaitPenaltyAt de espera sube la racha en 1; el pago de
+// la revisión se multiplica por 1 + streakStep/100 × min(racha anterior,
+// streakMaxSteps), en centésimas (100 = ×1, hasta 200 = ×2 con los valores
+// de abajo).
+const (
+	streakStep     = 25 // cada escalón de racha suma esto a la base de 100 (×0,25)
+	streakMaxSteps = 4  // tope de escalones: con streakStep = 25, el máximo es ×2
+)
+
 // Reputación (§5.9), en centésimas de estrella: 300 = 3 ★.
 //
 // firstWaitPenaltyAt subió de 20 a 30 s (decisión de Samuel, §12.8: en la

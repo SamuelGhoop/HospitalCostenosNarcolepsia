@@ -23,6 +23,8 @@ type Snapshot struct {
 	Money             int                // plata del hospital, en pesos
 	Reputation        int                // en centésimas de estrella (300 = 3 ★); la interfaz la muestra como "3,00 ★"
 	ReputationChanges []ReputationChange // últimos cambios de reputación con su motivo, del más viejo al más nuevo (§12.8)
+	Streak            int                // revisiones seguidas con poca espera (§5.8, §12.8)
+	StreakMultiplier  int                // multiplicador del pago que da la racha ahora, en centésimas (100 = ×1, 200 = ×2)
 	GameOver          GameOver           // NotOver mientras la partida sigue
 	Score             int                // puntaje acumulado (§5.10)
 	FinalScore        int                // puntaje final, solo con la partida perdida; 0 mientras sigue
@@ -60,16 +62,18 @@ func (g *Game) Snapshot() Snapshot {
 	defer g.mu.Unlock()
 
 	snap := Snapshot{
-		Day:        g.clock.day,
-		Clock:      g.clock.String(),
-		Progress:   g.clock.progress(),
-		Paused:     g.paused,
-		DayOver:    g.clock.over(),
-		RushHour:   g.rushHour,
-		Money:      g.money,
-		Reputation: g.reputation,
-		GameOver:   g.over,
-		Score:      g.score,
+		Day:              g.clock.day,
+		Clock:            g.clock.String(),
+		Progress:         g.clock.progress(),
+		Paused:           g.paused,
+		DayOver:          g.clock.over(),
+		RushHour:         g.rushHour,
+		Money:            g.money,
+		Reputation:       g.reputation,
+		Streak:           g.streak,
+		StreakMultiplier: streakMultiplier(g.streak),
+		GameOver:         g.over,
+		Score:            g.score,
 		// Copia: si se pasara g.notices tal cual, la interfaz compartiría el
 		// arreglo de fondo con el juego mientras el motor le agrega avisos.
 		Notices: append([]string(nil), g.notices...),

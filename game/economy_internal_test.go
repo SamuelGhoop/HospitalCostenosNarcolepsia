@@ -28,6 +28,48 @@ func TestReviewFee_DependsOnTheWait(t *testing.T) {
 	}
 }
 
+// §5.8 y §12.8: la racha sube el pago 25 puntos (centésimas) por escalón,
+// hasta streakMaxSteps (4) escalones, tope ×2.
+func TestStreakMultiplier_CapsAtFourSteps(t *testing.T) {
+	cases := []struct {
+		streak int
+		want   int
+	}{
+		{0, 100},
+		{1, 125},
+		{2, 150},
+		{3, 175},
+		{4, 200},
+		{5, 200}, // tope: una racha más larga no multiplica más
+		{100, 200},
+	}
+	for _, c := range cases {
+		if got := streakMultiplier(c.streak); got != c.want {
+			t.Errorf("streakMultiplier(%d) = %d; se esperaba %d", c.streak, got, c.want)
+		}
+	}
+}
+
+// applyStreakMultiplier redondea al peso más cercano, no trunca hacia abajo.
+func TestApplyStreakMultiplier_RoundsToTheNearestPeso(t *testing.T) {
+	cases := []struct {
+		fee, streak int
+		want        int
+	}{
+		{450, 0, 450}, // ×1,00: sin cambios
+		{450, 1, 563}, // ×1,25 = 562,5; redondea a 563
+		{450, 2, 675}, // ×1,50 = 675,0: exacto
+		{450, 3, 788}, // ×1,75 = 787,5; redondea a 788
+		{450, 4, 900}, // ×2,00 = 900: exacto
+		{100, 1, 125}, // ×1,25 = 125: exacto
+	}
+	for _, c := range cases {
+		if got := applyStreakMultiplier(c.fee, c.streak); got != c.want {
+			t.Errorf("applyStreakMultiplier(%d, racha %d) = %d; se esperaba %d", c.fee, c.streak, got, c.want)
+		}
+	}
+}
+
 // §5.8: la fórmula de la nómina (y del costo de contratar, que es un día de
 // salario adelantado): médico 250 + 50 × (rapidez + pericia); camillero
 // 120 + 60 × rapidez.

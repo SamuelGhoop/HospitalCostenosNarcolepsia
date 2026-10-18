@@ -220,6 +220,7 @@ func (g *Game) leaveAngryLocked(pt *patient) {
 		}
 	}
 	g.cancelJobsForLocked(pt)
+	g.streak = 0 // alguien se fue enojado: se rompe la racha (§5.8)
 	g.changeReputationLocked(-angryPenalty, fmt.Sprintf("%s se fue enojado", pt.p.ID()))
 	g.noticeLocked(fmt.Sprintf("%s se fue enojado", pt.p))
 	g.leaveLocked(pt, "(se fue enojado)")

@@ -205,10 +205,23 @@ func (g *Game) reviewLocked(s *StaffMember, pt *patient) {
 	pt.stage = InBed
 	pt.reviewedBy = s
 	pt.timer = sleepDuration(pt.p.Level(), s.skill)
-	fee := reviewFee(pt.waited)
+	// La racha (§5.8, §12.8) multiplica el pago según lo que el jugador
+	// traía ANTES de esta revisión: por eso se usa g.streak aquí y recién
+	// después se actualiza.
+	fee := applyStreakMultiplier(reviewFee(pt.waited), g.streak)
 	g.money += fee
 	g.dayReviewIncome += fee // para el Shift Report diario (§5.8, F4)
 	g.score += reviewPoints
+
+	// Una revisión rápida (menos de firstWaitPenaltyAt de espera) sube la
+	// racha. Una tardía no la rompe aquí: ya cayó una penalización de espera
+	// que la reinició en applyWaitPenaltiesLocked (reputation.go).
+	if pt.waited < firstWaitPenaltyAt {
+		g.streak++
+		if g.streak > g.dayBestStreak {
+			g.dayBestStreak = g.streak
+		}
+	}
 }
 
 // registerOnCallLocked es el mecanismo "de guardia" (§3.2). Por un momento s

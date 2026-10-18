@@ -51,6 +51,7 @@ func waitPenaltiesDue(waited time.Duration) int {
 // para el motivo: "P-003 lleva 30 s esperando revisión".
 func (g *Game) applyWaitPenaltiesLocked(pt *patient) {
 	for due := waitPenaltiesDue(pt.waited); pt.penalties < due; pt.penalties++ {
+		g.streak = 0 // cae una penalización de espera: se rompe la racha (§5.8)
 		threshold := firstWaitPenaltyAt + time.Duration(pt.penalties)*waitPenaltyEvery
 		reason := fmt.Sprintf("%s lleva %d s esperando revisión", pt.p.ID(), int(threshold/time.Second))
 		if pt.penalties == 0 {

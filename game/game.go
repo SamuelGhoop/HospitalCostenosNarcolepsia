@@ -48,6 +48,10 @@ type Game struct {
 	repChanges                []ReputationChange // últimos cambios de reputación con su motivo (§5.9, §12.8)
 	rushHour                  bool               // hora pico ahora mismo (§5.3); para el aviso y Snapshot.RushHour
 
+	// Racha de atención (§5.8, pedido de Samuel del 2026-10-17, §12.8).
+	streak        int // revisiones seguidas con menos de firstWaitPenaltyAt de espera
+	dayBestStreak int // la racha más alta que hubo hoy, para el Shift Report diario (DayReport.BestStreak)
+
 	// Contratación y nómina (§5.8 y §6, F4).
 	candidates         []*candidate // los candidatesPerDay candidatos de la bolsa de empleo de hoy
 	dayStartMoney      int          // plata al empezar el día de hoy, para el Shift Report diario
@@ -116,6 +120,7 @@ func (g *Game) tickLocked(dt time.Duration) {
 		// partida por quiebra.
 		g.score += dayCompletedPoints
 		g.payPayrollLocked()
+		g.streak = 0 // la racha también se reinicia al terminar el día (§5.8)
 	}
 }
 
@@ -156,6 +161,7 @@ func (g *Game) StartNextDay() error {
 	g.dayStartMoney = g.money
 	g.dayReviewIncome = 0
 	g.dayDischargeIncome = 0
+	g.dayBestStreak = 0
 	g.dayHires = nil
 	g.generateCandidatesLocked()
 	return nil

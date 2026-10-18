@@ -223,6 +223,7 @@ type DayReport struct {
 	Hires           []HireLine // contrataciones hechas durante el día
 	StartMoney      int        // plata al empezar el día
 	EndMoney        int        // plata después de pagar la nómina
+	BestStreak      int        // la racha de atención más alta del día (§5.8, §12.8)
 	Report          Report
 }
 

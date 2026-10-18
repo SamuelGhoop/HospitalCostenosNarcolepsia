@@ -17,6 +17,23 @@ func reviewFee(waited time.Duration) int {
 	return max(reviewFeeMax-reviewFeeDrop*late, reviewFeeMin)
 }
 
+// streakMultiplier es el multiplicador del pago de la revisión según la
+// racha ANTERIOR (la que traía el jugador antes de esta revisión), en
+// centésimas: 100 = ×1, 125 = ×1,25… hasta streakMaxSteps escalones (200 =
+// ×2 con los valores de game/config.go). Pedido de Samuel del 2026-10-17
+// (§12.8, §5.8): la jugabilidad estaba "un poco aburrida".
+func streakMultiplier(streak int) int {
+	steps := min(streak, streakMaxSteps)
+	return 100 + streakStep*steps
+}
+
+// applyStreakMultiplier aplica streakMultiplier a fee, redondeado al peso
+// más cercano (no truncado hacia abajo: +50 antes de dividir entre 100 es el
+// truco de redondeo con aritmética entera).
+func applyStreakMultiplier(fee, streak int) int {
+	return (fee*streakMultiplier(streak) + 50) / 100
+}
+
 // payPayrollLocked paga la nómina de todo el personal (§5.8) y arma el
 // Shift Report diario (DayReport). Lo llama tickLocked una sola vez, en el
 // Tick que llega a las 20:00, justo después de sumar los +500 puntos por
@@ -44,6 +61,7 @@ func (g *Game) payPayrollLocked() {
 		Hires:      append([]HireLine(nil), g.dayHires...),
 		StartMoney: startMoney,
 		EndMoney:   g.money,
+		BestStreak: g.dayBestStreak,
 		Report:     g.reportLocked(),
 	}
 
