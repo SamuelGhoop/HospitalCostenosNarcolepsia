@@ -221,6 +221,30 @@ func layoutHUD(repText, moneyText, dayText, clockText string) hudLayout {
 	return l
 }
 
+// rushHourText es el letrero de la hora pico (§12.9).
+const rushHourText = "HORA PICO"
+
+// rushHourSignRect es dónde va "HORA PICO": a la izquierda del ícono del
+// reloj (nunca toca el DÍA ni la barra del turno, que están más a la
+// izquierda y más a la derecha; TestHUD_RushHourSignDoesNotOverlapAnything).
+func rushHourSignRect(l hudLayout) image.Rectangle {
+	w := pixelTextWidth(rushHourText, smallFace.Size)
+	x := l.clockIcon.Min.X - hudGap - w
+	y := l.clockIcon.Min.Y + (l.clockIcon.Dy()-int(smallFace.Size))/2
+	return image.Rect(x, y, x+w, y+int(smallFace.Size))
+}
+
+// streakBadgeRect es dónde va "RACHA ×N": debajo de la plata, empezando en
+// el mismo x que su texto (l.money.Min.X, que depende del ícono y la
+// reputación, nunca de cuántos dígitos tenga la plata: así nunca se corre
+// hacia el DÍA por una cifra grande). TestHUD_StreakAndRushHourSignsDoNotOverlapAnything.
+func streakBadgeRect(l hudLayout, text string) image.Rectangle {
+	w := pixelTextWidth(text, smallFace.Size)
+	x := l.money.Min.X
+	y := l.money.Max.Y + 1
+	return image.Rect(x, y, x+w, y+int(smallFace.Size))
+}
+
 // progressFill es lo que se llena de la barra del turno (por dentro del
 // borde) con el turno en progress (de 0 a 1).
 func progressFill(bar image.Rectangle, progress float64) int {
@@ -292,6 +316,17 @@ func formatReputationStars(hundredths int) string {
 // hudDayLabel es el texto del recuadro del centro.
 func hudDayLabel(day int) string { return fmt.Sprintf("DÍA %d", day) }
 
+// formatStreakMultiplier escribe el multiplicador de la racha (centésimas,
+// 100 = ×1) con coma decimal y sin ceros de más: 150 → "×1,5", 200 → "×2".
+func formatStreakMultiplier(hundredths int) string {
+	whole := hundredths / 100
+	frac := strings.TrimRight(fmt.Sprintf("%02d", hundredths%100), "0")
+	if frac == "" {
+		return fmt.Sprintf("×%d", whole)
+	}
+	return fmt.Sprintf("×%d,%s", whole, frac)
+}
+
 // ─── Lo que se mueve ───────────────────────────────────────────────────
 
 // Tiempos de la barra, en ticks (60 por segundo).
@@ -300,6 +335,15 @@ const (
 	moneyCountTicks = 36 // la plata cuenta hasta la real en 0,6 s
 	deltaTicks      = 60 // el "+$450" sube y se desvanece en 1 s
 	deltaRise       = 24 // lo que sube, en px
+)
+
+// Tiempos de la racha de atención (§12.9): streakPopTicks es el "pop" (un
+// salto de 3 px) cuando sube el multiplicador, streakLostTicks el
+// parpadeo corto (3 destellos) cuando se pierde.
+const (
+	streakPopTicks  = 10
+	streakLostTicks = 24
+	streakPopRise   = 3 // px que salta hacia arriba
 )
 
 // moneyDelta es un "+$450" o un "-$X" que sube y se desvanece.
@@ -363,6 +407,17 @@ type hud struct {
 	// repDeltas son los que todavía se ven, subiendo y desvaneciéndose.
 	repSeen   map[game.ReputationChange]bool
 	repDeltas []repChangeDelta
+
+	// La racha de atención y la hora pico (§12.9, pedido de Samuel el
+	// 2026-10-17). streakShown es el multiplicador que se ve (en
+	// centésimas; 100 = sin racha); popTicks cuenta el salto cuando sube
+	// y lostTicks el parpadeo corto cuando se pierde (baja a 100).
+	// hudTicks es el reloj propio de la barra, para el parpadeo suave de
+	// HORA PICO.
+	streakShown int
+	streakPop   int
+	streakLost  int
+	hudTicks    int
 }
 
 // repTenths es la reputación de la foto (en centésimas) en décimas,
@@ -379,8 +434,23 @@ func (h *hud) update(snap game.Snapshot) {
 		for _, c := range snap.ReputationChanges { // de antes de abrir la pantalla: no dejan aviso
 			h.repSeen[c] = true
 		}
+		h.streakShown = snap.StreakMultiplier
 		return
 	}
+
+	h.hudTicks++
+	if h.streakPop > 0 {
+		h.streakPop--
+	}
+	if h.streakLost > 0 {
+		h.streakLost--
+	}
+	if snap.StreakMultiplier > h.streakShown {
+		h.streakPop = streakPopTicks
+	} else if snap.StreakMultiplier < h.streakShown {
+		h.streakLost = streakLostTicks
+	}
+	h.streakShown = snap.StreakMultiplier
 
 	// Reputación: un paso de 0,1 cada repStepTicks, con su destello.
 	if h.stepTicks > 0 {
@@ -576,6 +646,35 @@ func (h *hud) draw(dst *ebiten.Image, snap game.Snapshot, repMinTop int) {
 		rise, alpha := d.offset()
 		y := l.money.Min.Y - 6 + int(math.Round(rise))
 		drawPixelText(dst, d.text, l.money.Max.X+6, y, hudTextSize, append(outlined(2, colInk), textLayer{0, 0, d.color}), alpha)
+	}
+
+	// La racha de atención (§12.9): "RACHA ×1,5" junto a la plata, solo si
+	// hay alguna (o si se acaba de perder y todavía está parpadeando),
+	// con un salto de unos px cuando sube y un parpadeo corto cuando se
+	// pierde.
+	if snap.Streak > 0 || h.streakLost > 0 {
+		visible := true
+		if h.streakLost > 0 {
+			visible = (h.streakLost/4)%2 == 0 // 3 destellos en streakLostTicks
+		}
+		if visible {
+			txt := "RACHA " + formatStreakMultiplier(h.streakShown)
+			r := streakBadgeRect(l, txt)
+			y := r.Min.Y
+			if h.streakPop > 0 {
+				y -= int(math.Round(streakPopRise * float64(h.streakPop) / streakPopTicks))
+			}
+			drawPixelText(dst, txt, r.Min.X, y, smallFace.Size, []textLayer{{0, 0, colHUDGreen}}, 1)
+		}
+	}
+
+	// La hora pico (§12.9): "HORA PICO" junto al reloj, parpadeando suave
+	// (seno, nunca tapa ni el DÍA ni la barra del turno: va a la
+	// izquierda del ícono del reloj, en el hueco entre el DÍA y ahí).
+	if snap.RushHour {
+		alpha := float32(0.5 + 0.5*math.Sin(float64(h.hudTicks)/20))
+		r := rushHourSignRect(l)
+		drawPixelText(dst, rushHourText, r.Min.X, r.Min.Y, smallFace.Size, []textLayer{{0, 0, colOrange}}, alpha)
 	}
 
 	// El DÍA: recuadro azul con borde negro, sombra de adentro y letras blancas.

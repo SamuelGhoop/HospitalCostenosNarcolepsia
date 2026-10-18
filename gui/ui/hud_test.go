@@ -374,3 +374,72 @@ func TestHUD_LayoutFollowsTheMockup(t *testing.T) {
 		t.Errorf("a la mitad del turno la barra se llena %d px", w)
 	}
 }
+
+// §12.9 (pedido de Samuel, 2026-10-17): "RACHA ×1,5" junto a la plata y
+// "HORA PICO" junto al reloj.
+
+// formatStreakMultiplier: coma decimal y sin ceros de más.
+func TestFormatStreakMultiplier(t *testing.T) {
+	cases := map[int]string{100: "×1", 150: "×1,5", 200: "×2", 125: "×1,25"}
+	for in, want := range cases {
+		if got := formatStreakMultiplier(in); got != want {
+			t.Errorf("formatStreakMultiplier(%d) = %q; se esperaba %q", in, got, want)
+		}
+	}
+}
+
+// Con racha, h.update deja streakShown al día; al subir deja el "pop" en
+// curso (streakPop > 0) y al perderse (bajar a 100) el parpadeo
+// (streakLost > 0).
+func TestHUD_StreakPopsOnRiseAndBlinksOnLoss(t *testing.T) {
+	needFonts(t)
+	var h hud
+	h.update(game.Snapshot{Money: 1000, StreakMultiplier: 100})
+	if h.streakPop != 0 || h.streakLost != 0 {
+		t.Fatal("la primera foto no debía dejar ningún pop ni parpadeo")
+	}
+
+	h.update(game.Snapshot{Money: 1000, StreakMultiplier: 150}) // subió: pop
+	if h.streakShown != 150 || h.streakPop == 0 {
+		t.Errorf("tras subir a 150: streakShown %d, streakPop %d; se esperaba 150 y > 0", h.streakShown, h.streakPop)
+	}
+	if h.streakLost != 0 {
+		t.Error("al subir no debía arrancar el parpadeo de pérdida")
+	}
+
+	h.update(game.Snapshot{Money: 1000, StreakMultiplier: 100}) // se perdió: parpadeo
+	if h.streakShown != 100 || h.streakLost == 0 {
+		t.Errorf("tras perder la racha: streakShown %d, streakLost %d; se esperaba 100 y > 0", h.streakShown, h.streakLost)
+	}
+}
+
+// El rótulo de la racha y el de HORA PICO, con los textos más largos que
+// pueden salir (DÍA de tres cifras, reloj con horas de dos cifras), no se
+// encimen con el DÍA, la barra del turno, el reloj ni entre ellos.
+func TestHUD_StreakAndRushHourSignsDoNotOverlapAnything(t *testing.T) {
+	needFonts(t)
+	l := layoutHUD("5,0", "$ 999.999", "DÍA 365", "23:59")
+	streak := streakBadgeRect(l, "RACHA ×2")
+	rush := rushHourSignRect(l)
+
+	others := []image.Rectangle{l.stars, l.rep, l.moneyIcon, l.money, l.day, l.clockIcon, l.clock, l.progress}
+	for _, badge := range []struct {
+		name string
+		r    image.Rectangle
+	}{{"RACHA", streak}, {"HORA PICO", rush}} {
+		for _, o := range others {
+			if badge.r.Overlaps(o) {
+				t.Errorf("%s (%v) se encima con %v", badge.name, badge.r, o)
+			}
+		}
+	}
+	if streak.Overlaps(rush) {
+		t.Errorf("RACHA (%v) y HORA PICO (%v) se encima entre sí", streak, rush)
+	}
+	if !streak.In(image.Rect(0, 0, ScreenWidth, hudHeight)) {
+		t.Errorf("RACHA (%v) se sale de la barra", streak)
+	}
+	if !rush.In(image.Rect(0, 0, ScreenWidth, hudHeight)) {
+		t.Errorf("HORA PICO (%v) se sale de la barra", rush)
+	}
+}

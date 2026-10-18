@@ -124,3 +124,16 @@ func TestReportRows_FitThePaper(t *testing.T) {
 		t.Errorf("la fila de episodio recortada (%q) mide %.0f px; el papel deja %d px de ese punto al borde", fitted, w, avail)
 	}
 }
+
+// TestDayOverLines_FitTheBox: "Puntaje: N" y "Mejor racha: N" (§12.9),
+// centradas en el panel del fin de día (drawDayOver, game_scene.go), de
+// x=400 a x=880: con textFace a 16 px tienen que caber enteras.
+func TestDayOverLines_FitTheBox(t *testing.T) {
+	needFonts(t)
+	const boxWidth = 880 - 400
+	for _, s := range []string{"Puntaje: 123456", "Mejor racha: 99"} {
+		if w := textWidth(s, textFace); w >= float64(boxWidth) {
+			t.Errorf("%q mide %.0f px; el panel del fin de día mide %d px de ancho", s, w, boxWidth)
+		}
+	}
+}

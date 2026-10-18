@@ -420,6 +420,13 @@ func (s *GameScene) drawDayOver(dst *ebiten.Image) {
 		drawPixelText(c, title, ScreenWidth/2-pixelTextWidth(title, 24)/2, 280, 24, []textLayer{{0, 0, colInk}}, 1)
 		score := fmt.Sprintf("Puntaje: %d", s.snap.Score)
 		drawText(c, score, float64(ScreenWidth/2)-textWidth(score, textFace)/2, 340, textFace, colMuted)
+		// MEJOR RACHA del día (§12.9, DayReport.BestStreak): la racha de
+		// atención más alta que llegó a tener hoy, aunque se haya perdido
+		// después. g.DayReport() es del último día que CERRÓ (nómina ya
+		// pagada); acá se dibuja encima de ese cierre, así que es la de
+		// hoy.
+		best := fmt.Sprintf("Mejor racha: %d", s.g.DayReport().BestStreak)
+		drawText(c, best, float64(ScreenWidth/2)-textWidth(best, textFace)/2, 368, textFace, colMuted)
 		panel(c, dayOverButton, colBlue)
 		drawText(c, "SIGUIENTE DÍA", float64(dayOverButton.Min.X+(dayOverButton.Dx()-int(textWidth("SIGUIENTE DÍA", boldFace)))/2), float64(dayOverButton.Min.Y+12), boldFace, colWhite)
 	})
