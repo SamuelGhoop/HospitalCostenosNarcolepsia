@@ -72,6 +72,41 @@ const (
 	doorWindow          = 1 * time.Second // la puerta se abre cuando alguien está a esto de cruzarla
 )
 
+// rushBand describe una franja horaria del turno (minutos desde la
+// medianoche, [from, to)) y el factor que multiplica el intervalo de
+// llegadas sorteado dentro de ella (§5.3). Pedido de Samuel del 2026-10-17
+// (§12.8): la jugabilidad estaba "un poco aburrida", así que el ritmo de
+// llegadas ahora varía como en Diner Dash, con dos horas pico.
+type rushBand struct {
+	from, to int     // minutos desde la medianoche
+	factor   float64 // multiplica el intervalo sorteado; menor a 1 = llegan más seguido
+	peak     bool    // true si esta franja es "hora pico" (aviso y Snapshot.RushHour)
+}
+
+// rushBands cubre las 12 horas del turno (08:00–20:00) sin huecos ni
+// traslapes, de la más temprana a la más tardía. Para ajustar el ritmo basta
+// cambiar los minutos o el factor de una fila; no hay que tocar la lógica.
+var rushBands = []rushBand{
+	{8 * 60, 10 * 60, 1.3, false},     // 08:00–10:00 tranquilo: la gente recién va llegando
+	{10 * 60, 12 * 60, 0.5, true},     // 10:00–12:00 PICO de media mañana
+	{12 * 60, 15 * 60, 1.0, false},    // 12:00–15:00 normal
+	{15 * 60, 17*60 + 30, 0.5, true},  // 15:00–17:30 PICO de media tarde
+	{17*60 + 30, 20 * 60, 0.9, false}, // 17:30–20:00 bajando el ritmo antes de cerrar
+}
+
+// rushAt devuelve el factor y si es hora pico para minute (hora de juego, en
+// minutos desde la medianoche). Fuera de las franjas conocidas (no debería
+// pasar dentro de un turno de 08:00 a 20:00) no cambia nada: factor 1, sin
+// pico.
+func rushAt(minute int) (factor float64, peak bool) {
+	for _, b := range rushBands {
+		if minute >= b.from && minute < b.to {
+			return b.factor, b.peak
+		}
+	}
+	return 1, false
+}
+
 // Comportamiento del paciente (§5.4).
 const (
 	mildAwakeMin     = 60 * time.Second // tiempo despierto antes del ataque, según el nivel

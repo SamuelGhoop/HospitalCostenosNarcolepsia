@@ -9,19 +9,22 @@ import (
 	"github.com/SamuelGhoop/HospitalCostenosNarcolepsia/hospital"
 )
 
-// §5.3: el primer paciente aparece en la calle entre los 18 y los 25 s.
+// §5.3: el primer paciente aparece en la calle entre los 18 y los 25 s de
+// intervalo sorteado. La partida arranca a las 08:00, dentro de la franja
+// "tranquila" de rushBands (§12.8), que multiplica ese intervalo ×1,3: en
+// tiempo real son 23,4 a 32,5 s.
 func TestArrivals_FirstPatientAppearsOnTheStreetAfter18To25s(t *testing.T) {
 	g := newGame(t)
 
-	tickFor(g, 17900*time.Millisecond)
+	tickFor(g, 23300*time.Millisecond)
 	if n := len(g.Snapshot().Patients); n != 0 {
-		t.Fatalf("a los 17,9 s ya hay %d pacientes; el primero llega desde los 18 s", n)
+		t.Fatalf("a los 23,3 s ya hay %d pacientes; el primero llega desde los 23,4 s (18 s × 1,3)", n)
 	}
 
-	tickFor(g, 7100*time.Millisecond) // 25 s
+	tickFor(g, 9200*time.Millisecond) // 32,5 s
 	snap := g.Snapshot()
 	if len(snap.Patients) != 1 {
-		t.Fatalf("a los 25 s hay %d pacientes; se esperaba 1", len(snap.Patients))
+		t.Fatalf("a los 32,5 s hay %d pacientes; se esperaba 1", len(snap.Patients))
 	}
 	if p := snap.Patients[0]; p.ID != "P-001" || p.Name == "" || p.Stage != game.Arriving {
 		t.Errorf("primer paciente = (%s, %q, %v); se esperaba P-001, con nombre, llegando por la calle", p.ID, p.Name, p.Stage)

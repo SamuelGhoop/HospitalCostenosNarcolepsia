@@ -46,6 +46,7 @@ type Game struct {
 	episodeTimes              map[string]string  // ID del episodio → hora del juego ("14:15"), §3.2
 	notices                   []string           // últimos avisos para la interfaz, del más viejo al más nuevo
 	repChanges                []ReputationChange // últimos cambios de reputación con su motivo (§5.9, §12.8)
+	rushHour                  bool               // hora pico ahora mismo (§5.3); para el aviso y Snapshot.RushHour
 
 	// Contratación y nómina (§5.8 y §6, F4).
 	candidates         []*candidate // los candidatesPerDay candidatos de la bolsa de empleo de hoy
@@ -80,7 +81,7 @@ func New(rng, looks, hiring *rand.Rand) (*Game, error) {
 	if err := g.hireLocked(g.newOrderlyLocked(startSpeed)); err != nil {
 		return nil, fmt.Errorf("contratando al camillero inicial: %w", err)
 	}
-	g.nextArrival = arrivalInterval(rng, g.clock.day)
+	g.nextArrival = arrivalInterval(rng, g.clock.day, g.clock.minute())
 	g.dayStartMoney = g.money
 	g.generateCandidatesLocked() // §6: la bolsa de empleo ya tiene 3 candidatos desde el día 1
 	return g, nil
@@ -102,6 +103,7 @@ func (g *Game) tickLocked(dt time.Duration) {
 		return
 	}
 	g.clock.advance(dt)
+	g.tickRushHourLocked()
 	g.tickArrivalsLocked(dt)
 	g.tickPatientsLocked(dt)
 	g.tickStaffLocked(dt)
@@ -150,6 +152,7 @@ func (g *Game) StartNextDay() error {
 		return fmt.Errorf("%w: son las %s", ErrDayNotOver, g.clock)
 	}
 	g.clock.nextDay()
+	g.rushHour = false // el día nuevo arranca a las 08:00, fuera de cualquier pico
 	g.dayStartMoney = g.money
 	g.dayReviewIncome = 0
 	g.dayDischargeIncome = 0

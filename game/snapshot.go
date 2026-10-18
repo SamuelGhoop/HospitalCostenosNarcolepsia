@@ -19,6 +19,7 @@ type Snapshot struct {
 	Candidates        []CandidateView    // los 3 de la bolsa de empleo de hoy (§6, F4)
 	Notices           []string           // últimos avisos, del más viejo al más nuevo: "08:12 …"
 	DoorOpen          bool               // la puerta del hospital está abierta: alguien la va a cruzar (§5.3)
+	RushHour          bool               // hora pico ahora mismo: llegan más pacientes (§5.3, §12.8)
 	Money             int                // plata del hospital, en pesos
 	Reputation        int                // en centésimas de estrella (300 = 3 ★); la interfaz la muestra como "3,00 ★"
 	ReputationChanges []ReputationChange // últimos cambios de reputación con su motivo, del más viejo al más nuevo (§12.8)
@@ -64,6 +65,7 @@ func (g *Game) Snapshot() Snapshot {
 		Progress:   g.clock.progress(),
 		Paused:     g.paused,
 		DayOver:    g.clock.over(),
+		RushHour:   g.rushHour,
 		Money:      g.money,
 		Reputation: g.reputation,
 		GameOver:   g.over,
