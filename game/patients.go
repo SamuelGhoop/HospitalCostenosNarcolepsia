@@ -66,11 +66,12 @@ type patient struct {
 	penalties  int           // penalizaciones por espera ya cobradas en este episodio
 	reviewedBy *StaffMember  // el médico que lo revisó; nil si nadie
 	gone       bool          // ya cruzó la puerta de salida: se quita del mapa
+	lastFee    int           // lo que pagó la última revisión (§12.10, pase de juice)
 }
 
 // view copia los datos del paciente a una vista (solo valores).
 func (pt *patient) view() GamePatientView {
-	v := GamePatientView{PatientView: patientViewOf(pt.p), Stage: pt.stage, Zone: pt.zone, Look: pt.look, Waited: pt.waited}
+	v := GamePatientView{PatientView: patientViewOf(pt.p), Stage: pt.stage, Zone: pt.zone, Look: pt.look, Waited: pt.waited, LastFee: pt.lastFee}
 	if pt.stage == Arriving || pt.stage == Leaving || pt.stage == Drowsy {
 		v.Left = pt.timer
 	}

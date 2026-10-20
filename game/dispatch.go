@@ -210,6 +210,7 @@ func (g *Game) reviewLocked(s *StaffMember, pt *patient) {
 	// después se actualiza.
 	fee := applyStreakMultiplier(reviewFee(pt.waited), g.streak)
 	g.money += fee
+	pt.lastFee = fee         // para el "+$350" flotante de la interfaz (§12.10)
 	g.dayReviewIncome += fee // para el Shift Report diario (§5.8, F4)
 	g.score += reviewPoints
 

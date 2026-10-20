@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/hajimehoshi/ebiten/v2/text/v2"
 
 	"github.com/SamuelGhoop/HospitalCostenosNarcolepsia/game"
 	"github.com/SamuelGhoop/HospitalCostenosNarcolepsia/hospital"
@@ -36,23 +37,61 @@ func (s *GameScene) figureBox(f figure) image.Rectangle {
 	}
 }
 
-// figureAt es el personaje que está bajo p: si hay varios, el que se dibuja
-// encima (el de los pies más abajo). Los que van en camilla no cuentan.
-func (s *GameScene) figureAt(p image.Point) (figure, bool) {
-	var hits []figure
+// clickableFigures son los personajes que cuentan para el clic, el hover y
+// el imán: los mismos que antes (nadie en camilla).
+func (s *GameScene) clickableFigures() []figure {
+	var out []figure
 	for _, f := range s.figures {
 		if s.actorOf(f.id).exiting || (s.carryOf(f.id) != nil && f.id == s.carryOf(f.id).order.patient) {
 			continue
 		}
-		if p.In(s.figureBox(f)) {
+		out = append(out, f)
+	}
+	return out
+}
+
+// figureAt es el personaje que está bajo p: si hay varios, el que se dibuja
+// encima (el de los pies más abajo). Los que van en camilla no cuentan.
+//
+// BLOQUE 1 del pase de juice (GAME_DESIGN §12.10, pedido de Samuel el
+// 2026-10-19, "clics más fáciles"): la hitbox de cada uno crece +50 %
+// (hitboxGrowFactor, juice.go) alrededor de su caja actual, y si el clic no
+// cae en nadie así agrandado, se usa el imán (magnetFigureAt): el personaje
+// clicable más cercano por distancia al centro de su caja, dentro de
+// clickMagnetRadius píxeles de pantalla. No cambia la regla de despacho
+// (sigue siendo clic paciente → clic personal): esto solo decide A QUIÉN
+// apunta el clic, igual que antes.
+func (s *GameScene) figureAt(p image.Point) (figure, bool) {
+	figs := s.clickableFigures()
+	var hits []figure
+	for _, f := range figs {
+		if p.In(growRect(s.figureBox(f), hitboxGrowFactor)) {
 			hits = append(hits, f)
 		}
 	}
 	if len(hits) == 0 {
-		return figure{}, false
+		return s.magnetFigureAt(p, figs)
 	}
 	sort.SliceStable(hits, func(i, j int) bool { return s.pos[hits[i].id].y > s.pos[hits[j].id].y })
 	return hits[0], true
+}
+
+// magnetFigureAt es el imán (§12.10 BLOQUE 1): entre figs, el más cercano a
+// p por distancia al centro de su caja ACTUAL (sin agrandar: el imán ya hace
+// más fácil llegar a alguien, no hace falta agrandar dos veces), si queda a
+// clickMagnetRadius píxeles o menos. Sin nadie tan cerca, no hay imán.
+func (s *GameScene) magnetFigureAt(p image.Point, figs []figure) (figure, bool) {
+	best := math.Inf(1)
+	var closest figure
+	found := false
+	for _, f := range figs {
+		cx, cy := boxCenter(s.figureBox(f))
+		d := math.Hypot(float64(p.X)-cx, float64(p.Y)-cy)
+		if d <= clickMagnetRadius && d < best {
+			best, closest, found = d, f, true
+		}
+	}
+	return closest, found
 }
 
 // patientView y staffView buscan en la foto.
@@ -81,6 +120,12 @@ func needsSomeone(st game.Stage) bool {
 
 // click es el clic izquierdo en p: elige un paciente que necesita a alguien
 // o, con uno elegido, manda a quien se clicó. Clic en otro sitio, nada.
+//
+// BLOQUE 2 del pase de juice (§12.10): todo clic que de verdad le pega a
+// alguien deja su squash&stretch + destello blanco (s.fx.punch). Si el clic
+// manda a alguien (Dispatch), un despacho exitoso deja además la línea
+// punteada hasta el paciente; uno inválido tiñe el destello de rojo y
+// tiembla la pantalla (s.fx.invalidClick).
 func (s *GameScene) click(p image.Point) {
 	f, ok := s.figureAt(p)
 	switch {
@@ -89,12 +134,24 @@ func (s *GameScene) click(p image.Point) {
 	case f.patient:
 		if pv, _ := s.patientView(f.id); needsSomeone(pv.Stage) && s.selected != f.id {
 			s.selected = f.id
+			s.fx.punch(f.id, colWhite)
+			playSound(sfxClick) // bloque 7 (§12.10): "clic/selección"
 		} else {
 			s.selected = ""
 		}
 	case s.selected != "":
+		from, _ := s.figure(s.selected)
+		fx0, fy0 := boxCenter(s.figureBox(from))
+		tx0, ty0 := boxCenter(s.figureBox(f))
 		if err := s.g.Dispatch(s.selected, f.id); err != nil {
 			s.say(err.Error())
+			s.fx.punch(f.id, colRed)
+			s.fx.invalidClick()
+			playSound(sfxInvalid)
+		} else {
+			s.fx.punch(f.id, colWhite)
+			s.fx.dispatchSuccess(vec{fx0, fy0}, vec{tx0, ty0})
+			playSound(sfxDispatch)
 		}
 		s.selected = ""
 	default:
@@ -111,7 +168,12 @@ func (s *GameScene) rightClick(p image.Point) {
 	}
 	if err := s.g.WakeEarly(f.id); err != nil {
 		s.say(err.Error())
+		s.fx.punch(f.id, colRed)
+		s.fx.invalidClick()
+		playSound(sfxInvalid)
+		return
 	}
+	s.fx.punch(f.id, colWhite)
 }
 
 // say muestra un aviso de la escena (los errores del juego, "Próximamente").
@@ -148,12 +210,20 @@ func (s *GameScene) gameOverlays(f figure, showLabel bool) []overlay {
 			}
 			blinkOff := (pv.Stage == game.Collapsed || pv.Stage == game.InHallway) && pv.Waited > bubbleBlinkAfter && s.ticks/30%2 == 1
 			if !blinkOff {
-				box := centeredBox(txt, x+figWidth/2, y-20, smallFace)
+				// BLOQUE 3 del pase de juice (§12.10): recién desplomado, la
+				// burbuja sale más grande y con vaivén (collapseFlourish,
+				// juice_collapse.go) durante collapseFlourishTicks.
+				face, bobY := text.Face(smallFace), 0
+				if cf := s.fx.collapses[f.id]; cf != nil {
+					face = pixelFace(smallFace.Size * zzzEmphasisScale)
+					bobY = int(math.Round(cf.zzzBob()))
+				}
+				box := centeredBox(txt, x+figWidth/2, y-20+bobY, face)
 				if s.onBed(f) {
 					bed := bedRect(roomZone(f.room))
-					box = textBox(txt, bed.Max.X+4, bed.Min.Y+4, smallFace)
+					box = textBox(txt, bed.Max.X+4, bed.Min.Y+4+bobY, face)
 				}
-				out = append(out, bubbleOverlays(txt, bg, f.level, box)...)
+				out = append(out, bubbleOverlays(txt, bg, f.level, box, face)...)
 			}
 		}
 	} else {

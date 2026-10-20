@@ -25,6 +25,12 @@ func TestEffects_DurationAndSilence(t *testing.T) {
 		"dayEnd":     DayEnd(rnd),
 		"gameOver":   GameOver(rnd),
 		"snore":      Snore(rnd),
+
+		// Pase de juice (§12.10, 2026-10-19).
+		"dispatch":     Dispatch(rnd),
+		"invalidClick": InvalidClick(rnd),
+		"discharge":    Discharge(rnd),
+		"angry":        Angry(rnd),
 	}
 	for name, data := range effects {
 		if len(data) == 0 {

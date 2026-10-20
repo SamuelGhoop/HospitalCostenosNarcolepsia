@@ -128,3 +128,33 @@ func GameOver(rnd *rand.Rand) []byte {
 func Snore(rnd *rand.Rand) []byte {
 	return atLevel(LevelAmbient, Tone(Triangle, 150, 100, 300*time.Millisecond, 1, DefaultEnvelope, rnd))
 }
+
+// Pase de juice (GAME_DESIGN §12.10, pedido de Samuel el 2026-10-19): 4
+// efectos nuevos, con el mismo estilo Game Boy de arriba.
+
+// Dispatch: blip corto y grave cuando un despacho (Dispatch) sale bien —
+// distinto de Click (agudo, de menú): este es "algo se puso en marcha".
+func Dispatch(rnd *rand.Rand) []byte {
+	return atLevel(LevelUI, Tone(Pulse25, 659.25, 880, 70*time.Millisecond, 1, DefaultEnvelope, rnd)) // Mi5 a La5
+}
+
+// InvalidClick: un blip corto que cae en vez de subir — "eso no se puede".
+func InvalidClick(rnd *rand.Rand) []byte {
+	return atLevel(LevelUI, Tone(Pulse25, 392, 261.63, 90*time.Millisecond, 1, DefaultEnvelope, rnd)) // Sol4 a Do4
+}
+
+// Discharge: fanfarria corta (3 notas) cuando un paciente recibe el alta.
+func Discharge(rnd *rand.Rand) []byte {
+	notes := []float64{659.25, 784.0, 1046.5} // Mi-Sol-Do, subiendo
+	parts := make([][]byte, len(notes))
+	for i, f := range notes {
+		parts[i] = Tone(Pulse25, f, f, 90*time.Millisecond, 1, DefaultEnvelope, rnd)
+	}
+	return atLevel(LevelEvent, Concat(parts...))
+}
+
+// Angry: zumbido grave cuando alguien se va enojado.
+func Angry(rnd *rand.Rand) []byte {
+	buzz := Tone(Square, 110, 90, 260*time.Millisecond, 0.8, Envelope{Attack: 0.02, Decay: 0.2, Sustain: 0.5, Release: 0.3}, rnd)
+	return atLevel(LevelEvent, LowPass(buzz, 0.25))
+}

@@ -24,6 +24,10 @@ type overlay struct {
 	text     string // "" para rayitos y puntos
 	fg, bg   color.Color
 	floating bool // burbuja o rayito: flota sobre el acostado (ver spotFree)
+	// face es la fuente del texto; nil usa smallFace (el tamaño de siempre).
+	// La usa el aviso de desplome (§12.10, BLOQUE 3) para que la burbuja Zzz
+	// salga más grande mientras dura, sin tocar el tamaño de las demás.
+	face text.Face
 }
 
 // textBox es la caja de un rótulo de texto con su esquina en (left, top).
@@ -63,14 +67,14 @@ func figureOverlays(f figure, at vec, showBubble bool) []overlay {
 	if f.patient && f.room != 0 && at == bedCell(roomZone(f.room)) {
 		bed := bedRect(roomZone(f.room))
 		if txt, bg, ok := bubbleFor(f.state); ok && showBubble {
-			out = append(out, bubbleOverlays(txt, bg, f.level, textBox(txt, bed.Max.X+4, bed.Min.Y+4, smallFace))...)
+			out = append(out, bubbleOverlays(txt, bg, f.level, textBox(txt, bed.Max.X+4, bed.Min.Y+4, smallFace), smallFace)...)
 		}
 		return append(out, overlay{rect: textBox(f.id, bed.Max.X+4, bed.Min.Y+28, smallFace), text: f.id, fg: colInk, bg: colPaper})
 	}
 
 	if f.patient {
 		if txt, bg, ok := bubbleFor(f.state); ok && showBubble {
-			out = append(out, bubbleOverlays(txt, bg, f.level, centeredBox(txt, x+figWidth/2, y-20, smallFace))...)
+			out = append(out, bubbleOverlays(txt, bg, f.level, centeredBox(txt, x+figWidth/2, y-20, smallFace), smallFace)...)
 		}
 	} else {
 		// Punto verde = libre. En la demo el personal nunca queda ocupado.
@@ -81,9 +85,11 @@ func figureOverlays(f figure, at vec, showBubble bool) []overlay {
 }
 
 // bubbleOverlays: la burbuja Zzz en box y, a su derecha, los rayitos de
-// nivel (1 amarillo leve, 2 naranja moderada, 3 rojos severa).
-func bubbleOverlays(txt string, bg color.RGBA, level hospital.NarcolepsyLevel, box image.Rectangle) []overlay {
-	out := []overlay{{rect: box, text: txt, fg: colWhite, bg: bg, floating: true}}
+// nivel (1 amarillo leve, 2 naranja moderada, 3 rojos severa). face es la
+// fuente del texto de la burbuja (smallFace normalmente; más grande durante
+// el aviso de desplome, §12.10 BLOQUE 3).
+func bubbleOverlays(txt string, bg color.RGBA, level hospital.NarcolepsyLevel, box image.Rectangle, face text.Face) []overlay {
+	out := []overlay{{rect: box, text: txt, fg: colWhite, bg: bg, floating: true, face: face}}
 	c, n := levelStyle(level)
 	for i := 0; i < n; i++ {
 		bolt := image.Rect(box.Max.X+4+i*8, box.Min.Y+4, box.Max.X+10+i*8, box.Max.Y-4)
@@ -138,6 +144,10 @@ func zoneLabelBox(z zone) image.Rectangle {
 func drawOverlay(dst *ebiten.Image, o overlay) {
 	panel(dst, o.rect, o.bg)
 	if o.text != "" {
-		drawText(dst, o.text, float64(o.rect.Min.X+4), float64(o.rect.Min.Y+2), smallFace, o.fg)
+		face := o.face
+		if face == nil {
+			face = smallFace
+		}
+		drawText(dst, o.text, float64(o.rect.Min.X+4), float64(o.rect.Min.Y+2), face, o.fg)
 	}
 }

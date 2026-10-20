@@ -227,6 +227,152 @@ func TestGameScene_ClicksDispatchAndWake(t *testing.T) {
 	}
 }
 
+// BLOQUE 4 del pase de juice (§12.10): el hit-stop congela el CUADRO que se
+// ve (Draw reusa el lienzo de la vez pasada), pero animate() sigue
+// corriendo por dentro: quien estaba caminando se sigue moviendo de
+// verdad, aunque la pantalla no lo muestre todavía. Si esto fallara,
+// TestNobodyStandsOnAnother_GameSeeds volvería a fallar (fue justo lo que
+// pasó al probarlo la primera vez: saltarse animate() corría las
+// decisiones de settle/dodge y dejaba, rara vez, a dos quietos encimados).
+func TestGameScene_HitStopDoesNotFreezeAnimate(t *testing.T) {
+	s := newTestGameScene(t)
+	id := firstCollapsed(t, s)
+	clickOn(s, id, false)
+	clickOn(s, "C-01", false)
+	// C-01 ya va caminando hacia el paciente. Un hit-stop no debería
+	// impedir que se siga moviendo tick a tick.
+	s.fx.hitStop.trigger(hitStopTicks)
+	before := s.pos["C-01"]
+	play(s, 1)
+	if s.pos["C-01"] == before {
+		t.Error("con el hit-stop activo, C-01 no se movió: animate() no debería frenarse")
+	}
+}
+
+// BLOQUE 3 del pase de juice (§12.10): al desplomarse (de verdad, jugando)
+// deja la nube de polvo, el aviso "!" y un shake leve.
+func TestGameScene_CollapseLeavesDustAndExclaim(t *testing.T) {
+	s := newTestGameScene(t)
+	id := firstCollapsed(t, s) // espera a que termine de desplomarse (showsBubble)
+	if _, ok := s.fx.collapses[id]; !ok {
+		t.Errorf("%s se desplomó pero no quedó su aviso (collapseFlourish)", id)
+	}
+	if len(s.fx.dust) == 0 {
+		t.Error("al desplomarse no quedó ninguna partícula de polvo")
+	}
+}
+
+// BLOQUE 4 del pase de juice (§12.10): cobrar una revisión de verdad deja
+// el hit-stop activo y un "+$NNN" flotando sobre el paciente, con el monto
+// real (GamePatientView.LastFee).
+func TestGameScene_PaymentTriggersHitStopAndPopup(t *testing.T) {
+	s := newTestGameScene(t)
+	id := firstCollapsed(t, s)
+	clickOn(s, id, false)
+	clickOn(s, "C-01", false)
+	playUntil(t, s, 60*12, "la camilla llegara a la cama", func() bool {
+		f, _ := s.figure(id)
+		return s.onBed(f) && s.carryOf(id) == nil
+	})
+	clickOn(s, id, false)
+	clickOn(s, "D-01", false)
+
+	if len(s.fx.payments) != 0 {
+		t.Fatalf("ya había %d popups de cobro antes de revisarlo", len(s.fx.payments))
+	}
+	playUntil(t, s, 60*12, "el médico lo revisara", func() bool { return stageOf(s, id) == game.InBed })
+
+	if !s.fx.hitStop.active() {
+		t.Error("cobrar una revisión no dejó el hit-stop activo")
+	}
+	if len(s.fx.payments) != 1 {
+		t.Fatalf("hay %d popups de cobro; se esperaba 1", len(s.fx.payments))
+	}
+	pv, _ := s.patientView(id)
+	if want := formatDelta(pv.LastFee); s.fx.payments[0].text != want {
+		t.Errorf("el popup dice %q; se esperaba %q (LastFee = %d)", s.fx.payments[0].text, want, pv.LastFee)
+	}
+}
+
+// BLOQUE 4 del pase de juice (§12.10): aplicar los eventos de racha, alta y
+// enojo deja lo que corresponde en s.fx. Se prueban llamando
+// applyJuiceEvent directo (no esperando 45 s de juego de verdad para un
+// enojo, por ejemplo), sobre una escena real para que s.pos tenga a P-001
+// en un sitio válido.
+func TestApplyJuiceEvent_StreakUpAndLost(t *testing.T) {
+	s := newTestGameScene(t)
+	s.applyJuiceEvent(juiceEvent{kind: juiceStreakUp, amount: 150})
+	if s.fx.streak == nil || s.fx.streak.text != "¡RACHA "+formatStreakMultiplier(150)+"!" {
+		t.Errorf("streak banner = %+v; se esperaba el texto con ×1,5", s.fx.streak)
+	}
+	if len(s.fx.sparks) != streakSparkCount {
+		t.Errorf("hay %d chispas; se esperaban %d", len(s.fx.sparks), streakSparkCount)
+	}
+
+	s.applyJuiceEvent(juiceEvent{kind: juiceStreakLost})
+	if s.fx.streakLostText == nil || s.fx.streakLostText.text != "RACHA PERDIDA" {
+		t.Errorf("streakLostText = %+v; se esperaba \"RACHA PERDIDA\"", s.fx.streakLostText)
+	}
+}
+
+func TestApplyJuiceEvent_DischargeAndAngry(t *testing.T) {
+	s := newTestGameScene(t)
+	id := firstCollapsed(t, s)
+
+	s.applyJuiceEvent(juiceEvent{kind: juiceDischarge, patientID: id})
+	if len(s.fx.discharge) != dischargeParticleCount {
+		t.Errorf("hay %d partículas de alta; se esperaban %d", len(s.fx.discharge), dischargeParticleCount)
+	}
+
+	if got := s.fx.shake.current(); got != 0 {
+		t.Fatalf("antes del enojo ya había shake (%v)", got)
+	}
+	s.applyJuiceEvent(juiceEvent{kind: juiceAngry, patientID: id})
+	if len(s.fx.angrySmoke) != angrySmokeCount {
+		t.Errorf("hay %d partículas de humo; se esperaban %d", len(s.fx.angrySmoke), angrySmokeCount)
+	}
+	if len(s.fx.fallingStars) != 1 {
+		t.Errorf("hay %d estrellas cayendo; se esperaba 1", len(s.fx.fallingStars))
+	}
+	if s.fx.shake.current() != shakeAngry {
+		t.Errorf("shake tras el enojo = %v; se esperaba %v (shakeAngry)", s.fx.shake.current(), shakeAngry)
+	}
+}
+
+// BLOQUE 5 del pase de juice (§12.10): la reputación subiendo deja chispas
+// blancas sobre las estrellas del HUD; bajando (sin ser un enojo, que ya
+// tiene su propia animación), fragmentos grises.
+func TestApplyJuiceEvent_StarShimmerAndBreak(t *testing.T) {
+	s := newTestGameScene(t)
+	s.applyJuiceEvent(juiceEvent{kind: juiceStarUp})
+	if len(s.fx.hudSparks) != starShimmerCount {
+		t.Errorf("hay %d chispas; se esperaban %d (starShimmerCount)", len(s.fx.hudSparks), starShimmerCount)
+	}
+
+	s.fx.hudSparks = nil
+	s.applyJuiceEvent(juiceEvent{kind: juiceStarDown})
+	if len(s.fx.hudSparks) != starBreakCount {
+		t.Errorf("hay %d fragmentos; se esperaban %d (starBreakCount)", len(s.fx.hudSparks), starBreakCount)
+	}
+}
+
+// BLOQUE 6 del pase de juice (§12.10): aplicar el evento de día/hora pico
+// deja el banner correspondiente listo para dibujarse.
+func TestApplyJuiceEvent_DayAndRushBanners(t *testing.T) {
+	s := newTestGameScene(t)
+	if s.fx.dayBanner != nil || s.fx.rushBanner != nil {
+		t.Fatal("ya había un banner antes de aplicar nada")
+	}
+	s.applyJuiceEvent(juiceEvent{kind: juiceDayBanner, amount: 3})
+	if s.fx.dayBanner == nil || s.fx.dayBanner.text != "DÍA 3" {
+		t.Errorf("dayBanner = %+v; se esperaba el texto \"DÍA 3\"", s.fx.dayBanner)
+	}
+	s.applyJuiceEvent(juiceEvent{kind: juiceRushBanner})
+	if s.fx.rushBanner == nil || s.fx.rushBanner.text != "¡HORA PICO!" {
+		t.Errorf("rushBanner = %+v; se esperaba \"¡HORA PICO!\"", s.fx.rushBanner)
+	}
+}
+
 // Los errores del juego salen como aviso: mandar al médico a recoger a
 // alguien cuando hay un camillero libre (§5.5: recoger le toca al camillero).
 func TestGameScene_DispatchErrorsBecomeNotices(t *testing.T) {

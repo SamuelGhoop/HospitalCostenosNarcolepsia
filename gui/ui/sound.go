@@ -36,6 +36,12 @@ const (
 	sfxDayEnd     = "dayEnd"
 	sfxGameOver   = "gameOver"
 	sfxSnore      = "snore"
+
+	// Pase de juice (GAME_DESIGN §12.10, 2026-10-19).
+	sfxDispatch  = "dispatch"
+	sfxInvalid   = "invalidClick"
+	sfxDischarge = "discharge"
+	sfxAngry     = "angry"
 )
 
 // soundCooldownTicks: el mismo efecto no vuelve a sonar antes de esto
@@ -83,6 +89,10 @@ var effectGenerators = map[string]func(*rand.Rand) []byte{
 	sfxDayEnd:     sfx.DayEnd,
 	sfxGameOver:   sfx.GameOver,
 	sfxSnore:      sfx.Snore,
+	sfxDispatch:   sfx.Dispatch,
+	sfxInvalid:    sfx.InvalidClick,
+	sfxDischarge:  sfx.Discharge,
+	sfxAngry:      sfx.Angry,
 }
 
 // coinEffects son las 5 variantes de Coin, una por racha (0 a 4), para no
