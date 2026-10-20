@@ -151,7 +151,7 @@ GAME_DESIGN.md   especificación del modo demostración y del juego
 - [x] Fase 4: `Hospital` y las cuatro consultas
 - [x] Fase 5: escenario de demostración en `main.go`
 - [x] Fase 6: bonus de simulación concurrente
-- [ ] Fase 7: bonus de interfaz gráfica (ver `GAME_DESIGN.md`)
+- [x] Fase 7: bonus de interfaz gráfica (ver `GAME_DESIGN.md`)
   - [x] Demostración de la Sección 6 paso a paso, con subtítulos y Shift Report
-  - [ ] Modo juego
-- [ ] Fase 8: revisión final y `AI_USAGE.md`
+  - [x] Modo juego
+- [x] Fase 8: revisión final y `AI_USAGE.md`
