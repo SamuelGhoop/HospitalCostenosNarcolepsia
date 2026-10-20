@@ -262,7 +262,7 @@ La demo no cambia: sigue el round-robin real de la Sección 6 (sección 4).
 - El que se va enojado no paga: **$0**.
 - Alta: **+$200**.
 - Nómina a las 20:00. Médico: `250 + 50 × (rapidez + pericia)`; camillero: `120 + 60 × rapidez`.
-- Contratar cuesta un día de salario por adelantado.
+- Contratar cuesta un día de salario por adelantado, **encarecido según el día** (2026-10-19, pedido de Samuel: "as the days pass it is harder to hire new staff"): sueldo × (100 + 20 × (día − 1)) %, con tope ×3 (`hireCostStepPercent`/`hireCostMaxPercent` en `config.go`). Día 1 ×1, día 2 ×1,2, día 5 ×1,8; desde el día 11, ×3. `CandidateView.Cost` y `Affordable` ya traen el costo del día; la nómina de las 20:00 sigue con el sueldo base. Como el contratado solo dura ese día (5.12), paga el costo al contratarlo y otra vez su sueldo en la nómina de esa noche.
 - (Opcional, fase final) **Ampliar**: comprar la habitación 104 por $2.500 con `AddRoom`.
 - **Cómo quedó (F4, 2026-10-15)**: la nómina se paga en el `Tick` de las 20:00, justo después de los +500 del día completado, y no al pulsar SIGUIENTE DÍA. Así el reporte del día (`Game.DayReport()`) ya muestra la plata después de pagar cuando sale la pantalla de fin de día.
 - **Racha de atención** (2026-10-17, §12.9: pedido de Samuel, inspirado en Diner Dash, porque la jugabilidad le pareció "un poco aburrida"). Cada revisión con menos de `firstWaitPenaltyAt` (30 s) de espera sube una racha en 1. El pago de la revisión se multiplica por `1 + 0,25 × min(racha anterior, 4)` (hasta ×2), redondeado al peso más cercano (`streakStep`/`streakMaxSteps` en `config.go`). La racha vuelve a 0 cuando cae una penalización de espera (5.9), cuando alguien se va enojado o al terminar el día. `Snapshot.Streak` (la racha actual) y `Snapshot.StreakMultiplier` (en centésimas: 100, 125… 200) la muestran; `DayReport.BestStreak` guarda la racha más alta del día, aunque algo la haya roto antes de cerrar el turno.
@@ -288,6 +288,15 @@ La demo no cambia: sigue el round-robin real de la Sección 6 (sección 4).
 - **Cargar** arma un hospital nuevo con la API pública (`AddRoom`, `NewDoctor` / `NewOrderly` + `HireStaff` envuelto en `StaffMember`) y arranca el día siguiente.
 - Tests: guardar y cargar da el mismo estado; un archivo dañado devuelve un error, sin `panic`.
 - Salir al menú a mitad del día (9.4) pierde el día en curso: lo guardado es el final del día anterior.
+
+### 5.12 Día siguiente: el hospital arranca vacío (2026-10-19)
+Pedido de Samuel: *"when the day ends it gets patients out of the hospital and staff pool restarts but money and reputation stays as the day ends"*. Antes `StartNextDay` solo movía el reloj: el día 2 seguía con los pacientes, las camas ocupadas y el personal a medio trabajo del día 1.
+- Pasa al pulsar **SIGUIENTE DÍA** (en `StartNextDay` → `closeDayLocked`, `game/newday.go`), no a las 20:00: el panel de fin de día se ve sobre el hospital tal como quedó.
+- **Pacientes**: todos salen del mapa, sin penalización. A los que el modelo tiene dormidos (en cama, esperando revisión o en el pasillo) se les llama `WakePatient`, que libera la cama o el pasillo; los demás ya están `Awake` en el modelo. Sus episodios siguen en el historial; el Shift Report los marca "(cerró el turno)".
+- **Personal**: vuelve a ser solo el inicial (D-01 y C-01), todos libres. El modelo no tiene cómo despedir a nadie, así que los contratados siguen en su lista, pero nunca vuelven a salir en el despacho por turnos: el decorador `StaffMember` solo dice `IsAvailable() == true` durante un despacho "de guardia" del juego (3.2), y ya no están en el juego. Los IDs siguen contando (el siguiente médico no repite D-02), porque el modelo ya tiene esos IDs. Consecuencia: en la consulta 5.2 del Shift Report solo salen los médicos que están hoy.
+- **Se mantiene**: plata, reputación, puntaje y el número del día. Se borran los avisos y el último error de `AssignRoom`.
+- **Interfaz**: `GameScene.startNewDayWorld` (`gui/ui/game_world.go`) olvida posiciones, rutas, camillas a medias, puestos y al elegido, para que nadie del día anterior salga caminando por la acera.
+- Tests: `game/newday_test.go` y `gui/ui/new_day_test.go`.
 
 ---
 

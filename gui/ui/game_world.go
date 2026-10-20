@@ -410,3 +410,18 @@ func (s *GameScene) animate() {
 		}
 	}
 }
+
+// startNewDayWorld olvida todo lo que la escena recordaba del día anterior:
+// posiciones, rutas, camillas a medias, puestos reservados y al paciente
+// elegido. Se llama justo después de StartNextDay, que ya sacó a los
+// pacientes y dejó solo al personal inicial (game.closeDayLocked). Sin
+// esto, los pacientes de ayer saldrían caminando por la acera al empezar
+// el día y la camilla que iba a medias seguiría su recorrido. En el sync
+// siguiente el personal inicial reaparece en la sala del personal, como
+// al empezar la partida.
+func (s *GameScene) startNewDayWorld() {
+	s.world = newWorld() // también vacía world.rest (dónde se quedó quieto cada uno)
+	s.actors = map[string]*actor{}
+	s.standing, s.lying = spotBook{}, spotBook{}
+	s.selected, s.hover = "", ""
+}

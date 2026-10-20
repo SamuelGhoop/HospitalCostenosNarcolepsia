@@ -145,8 +145,9 @@ func (g *Game) Resume() {
 //
 // La nómina del día que cierra se paga en tickLocked, no aquí (ver
 // payPayrollLocked): a las 20:00, no cuando el jugador decide seguir. Aquí
-// solo se reinician las cuentas del día nuevo y se renueva la bolsa de
-// empleo (§6).
+// se vacía el hospital y el personal vuelve a ser el inicial
+// (closeDayLocked, newday.go), se reinician las cuentas del día nuevo y se
+// renueva la bolsa de empleo (§6), ya con el costo del día nuevo.
 func (g *Game) StartNextDay() error {
 	g.mu.Lock()
 	defer g.mu.Unlock()
@@ -156,6 +157,7 @@ func (g *Game) StartNextDay() error {
 	if !g.clock.over() {
 		return fmt.Errorf("%w: son las %s", ErrDayNotOver, g.clock)
 	}
+	g.closeDayLocked() // saca a los pacientes y deja solo al personal inicial
 	g.clock.nextDay()
 	g.rushHour = false // el día nuevo arranca a las 08:00, fuera de cualquier pico
 	g.dayStartMoney = g.money

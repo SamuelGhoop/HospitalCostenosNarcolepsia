@@ -214,6 +214,8 @@ func (s *GameScene) updateDayOver(in input) (Scene, error) {
 			s.dayOverAnim = nil // listo para abrir de cero el día que vuelva a terminar
 			if err := s.g.StartNextDay(); err != nil {
 				s.say(err.Error())
+			} else {
+				s.startNewDayWorld() // el mapa arranca vacío, como el juego (game_world.go)
 			}
 		}
 		return s, nil

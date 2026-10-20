@@ -37,6 +37,15 @@ const (
 	doctorChancePercent = 66 // el resto, camilleros
 )
 
+// Contratar se encarece cada día (pedido de Samuel, 2026-10-19): el costo
+// es un día de sueldo × (100 + hireCostStepPercent × (día − 1)) %, con tope
+// en hireCostMaxPercent. Día 1 ×1, día 2 ×1,2, día 5 ×1,8; del día 11 en
+// adelante ×3. La nómina de las 20:00 sigue cobrando el sueldo base.
+const (
+	hireCostStepPercent = 20
+	hireCostMaxPercent  = 300
+)
+
 // doctorSalaryBase, doctorSalaryPerStat, orderlySalaryBase y
 // orderlySalaryPerSpeed son la fórmula de la nómina (§5.8):
 // médico = base + perStat × (rapidez + pericia); camillero = base + perSpeed × rapidez.

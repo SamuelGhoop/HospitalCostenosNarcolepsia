@@ -19,7 +19,8 @@ type candidate struct {
 	specialty string     // "" en los camilleros
 	speed     int        // 1 a maxStat
 	skill     int        // 1 a maxStat; 0 en los camilleros
-	salary    int        // sueldo diario; también el costo de contratarlo (§5.8)
+	salary    int        // sueldo diario (la nómina de las 20:00)
+	cost      int        // lo que cuesta contratarlo hoy: el sueldo encarecido según el día (hireCost)
 	look      Appearance // sorteada con el azar cosmético, como el resto del personal
 	female    bool       // mismo sorteo que decide "Dr."/"Dra." en el nombre (§6, F4): decide "Médica"/"Camillera" en RoleLabel
 }
@@ -54,9 +55,9 @@ func (c *candidate) view(money int) CandidateView {
 		Speed:      c.speed,
 		Skill:      c.skill,
 		Salary:     c.salary,
-		Cost:       c.salary, // §5.8: contratar cuesta un día de salario adelantado
+		Cost:       c.cost, // §5.8: un día de sueldo adelantado, encarecido según el día (hireCost)
 		Look:       c.look,
-		Affordable: money >= c.salary,
+		Affordable: money >= c.cost,
 	}
 }
 
@@ -80,7 +81,7 @@ type CandidateView struct {
 	Speed      int
 	Skill      int // 0 en los camilleros
 	Salary     int // sueldo por día
-	Cost       int // costo de contratarlo; igual al sueldo (§5.8)
+	Cost       int // costo de contratarlo hoy: el sueldo encarecido según el día (hireCost)
 	Look       Appearance
 	Affordable bool // si la plata del hospital alcanza para contratarlo
 }
@@ -108,8 +109,21 @@ func weightedStat(rng *rand.Rand) int {
 func (g *Game) generateCandidatesLocked() {
 	g.candidates = make([]*candidate, candidatesPerDay)
 	for i := range g.candidates {
-		g.candidates[i] = g.newCandidateLocked()
+		c := g.newCandidateLocked()
+		c.cost = hireCost(c.salary, g.clock.day)
+		g.candidates[i] = c
 	}
+}
+
+// hireCost es lo que cuesta contratar a alguien de sueldo salary el día day:
+// cada día un hireCostStepPercent más caro, hasta hireCostMaxPercent
+// (config.go). Aritmética entera, como el resto de la plata.
+func hireCost(salary, day int) int {
+	percent := 100 + hireCostStepPercent*(day-1)
+	if percent > hireCostMaxPercent {
+		percent = hireCostMaxPercent
+	}
+	return salary * percent / 100
 }
 
 // newCandidateLocked sortea un candidato: ≈ 66 % médico, el resto camillero.
@@ -186,7 +200,7 @@ func (g *Game) Hire(i int) error {
 		return ErrStaffFull
 	}
 	c := g.candidates[i]
-	if g.money < c.salary {
+	if g.money < c.cost {
 		return ErrNotEnoughMoney
 	}
 
@@ -196,8 +210,8 @@ func (g *Game) Hire(i int) error {
 		// HireStaff fallara no se le cobra ni sale de la lista.
 		return err
 	}
-	g.money -= c.salary
-	g.dayHires = append(g.dayHires, HireLine{Name: m.Name(), IsDoctor: c.isDoctor, Cost: c.salary, RoleLabel: roleLabel(c.isDoctor, c.female)})
+	g.money -= c.cost
+	g.dayHires = append(g.dayHires, HireLine{Name: m.Name(), IsDoctor: c.isDoctor, Cost: c.cost, RoleLabel: roleLabel(c.isDoctor, c.female)})
 	// Sale de la lista del día (§6): se recorta el slice en el índice i.
 	g.candidates = append(g.candidates[:i], g.candidates[i+1:]...)
 	return nil
