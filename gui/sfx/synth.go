@@ -21,10 +21,30 @@ const SampleRate = 44100
 type Wave int
 
 const (
-	Square   Wave = iota // onda cuadrada: blips, cajas registradoras, alertas
-	Triangle             // onda triangular: barridos, tonos más "redondos"
+	Square   Wave = iota // pulso al 50 %: el más "grueso"; alertas
+	Triangle             // triangular de 4 bits, como el canal de onda de la Game Boy: tonos "redondos"
 	Noise                // ruido blanco: golpes, chisporroteo
+	Pulse25              // pulso al 25 %: el timbre típico de Pokémon (cobros, fanfarrias)
+	Pulse12              // pulso al 12,5 %: el más delgado; blips de menú
 )
+
+// envelopeSteps: la Game Boy maneja el volumen con 4 bits (16 niveles,
+// 0 a 15); la envolvente se redondea a esos escalones y la triangular
+// también, para que suene "de cartucho".
+const envelopeSteps = 15
+
+// quantize redondea x (0 a 1) al escalón de 4 bits más cercano.
+func quantize(x float64) float64 { return math.Round(x*envelopeSteps) / envelopeSteps }
+
+// pulse es un pulso con ciclo de trabajo duty (0 a 1), sin componente
+// continua: arriba vale 1−duty y abajo −duty, así su promedio es 0 y la
+// envolvente no lo "empuja" hacia un lado (eso se oiría como un golpe).
+func pulse(phase, duty float64) float64 {
+	if frac(phase) < duty {
+		return 1 - duty
+	}
+	return -duty
+}
 
 // Envelope es una envolvente ADSR corta, en fracciones de la duración
 // total (0 a 1): sube en Attack, baja hasta Sustain en Decay, se mantiene
@@ -108,11 +128,15 @@ func Tone(wave Wave, freqFrom, freqTo float64, dur time.Duration, volume float64
 				s = -1
 			}
 		case Triangle:
-			s = 4*math.Abs(frac(phase)-0.5) - 1
+			s = quantize(2*math.Abs(frac(phase)-0.5))*2 - 1
+		case Pulse25:
+			s = pulse(phase, 0.25)
+		case Pulse12:
+			s = pulse(phase, 0.125)
 		case Noise:
 			s = rnd.Float64()*2 - 1
 		}
-		amp := env.at(i, n) * volume
+		amp := quantize(env.at(i, n)) * volume
 		v := s * amp
 		writeSample(data, i, v)
 	}

@@ -117,3 +117,15 @@ func TestApp_MTogglesSound(t *testing.T) {
 		t.Error("con M otra vez, el sonido sigue apagado; se esperaba prendido")
 	}
 }
+
+// Sin reproductor de música (el backdoor -agent, o sin dispositivo de
+// audio), syncMusic no hace nada ni se cae, esté el sonido prendido o no.
+func TestSyncMusic_WithoutAPlayerDoesNothing(t *testing.T) {
+	oldOn, oldMusic := soundOn, musicPlayer
+	defer func() { soundOn, musicPlayer = oldOn, oldMusic }()
+	musicPlayer = nil
+	for _, on := range []bool{true, false} {
+		soundOn = on
+		syncMusic()
+	}
+}

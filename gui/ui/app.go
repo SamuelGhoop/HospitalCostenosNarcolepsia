@@ -74,6 +74,7 @@ func (a *App) update(esc bool) error {
 		soundOn = !soundOn
 		a.muteNotice = muteNoticeTicks
 	}
+	syncMusic() // la música de fondo sigue a M (sound.go)
 	if p, ok := a.scene.(pausable); ok && (esc || blurred(a.scene)) {
 		a.scene = newPauseScene(p)
 		return nil

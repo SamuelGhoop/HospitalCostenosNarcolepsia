@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"bytes"
 	"math/rand"
 	"sync"
 
@@ -41,6 +42,11 @@ const (
 // (GAME_DESIGN §10.11: "que no se apilen"), unos 3 ticks (0,05 s a 60/s).
 const soundCooldownTicks = 3
 
+// soundMasterVolume: volumen general (0 a 1) de todos los efectos. Cada
+// efecto ya sale normalizado de gui/sfx (todos igual de fuertes, según su
+// grupo); esta es la única perilla para subirlos o bajarlos todos juntos.
+const soundMasterVolume = 0.8
+
 // soundOn: si está en falso, playSound no suena (tecla M, app.go).
 // soundPlayer es el reproductor ya armado; nil mientras no se llamó a
 // initSound (el backdoor -agent nunca la llama, así nunca suena nada,
@@ -49,6 +55,7 @@ var (
 	soundOn        = true
 	soundPlayer    *audioPlayer
 	soundPlayerOne sync.Once
+	musicPlayer    *audio.Player // la música de fondo en bucle; nil igual que soundPlayer
 )
 
 // audioPlayer sintetiza los efectos una sola vez y los reproduce con el
@@ -102,8 +109,36 @@ func initSound() {
 		for streak := range coinEffects {
 			coinEffects[streak] = sfx.Coin(streak, rnd)
 		}
-		soundPlayer = &audioPlayer{ctx: audio.NewContext(soundSampleRate), effects: effects, cooldown: map[string]int{}}
+		ctx := audio.NewContext(soundSampleRate)
+		soundPlayer = &audioPlayer{ctx: ctx, effects: effects, cooldown: map[string]int{}}
+
+		// Música de fondo (gui/sfx/music.go): una vuelta del tema, repetida
+		// sin fin con audio.NewInfiniteLoop. Si no se puede armar, el juego
+		// sigue con los efectos y sin música.
+		music := sfx.Music()
+		loop := audio.NewInfiniteLoop(bytes.NewReader(music), int64(len(music)))
+		if pl, err := ctx.NewPlayer(loop); err == nil {
+			pl.SetVolume(soundMasterVolume)
+			musicPlayer = pl
+			syncMusic()
+		}
 	})
+}
+
+// syncMusic pone a sonar la música si el sonido está prendido y la pausa
+// si está apagado (tecla M). La llama App.update en cada tick, en
+// cualquier escena; sin reproductor (-agent) no hace nada. Pause no
+// rebobina: al volver a prender M sigue donde iba.
+func syncMusic() {
+	if musicPlayer == nil {
+		return
+	}
+	switch {
+	case soundOn && !musicPlayer.IsPlaying():
+		musicPlayer.Play()
+	case !soundOn && musicPlayer.IsPlaying():
+		musicPlayer.Pause()
+	}
 }
 
 // playSound pide que suene el efecto name, si el sonido está prendido, hay
@@ -152,6 +187,7 @@ func (p *audioPlayer) playData(name string, data []byte) {
 		return
 	}
 	pl := p.ctx.NewPlayerFromBytes(data)
+	pl.SetVolume(soundMasterVolume)
 	pl.Play()
 	p.cooldown[name] = soundCooldownTicks
 }
