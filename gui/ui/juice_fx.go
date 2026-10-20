@@ -16,13 +16,23 @@ import (
 type juiceFX struct {
 	shake   screenShake
 	hitStop hitStop
+	rng     *rand.Rand // azar propio de la interfaz (dust, confeti...); nunca el del juego
 
 	punches map[string]*figurePunch // squash&stretch + destello por personaje
 	lines   []*dashLine             // líneas de despacho exitoso
+
+	// collapses y dust son el aviso de desplome (BLOQUE 3, §12.10,
+	// juice_collapse.go): el "!" y la burbuja agrandada, por paciente, y la
+	// nube de polvo, compartida (no sigue a nadie en particular).
+	collapses map[string]*collapseFlourish
+	dust      []*dustParticle
 }
 
 func newJuiceFX(seed int64) juiceFX {
-	return juiceFX{shake: newScreenShake(seed), punches: map[string]*figurePunch{}}
+	return juiceFX{
+		shake: newScreenShake(seed), rng: rand.New(rand.NewSource(seed)),
+		punches: map[string]*figurePunch{}, collapses: map[string]*collapseFlourish{},
+	}
 }
 
 // step avanza un tick todas las piezas del pase de juice y descarta las que
@@ -42,6 +52,19 @@ func (fx *juiceFX) step() {
 		}
 	}
 	fx.lines = kept
+
+	for id, c := range fx.collapses {
+		if c.step() {
+			delete(fx.collapses, id)
+		}
+	}
+	keptDust := fx.dust[:0]
+	for _, p := range fx.dust {
+		if p.step() {
+			keptDust = append(keptDust, p)
+		}
+	}
+	fx.dust = keptDust
 }
 
 // punch arranca (o reinicia) el squash&stretch + destello de id, con el

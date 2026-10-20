@@ -413,6 +413,15 @@ func (s *GameScene) drawWorld(dst *ebiten.Image) {
 	for _, l := range s.fx.lines {
 		drawDashLine(dst, l)
 	}
+
+	// El aviso de desplome (bloque 3, §12.10): la nube de polvo, por debajo
+	// del "!" (que va bien arriba, sobre la cabeza).
+	for _, p := range s.fx.dust {
+		drawDust(dst, p)
+	}
+	for _, c := range s.fx.collapses {
+		drawExclaim(dst, c)
+	}
 }
 
 // drawButtons: CONTRATAR (un portapapeles chiquito: "Próximamente" hasta

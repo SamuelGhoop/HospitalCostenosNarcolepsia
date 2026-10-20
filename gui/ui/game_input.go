@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/hajimehoshi/ebiten/v2/text/v2"
 
 	"github.com/SamuelGhoop/HospitalCostenosNarcolepsia/game"
 	"github.com/SamuelGhoop/HospitalCostenosNarcolepsia/hospital"
@@ -208,12 +209,20 @@ func (s *GameScene) gameOverlays(f figure, showLabel bool) []overlay {
 			}
 			blinkOff := (pv.Stage == game.Collapsed || pv.Stage == game.InHallway) && pv.Waited > bubbleBlinkAfter && s.ticks/30%2 == 1
 			if !blinkOff {
-				box := centeredBox(txt, x+figWidth/2, y-20, smallFace)
+				// BLOQUE 3 del pase de juice (§12.10): recién desplomado, la
+				// burbuja sale más grande y con vaivén (collapseFlourish,
+				// juice_collapse.go) durante collapseFlourishTicks.
+				face, bobY := text.Face(smallFace), 0
+				if cf := s.fx.collapses[f.id]; cf != nil {
+					face = pixelFace(smallFace.Size * zzzEmphasisScale)
+					bobY = int(math.Round(cf.zzzBob()))
+				}
+				box := centeredBox(txt, x+figWidth/2, y-20+bobY, face)
 				if s.onBed(f) {
 					bed := bedRect(roomZone(f.room))
-					box = textBox(txt, bed.Max.X+4, bed.Min.Y+4, smallFace)
+					box = textBox(txt, bed.Max.X+4, bed.Min.Y+4+bobY, face)
 				}
-				out = append(out, bubbleOverlays(txt, bg, f.level, box)...)
+				out = append(out, bubbleOverlays(txt, bg, f.level, box, face)...)
 			}
 		}
 	} else {

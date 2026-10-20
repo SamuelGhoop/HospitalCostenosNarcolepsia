@@ -2,6 +2,7 @@ package ui
 
 import (
 	"image"
+	"math"
 	"testing"
 )
 
@@ -134,6 +135,71 @@ func TestFigurePunch_StepReportsDoneOnlyAtTheVeryEnd(t *testing.T) {
 	}
 	if ticks != squashTicks {
 		t.Errorf("terminó a los %d ticks; se esperaban %d (squashTicks, que dura más que el destello)", ticks, squashTicks)
+	}
+}
+
+// ─── BLOQUE 3: dormirse (desplome) ──────────────────────────────────────
+
+// easeOutBack vale 0 al empezar y 1 al terminar, pasándose de 1 en algún
+// punto intermedio (el "rebote").
+func TestEaseOutBack_StartsAtZeroEndsAtOneAndOvershoots(t *testing.T) {
+	const tolerance = 1e-9
+	if got := easeOutBack(0); math.Abs(got) > tolerance {
+		t.Errorf("easeOutBack(0) = %v; se esperaba ~0", got)
+	}
+	if got := easeOutBack(1); math.Abs(got-1) > tolerance {
+		t.Errorf("easeOutBack(1) = %v; se esperaba ~1", got)
+	}
+	over := false
+	for i := 0; i <= 20; i++ {
+		t0 := float64(i) / 20
+		if easeOutBack(t0) > 1.001 {
+			over = true
+		}
+	}
+	if !over {
+		t.Error("easeOutBack nunca pasó de 1; se esperaba que rebotara (overshoot)")
+	}
+}
+
+// El aviso de desplome dura collapseFlourishTicks y, a mitad de camino, el
+// "!" ya está en su tamaño normal (el rebote solo dura exclaimPopTicks).
+func TestCollapseFlourish_LastsItsTicksAndSettlesAfterThePop(t *testing.T) {
+	c := &collapseFlourish{}
+	for i := 0; i < exclaimPopTicks; i++ {
+		c.step()
+	}
+	if got := c.exclaimScale(); got != 1 {
+		t.Errorf("exclaimScale tras exclaimPopTicks = %v; se esperaba 1 (el rebote ya terminó)", got)
+	}
+	done := false
+	ticks := exclaimPopTicks
+	for !done {
+		done = c.step()
+		ticks++
+	}
+	if ticks != collapseFlourishTicks {
+		t.Errorf("terminó a los %d ticks; se esperaban %d", ticks, collapseFlourishTicks)
+	}
+}
+
+// El polvo cae (gravedad) y se desvanece con su vida, sin volverse a subir
+// de opacidad.
+func TestDustParticle_FallsAndFadesOut(t *testing.T) {
+	p := &dustParticle{vel: vec{0, -1}, life: 10, total: 10}
+	prevVY := p.vel.y
+	prevAlpha := p.alpha()
+	for p.step() {
+		if p.vel.y <= prevVY {
+			t.Fatalf("la velocidad vertical no subió con la gravedad: %v → %v", prevVY, p.vel.y)
+		}
+		if p.alpha() > prevAlpha {
+			t.Fatalf("la opacidad subió: %v → %v", prevAlpha, p.alpha())
+		}
+		prevVY, prevAlpha = p.vel.y, p.alpha()
+	}
+	if p.life != 0 {
+		t.Errorf("life terminó en %d; se esperaba 0", p.life)
 	}
 }
 

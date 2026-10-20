@@ -227,6 +227,19 @@ func TestGameScene_ClicksDispatchAndWake(t *testing.T) {
 	}
 }
 
+// BLOQUE 3 del pase de juice (§12.10): al desplomarse (de verdad, jugando)
+// deja la nube de polvo, el aviso "!" y un shake leve.
+func TestGameScene_CollapseLeavesDustAndExclaim(t *testing.T) {
+	s := newTestGameScene(t)
+	id := firstCollapsed(t, s) // espera a que termine de desplomarse (showsBubble)
+	if _, ok := s.fx.collapses[id]; !ok {
+		t.Errorf("%s se desplomó pero no quedó su aviso (collapseFlourish)", id)
+	}
+	if len(s.fx.dust) == 0 {
+		t.Error("al desplomarse no quedó ninguna partícula de polvo")
+	}
+}
+
 // Los errores del juego salen como aviso: mandar al médico a recoger a
 // alguien cuando hay un camillero libre (§5.5: recoger le toca al camillero).
 func TestGameScene_DispatchErrorsBecomeNotices(t *testing.T) {

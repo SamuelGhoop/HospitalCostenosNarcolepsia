@@ -396,7 +396,17 @@ func (s *GameScene) animate() {
 		}
 		now := s.pos[f.id]
 		if isPatient {
+			wasCollapsing := pa.anim == animCollapse
 			pa.step(now.x-old.x, now.y-old.y, s.arrived(f.id, dest), s.onBed(f))
+			if !wasCollapsing && pa.anim == animCollapse {
+				// BLOQUE 3 del pase de juice (§12.10): justo cuando arranca la
+				// animación de desplomarse (ya llegó a su sitio), no cuando el
+				// modelo lo marcó dormido (eso puede ser antes: camina al sitio
+				// primero).
+				head := vec{now.x + figWidth/2, now.y}
+				feet := vec{now.x + figWidth/2, now.y + figHeight}
+				s.fx.collapse(f.id, head, feet)
+			}
 		}
 		if sa, ok := s.staff[f.id]; ok {
 			c := s.carryOf(f.id)
