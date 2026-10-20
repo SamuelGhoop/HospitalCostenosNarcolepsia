@@ -223,6 +223,34 @@ func TestDispatch_DoctorReviewsWithoutTouchingTheModel(t *testing.T) {
 	}
 }
 
+// La interfaz necesita el pago exacto de ESE episodio para el "+$350" que
+// flota sobre el paciente en el momento del cobro (pase de juice, §12.10):
+// Snapshot no traía ese dato (solo Money, el total del hospital), así que
+// GamePatientView.LastFee lo expone por paciente, puesto en la revisión.
+func TestDispatch_ReviewExposesTheFeeJustPaid(t *testing.T) {
+	g := newGame(t)
+	collapse(t, g, "P-001", "Yeimy Padilla", hospital.Severe, game.Cafeteria)
+	dispatch(t, g, "P-001", "C-01")
+	tickFor(g, 5*time.Second)
+	dispatch(t, g, "P-001", "D-01")
+
+	before := g.Snapshot().Money
+	tickFor(g, 5*time.Second) // D-01 llega y revisa: ahí se paga
+	snap := g.Snapshot()
+
+	p := patientByID(t, snap, "P-001")
+	if p.Stage != game.InBed {
+		t.Fatalf("P-001 está %v; se esperaba revisado (en cama)", p.Stage)
+	}
+	want := snap.Money - before
+	if p.LastFee != want {
+		t.Errorf("LastFee = %d; se esperaba %d (lo que subió Money en la revisión)", p.LastFee, want)
+	}
+	if p.LastFee <= 0 {
+		t.Errorf("LastFee = %d; una revisión siempre cobra algo", p.LastFee)
+	}
+}
+
 func TestDispatch_OnlyADoctorCanReview(t *testing.T) {
 	g := newGame(t)
 	collapse(t, g, "P-001", "Yeimy Padilla", hospital.Severe, game.Cafeteria)

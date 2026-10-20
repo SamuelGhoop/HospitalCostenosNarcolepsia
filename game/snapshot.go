@@ -56,6 +56,12 @@ type GamePatientView struct {
 	Waited     time.Duration // cronómetro de espera del episodio (§5.4): del desplome a la revisión
 	ReviewedBy string        // ID del médico que lo revisó; "" si nadie
 	Left       time.Duration // llegando, saliendo o cabeceando: cuánto le falta (a la puerta o al desplome)
+	// LastFee es lo que pagó la ÚLTIMA revisión de este paciente (0 hasta que
+	// lo revisen una vez): Money es el total del hospital, no alcanza para
+	// saber cuánto cobró un episodio en particular. La interfaz lo usa para
+	// el "+$350" que flota sobre el paciente en el momento del cobro (pase de
+	// juice, GAME_DESIGN §12.10).
+	LastFee int
 }
 
 // Snapshot devuelve la foto actual de la partida.
