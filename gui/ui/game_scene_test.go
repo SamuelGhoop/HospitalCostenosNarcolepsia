@@ -339,6 +339,23 @@ func TestApplyJuiceEvent_DischargeAndAngry(t *testing.T) {
 	}
 }
 
+// BLOQUE 5 del pase de juice (§12.10): la reputación subiendo deja chispas
+// blancas sobre las estrellas del HUD; bajando (sin ser un enojo, que ya
+// tiene su propia animación), fragmentos grises.
+func TestApplyJuiceEvent_StarShimmerAndBreak(t *testing.T) {
+	s := newTestGameScene(t)
+	s.applyJuiceEvent(juiceEvent{kind: juiceStarUp})
+	if len(s.fx.hudSparks) != starShimmerCount {
+		t.Errorf("hay %d chispas; se esperaban %d (starShimmerCount)", len(s.fx.hudSparks), starShimmerCount)
+	}
+
+	s.fx.hudSparks = nil
+	s.applyJuiceEvent(juiceEvent{kind: juiceStarDown})
+	if len(s.fx.hudSparks) != starBreakCount {
+		t.Errorf("hay %d fragmentos; se esperaban %d (starBreakCount)", len(s.fx.hudSparks), starBreakCount)
+	}
+}
+
 // Los errores del juego salen como aviso: mandar al médico a recoger a
 // alguien cuando hay un camillero libre (§5.5: recoger le toca al camillero).
 func TestGameScene_DispatchErrorsBecomeNotices(t *testing.T) {

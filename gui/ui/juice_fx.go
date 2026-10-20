@@ -36,6 +36,12 @@ type juiceFX struct {
 	discharge      []*particle    // corazones y confeti del alta
 	angrySmoke     []*particle    // humo rojo de "se fue enojado"
 	fallingStars   []*fallingStar // estrella que se desprende del HUD
+
+	// hudSparks (BLOQUE 5, §12.10, juice_hud.go) son las chispas/fragmentos
+	// de las estrellas del HUD: a diferencia de sparks (la racha, que vive
+	// en el mapa y tiembla con él), salen de hudStarsCenter, un punto de
+	// pantalla fijo, así que se dibujan sin temblar, después del HUD.
+	hudSparks []*particle
 }
 
 func newJuiceFX(seed int64) juiceFX {
@@ -82,6 +88,9 @@ func (fx *juiceFX) step() {
 	}
 	fx.discharge = stepParticles(fx.discharge)
 	fx.angrySmoke = stepParticles(fx.angrySmoke)
+
+	// BLOQUE 5 (§12.10).
+	fx.hudSparks = stepParticles(fx.hudSparks)
 	keptStars := fx.fallingStars[:0]
 	for _, st := range fx.fallingStars {
 		if st.step() {

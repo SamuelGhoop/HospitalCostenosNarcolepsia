@@ -208,6 +208,26 @@ func TestHUDMoney_CountsUpAndShowsTheChange(t *testing.T) {
 	}
 }
 
+// BLOQUE 5 del pase de juice (§12.10): cada cambio de plata deja un
+// "pop" de escala que vale 1 en reposo y vuelve a 1 solo, en moneyPopTicks.
+func TestHUDMoney_PopsOnEachChange(t *testing.T) {
+	var h hud
+	h.update(game.Snapshot{Money: 2000})
+	if got := h.moneyPopScale(); got != 1 {
+		t.Fatalf("antes de cualquier cambio, moneyPopScale() = %v; se esperaba 1", got)
+	}
+	h.update(game.Snapshot{Money: 2450})
+	if got := h.moneyPopScale(); got == 1 {
+		t.Error("justo después de un cambio, moneyPopScale() sigue en 1")
+	}
+	for i := 0; i < moneyPopTicks; i++ {
+		h.update(game.Snapshot{Money: 2450})
+	}
+	if got := h.moneyPopScale(); got != 1 {
+		t.Errorf("tras moneyPopTicks ticks, moneyPopScale() = %v; se esperaba que ya hubiera vuelto a 1", got)
+	}
+}
+
 // La placa de un aviso de reputación va alineada a la izquierda bajo las
 // estrellas, arranca justo en top0 (que pone hud.draw: nunca más arriba del
 // borde y la sombra de la barra, ni de los avisos del juego si los hay), y

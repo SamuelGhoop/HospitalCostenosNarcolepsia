@@ -370,6 +370,10 @@ func (s *GameScene) Draw(screen *ebiten.Image) {
 	for _, st := range s.fx.fallingStars {
 		drawFallingStar(screen, st)
 	}
+	// Bloque 5 (§12.10): el brillo/los fragmentos de las estrellas del HUD.
+	for _, p := range s.fx.hudSparks {
+		drawParticle(screen, p)
+	}
 
 	if s.hover != "" && !s.shift {
 		if f, ok := s.figure(s.hover); ok {

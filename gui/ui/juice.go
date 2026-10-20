@@ -136,3 +136,28 @@ const (
 	fallingStarSpin    = 0.22 // rad/tick
 	fallingStarGravity = 0.12
 )
+
+// ─── BLOQUE 5: HUD vivo ─────────────────────────────────────────────────
+
+// La plata (hud.go) ya contaba hacia el valor real y dejaba su "+$450"; se
+// le suma un pequeño "pop" de escala (moneyPopTicks, un pulso de
+// moneyPopAmount que vale 0 al empezar y al terminar, igual que el squash
+// del bloque 2) cada vez que cambia.
+const (
+	moneyPopTicks  = 10
+	moneyPopAmount = 0.22
+)
+
+// Las estrellas (hud.go) ya se teñían al cambiar (flashing/flashColor); se
+// les suma un brillo de chispas blancas al subir y unos fragmentos que
+// caen al romperse cuando bajan.
+const (
+	starShimmerCount     = 5
+	starShimmerLifeTicks = 18
+	starShimmerSpeed     = 1.6
+
+	starBreakCount     = 6
+	starBreakLifeTicks = 30
+	starBreakSpeed     = 1.8
+	starBreakGravity   = 0.12
+)

@@ -413,6 +413,9 @@ type hud struct {
 	moneyFrom, moneyTo int
 	moneyTick          int
 	deltas             []moneyDelta
+	// moneyPop (BLOQUE 5 del pase de juice, §12.10): ticks que le quedan al
+	// "pop" de escala del número de la plata, cada vez que cambia.
+	moneyPop int
 	// Los avisos de reputación con motivo (§12.8): repSeen recuerda cuáles de
 	// Snapshot.ReputationChanges ya se mostraron (la cola se recorre entera
 	// en cada foto, como Notices con noticeSeen en game_scene.go), y
@@ -487,6 +490,10 @@ func (h *hud) update(snap game.Snapshot) {
 			c = colHUDRed
 		}
 		h.deltas = append(h.deltas, moneyDelta{text: formatDelta(d), color: c})
+		h.moneyPop = moneyPopTicks // BLOQUE 5 (§12.10): el "pop" de escala
+	}
+	if h.moneyPop > 0 {
+		h.moneyPop--
 	}
 	if h.moneyTick < moneyCountTicks {
 		h.moneyTick++
@@ -536,6 +543,17 @@ func (h *hud) flashColor() color.RGBA {
 		return colHUDGreen
 	}
 	return colHUDRed
+}
+
+// moneyPopScale es el "pop" de escala del número de la plata (BLOQUE 5,
+// §12.10): un pulso que vale 0 al empezar y al terminar (como el squash del
+// bloque 2), 1 en reposo.
+func (h *hud) moneyPopScale() float64 {
+	if h.moneyPop <= 0 {
+		return 1
+	}
+	t := 1 - float64(h.moneyPop)/float64(moneyPopTicks)
+	return 1 + math.Sin(t*math.Pi)*moneyPopAmount
 }
 
 // ─── Dibujo ────────────────────────────────────────────────────────────
@@ -653,7 +671,13 @@ func (h *hud) draw(dst *ebiten.Image, snap game.Snapshot, repMinTop int) {
 
 	// La plata, verde con contorno negro, y los cambios que suben.
 	drawImageAt(dst, hudImgs.money, l.moneyIcon.Min, nil)
-	drawPixelText(dst, l.moneyText, l.money.Min.X, l.money.Min.Y, hudTextSize, append(outlined(2, colInk), textLayer{0, 0, colHUDGreen}), 1)
+	// BLOQUE 5 (§12.10): el número de la plata "pop-ea" al cambiar, centrado
+	// en su mismo sitio (el tamaño sube y baja, la esquina se corre para
+	// que no se note que el ancla sigue siendo la misma esquina de siempre).
+	moneySize := hudTextSize * h.moneyPopScale()
+	moneyX := float64(l.money.Min.X) - (moneySize-hudTextSize)/2
+	moneyY := float64(l.money.Min.Y) - (moneySize-hudTextSize)/2
+	drawPixelText(dst, l.moneyText, int(moneyX), int(moneyY), moneySize, append(outlined(2, colInk), textLayer{0, 0, colHUDGreen}), 1)
 	for _, d := range h.deltas {
 		rise, alpha := d.offset()
 		y := l.money.Min.Y - 6 + int(math.Round(rise))

@@ -2,8 +2,7 @@ package ui
 
 // applyJuiceEvent traduce un juiceEvent (detectJuiceEvents, juice_events.go)
 // a lo que corresponde en s.fx: dónde en pantalla (s.pos, s.figureBox) y
-// qué sonido. Los eventos de estrella (juiceStarUp/juiceStarDown) son del
-// BLOQUE 5 (HUD): acá no hacen nada todavía.
+// qué sonido.
 func (s *GameScene) applyJuiceEvent(e juiceEvent) {
 	switch e.kind {
 	case juicePayment:
@@ -24,6 +23,10 @@ func (s *GameScene) applyJuiceEvent(e juiceEvent) {
 			s.fx.angryBurst(at, hudStarsCenter())
 		}
 		playSound(sfxAngry)
+	case juiceStarUp:
+		s.fx.starShimmer()
+	case juiceStarDown:
+		s.fx.starBreak()
 	}
 }
 
