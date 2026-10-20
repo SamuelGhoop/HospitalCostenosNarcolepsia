@@ -6,10 +6,13 @@ import (
 	"github.com/SamuelGhoop/HospitalCostenosNarcolepsia/hospital"
 )
 
-// stepN avanza la animación n ticks con el mismo movimiento.
+// stepN avanza la animación n ticks con el mismo movimiento: arrived (ya en
+// el destino de verdad, no solo quieto este tick) se deduce de dx,dy, como
+// antes de que existiera el parámetro (estos tests nunca simulan quedarse
+// quieto a mitad de camino).
 func stepN(a *patientAnim, n int, dx, dy float64, inBed bool) {
 	for i := 0; i < n; i++ {
-		a.step(dx, dy, inBed)
+		a.step(dx, dy, dx == 0 && dy == 0, inBed)
 	}
 }
 

@@ -122,7 +122,6 @@ func (s *DemoScene) advance() error {
 // ruta por las puertas, la animación de cada paciente avanza según cuánto
 // se movió, y la coreografía pasa a la siguiente fase cuando todos llegaron.
 func (s *DemoScene) animate() {
-	s.beginTick() // congela las posiciones de arranque: la reserva de celdas no depende del orden de la lista
 	// El traslado en camilla de la fase actual, si hay: lo mueve stepCarry.
 	var order *carryOrder
 	if s.choreo != nil {
@@ -151,7 +150,7 @@ func (s *DemoScene) animate() {
 		}
 		now := s.pos[f.id]
 		if isPatient {
-			a.step(now.x-old.x, now.y-old.y, s.onBed(f))
+			a.step(now.x-old.x, now.y-old.y, s.arrived(f.id, s.destination(f)), s.onBed(f))
 		}
 		if a, ok := s.staff[f.id]; ok {
 			c := s.carryOf(f.id)
@@ -170,7 +169,7 @@ func (s *DemoScene) animate() {
 	s.choreo.step(
 		func(id string) bool { // ¿ya llegó?
 			f, _ := s.figure(id)
-			return s.pos[id] == s.destination(f)
+			return s.arrived(id, s.destination(f))
 		},
 		func(id string) bool { // ¿ya está acostado?
 			a, ok := s.anims[id]
@@ -202,6 +201,7 @@ func (s *DemoScene) finishChoreography() {
 	for _, f := range s.figures {
 		s.pos[f.id] = f.target
 		delete(s.paths, f.id) // saltó a su puesto: la ruta vieja ya no sirve
+		delete(s.rest, f.id)  // ni el sitio de al lado que le había tocado
 		if a, ok := s.anims[f.id]; ok {
 			a.settle(s.onBed(f))
 		}
@@ -260,7 +260,7 @@ func (s *DemoScene) stillFeet(except ...string) []image.Rectangle {
 		if slices.Contains(except, f.id) || (f.patient && f.room != 0 && f.target == bedCell(roomZone(f.room))) {
 			continue
 		}
-		feet := f.target.add(feetOffset)
+		feet := s.restSpotFor(f.id, f.target).add(feetOffset)
 		out = append(out, feetBox.Add(image.Pt(int(math.Round(feet.x)), int(math.Round(feet.y)))))
 	}
 	return out
@@ -302,7 +302,11 @@ func (s *DemoScene) refresh() {
 		if !seen {
 			a = &patientAnim{state: p.State, room: p.Room}
 			s.anims[p.ID] = a
-			s.pos[p.ID] = arrivalSpawn() // los pacientes nuevos llegan por la acera, desde fuera de la pantalla
+			// Los pacientes nuevos llegan por la acera, desde fuera de la
+			// pantalla: en su puesto de la fila (arrivalQueueSpot, mismo
+			// índice que tendrá en s.arrivals, GAME_DESIGN §10.8 punto 14),
+			// no los dos en el mismo punto si llegan varios juntos.
+			s.pos[p.ID] = arrivalQueueSpot(arrivalSpawn(), len(s.arrivals))
 			s.arrivals = append(s.arrivals, p.ID)
 		}
 		was := a.state

@@ -245,11 +245,12 @@ func (s *GameScene) sync() {
 			s.anims[id].observe(hospital.Awake, 0)
 		}
 		f := figure{id: id, patient: true, state: hospital.Awake, target: arrivalSpawn()}
-		if s.pos[id] == f.target {
+		if s.arrived(id, f.target) {
 			delete(s.pos, id)
 			delete(s.anims, id)
 			delete(s.actors, id)
 			delete(s.paths, id)
+			delete(s.rest, id)
 			s.standing.release(id, noZone)
 			s.lying.release(id, noZone)
 			continue
@@ -299,7 +300,9 @@ func (s *GameScene) startCarry(pusher string, p game.GamePatientView, left time.
 func (s *GameScene) gameDodges() {
 	dodging := map[string]bool{}
 	for _, c := range s.others {
-		for id, to := range dodgesFor(s.figures, func(f figure) vec { return f.target }, c.order) {
+		lane := carryLane(c.order.plan)
+		exclude := map[string]bool{c.order.pusher: true, c.order.patient: true}
+		for id, to := range dodgesFor(s.figures, func(f figure) vec { return f.target }, lane, exclude) {
 			// Si ya se había hecho a un lado, se queda en ese mismo sitio: si
 			// cada tick buscara un sitio nuevo desde su puesto de siempre, el
 			// destino cambiaría de a poco (porque buscar de nuevo con los
@@ -337,10 +340,10 @@ func (s *GameScene) stillFeetExcept(except ...string) []image.Rectangle {
 		for _, e := range except {
 			skip = skip || f.id == e
 		}
-		if skip || s.pos[f.id] != f.target {
+		if skip || !s.arrived(f.id, f.target) {
 			continue
 		}
-		out = append(out, feetRectAt(f.target))
+		out = append(out, feetRectAt(s.pos[f.id]))
 	}
 	return out
 }
@@ -358,7 +361,6 @@ func (s *GameScene) routeLeft(id string, from vec) float64 {
 // animate hace un tick de movimiento: los traslados en camilla y, los
 // demás, hacia su destino (a su paso o al ritmo que marca el juego).
 func (s *GameScene) animate() {
-	s.beginTick() // congela las posiciones de arranque: la reserva de celdas no depende del orden de la lista
 	before := map[string]vec{}
 	for id, p := range s.pos {
 		before[id] = p
@@ -381,14 +383,7 @@ func (s *GameScene) animate() {
 		if !s.inCarry(f.id) && !(isPatient && pa.holdsStill()) {
 			next := s.nextWaypoint(f.id, old, dest)
 			speed := speedOf(f)
-			// Si next no se movió de old porque el próximo paso está ocupado
-			// (nextWaypoint lo hizo esperar), el crono de la caminata cronometrada
-			// se congela también: así, cuando se libera, recupera el tiempo
-			// repartiendo lo que falta entre los ticks que quedan (un poco más
-			// rápido, GAME_DESIGN §10.8), en vez de un salto grande por haber
-			// perdido ticks del crono sin moverse.
-			waiting := old != dest && next == old
-			if a.ticksLeft > 0 && !waiting {
+			if a.ticksLeft > 0 {
 				// El tope (igual que el de la camilla, carry.go) evita que
 				// recuperar el tiempo perdido esperando se vea como un salto: si
 				// quedan pocos ticks y de pronto hay mucho camino (por ejemplo,
@@ -401,7 +396,7 @@ func (s *GameScene) animate() {
 		}
 		now := s.pos[f.id]
 		if isPatient {
-			pa.step(now.x-old.x, now.y-old.y, s.onBed(f))
+			pa.step(now.x-old.x, now.y-old.y, s.arrived(f.id, dest), s.onBed(f))
 		}
 		if sa, ok := s.staff[f.id]; ok {
 			c := s.carryOf(f.id)
@@ -410,7 +405,7 @@ func (s *GameScene) animate() {
 			pushing := !f.doctor && c != nil && c.visible() && c.order.pusher == f.id
 			sa.step(now.x-old.x, now.y-old.y, a.attend > 0 && now == old, pushing)
 		}
-		if a.attend > 0 && now == f.target {
+		if a.attend > 0 && s.arrived(f.id, f.target) {
 			a.attend--
 		}
 	}

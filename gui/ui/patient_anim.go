@@ -78,9 +78,13 @@ func (a *patientAnim) settle(inBed bool) {
 }
 
 // step avanza un tick. dx, dy es cuánto se movió el paciente en este tick;
-// inBed dice si ya está sobre su cama (no solo si el modelo se la asignó:
-// mientras lo cargan hacia ella todavía no lo está).
-func (a *patientAnim) step(dx, dy float64, inBed bool) {
+// arrived dice si YA está en su destino de verdad (no solo quieto este
+// tick): quedarse quieto un tick a mitad de camino no es haber llegado al
+// sitio del ataque, y desplomarse ahí podía dejarlo encima de un mueble
+// (TestDemo_NobodyWalksThroughWallsOrFurniture). inBed dice si ya está
+// sobre su cama (no solo si el modelo se la asignó: mientras lo cargan
+// hacia ella todavía no lo está).
+func (a *patientAnim) step(dx, dy float64, arrived, inBed bool) {
 	a.ticks++
 	moving := dx != 0 || dy != 0
 
@@ -105,7 +109,7 @@ func (a *patientAnim) step(dx, dy float64, inBed bool) {
 	}
 
 	// Se durmió fuera de la cama: al llegar al sitio, se desploma.
-	if a.pendingCollapse && !moving {
+	if a.pendingCollapse && !moving && arrived {
 		a.pendingCollapse = false
 		a.set(animCollapse)
 		return

@@ -15,12 +15,31 @@ import (
 // arrivalGap: cada paciente nuevo sale 1,5 s después del anterior.
 const arrivalGap = 90
 
-// arrivalChoreography: cada uno espera fuera de la pantalla (spawn) hasta
-// que le toca y camina a su puesto. Termina cuando llega el último.
+// arrivalQueueSpot: dónde espera, fuera de la pantalla, el paciente que
+// llegó i-ésimo de la tanda: cada uno un poco más lejos que el anterior (en
+// fila, hacia afuera), nunca los dos en el mismo píxel exacto. Antes todos
+// esperaban en spawn, el mismo punto: con varias llegadas en el mismo paso
+// (el paso 3 de la demo trae 5 juntas) quedaban con el cuerpo perfectamente
+// encimado mientras esperaba cada uno su turno (GAME_DESIGN §10.8 punto
+// 14). refresh() (demo_scene.go) coloca a cada uno recién llegado en este
+// mismo puesto (con su propio índice en s.arrivals), así nunca camina de
+// más para llegar a esperar aquí.
+func arrivalQueueSpot(spawn vec, i int) vec {
+	return spawn.add(vec{float64(i) * arrivalQueueGap, 0})
+}
+
+// arrivalQueueGap: cuánto más lejos (afuera, en x) espera cada uno de la
+// fila de llegada respecto al anterior: más que el ancho del cuerpo
+// (figWidth), para no quedar encimados ni rozándose.
+const arrivalQueueGap = figWidth + 8
+
+// arrivalChoreography: cada uno espera fuera de la pantalla, en su puesto
+// de la fila (arrivalQueueSpot), hasta que le toca y camina a su puesto
+// final. Termina cuando llega el último.
 func arrivalChoreography(ids []string, targets map[string]vec, spawn vec) *choreography {
 	ph := phase{moves: map[string]vec{}, delays: map[string]int{}, waitAt: map[string]vec{}}
 	for i, id := range ids {
-		ph.moves[id], ph.delays[id], ph.waitAt[id] = targets[id], i*arrivalGap, spawn
+		ph.moves[id], ph.delays[id], ph.waitAt[id] = targets[id], i*arrivalGap, arrivalQueueSpot(spawn, i)
 	}
 	return &choreography{phases: []phase{ph}}
 }

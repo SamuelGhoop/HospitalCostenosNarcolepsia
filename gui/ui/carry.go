@@ -77,6 +77,10 @@ func (s *world) stepCarry(c *carrying) {
 		}
 	case carryHopOn:
 		to := riderPos(c.fp)
+		// Mientras el paciente se sube, los dos se quedan quietos aquí: el
+		// que esté parado encima de alguno de ellos se hace a un lado.
+		s.clearSpotFor(o.pusher, s.pos[o.pusher])
+		s.clearSpotFor(o.patient, to)
 		s.pos[o.patient] = moveToward(s.pos[o.patient], to, hopSpeed)
 		if s.pos[o.patient] == to {
 			c.stage = carryPush
@@ -102,6 +106,7 @@ func (s *world) stepCarry(c *carrying) {
 		}
 	case carryHopOff:
 		bed := bedCell(o.room)
+		s.clearSpotFor(o.pusher, s.pos[o.pusher]) // quieto mientras el paciente baja a la cama
 		s.pos[o.patient] = moveToward(s.pos[o.patient], bed, hopSpeed)
 		if s.pos[o.patient] == bed {
 			c.stage, c.fp = carryDone, image.Rectangle{} // la camilla desaparece
@@ -144,28 +149,30 @@ func overlapsAny(r image.Rectangle, rs []image.Rectangle) bool {
 	return false
 }
 
-// dodgesFor: los que están quietos en el camino de la camilla se hacen a
-// un lado mientras pasa (y después vuelven a su puesto): a cada uno se le
-// busca el sitio libre más cercano fuera del camino, sin encimarse con
-// nadie. Así la recepción, donde a ×3 no cabe un pasillo libre con los 5
-// pacientes esperando, no se queda sin puestos.
+// dodgesFor: los que están quietos en el carril lane se hacen a un lado
+// mientras alguien lo necesita (y después vuelven a su puesto): a cada uno
+// se le busca el sitio libre más cercano fuera del carril, sin encimarse
+// con nadie. Así la recepción, donde a ×3 no cabe un pasillo libre con los
+// 5 pacientes esperando, no se queda sin puestos. exclude son los que no se
+// hacen a un lado (quien tiene el carril: quien empuja y el paciente de la
+// camilla).
 //
-// Función libre (no solo de la demo, GAME_DESIGN §10.8): el modo juego
-// también la usa, con destOf = el puesto final de cada uno (f.target), al
-// arrancar un traslado (startCarry, game_world.go). En la demo destOf es
-// s.destination, que además mira la coreografía y los dodges anteriores.
-func dodgesFor(figures []figure, destOf func(figure) vec, o *carryOrder) map[string]vec {
-	lane := carryLane(o.plan)
+// Función libre (no solo de la demo): el modo juego también la usa, con
+// destOf = el puesto final de cada uno (f.target), al arrancar un traslado
+// (startCarry, game_world.go) y en gameDodges. En la
+// demo destOf es s.destination, que además mira la coreografía y los
+// dodges anteriores.
+func dodgesFor(figures []figure, destOf func(figure) vec, lane []image.Rectangle, exclude map[string]bool) map[string]vec {
 	var bodies []image.Rectangle // dónde están (o van a estar) los demás
 	for _, f := range figures {
-		if f.id != o.pusher && f.id != o.patient {
+		if !exclude[f.id] {
 			bodies = append(bodies, figureBodyAt(f, destOf(f)))
 		}
 	}
 	dodge := map[string]vec{}
 	for _, f := range figures {
 		at := destOf(f)
-		if f.id == o.pusher || f.id == o.patient || (f.patient && f.room != 0 && at == bedCell(roomZone(f.room))) {
+		if exclude[f.id] || (f.patient && f.room != 0 && at == bedCell(roomZone(f.room))) {
 			continue
 		}
 		if !overlapsAny(feetRectAt(at), lane) {
@@ -187,9 +194,9 @@ func dodgesFor(figures []figure, destOf func(figure) vec, o *carryOrder) map[str
 }
 
 // dodgesFor (método): la de la demo, con su destino (coreografía y dodges
-// en curso incluidos).
+// en curso incluidos), para el carril de la camilla de o.
 func (s *DemoScene) dodgesFor(o *carryOrder) map[string]vec {
-	return dodgesFor(s.figures, s.destination, o)
+	return dodgesFor(s.figures, s.destination, carryLane(o.plan), map[string]bool{o.pusher: true, o.patient: true})
 }
 
 // feetRectAt es la huella de los pies de alguien con el cuadro en at.

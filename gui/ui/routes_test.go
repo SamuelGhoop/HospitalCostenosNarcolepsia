@@ -61,7 +61,7 @@ func touchesWallOrFurniture(r image.Rectangle) bool {
 // everyoneArrived dice si todos los personajes ya llegaron a su destino.
 func (s *DemoScene) everyoneArrived() bool {
 	for _, f := range s.figures {
-		if s.pos[f.id] != s.destination(f) {
+		if !s.arrived(f.id, s.destination(f)) {
 			return false
 		}
 	}
