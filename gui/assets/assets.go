@@ -44,3 +44,16 @@ var Pause embed.FS
 //
 //go:embed hiring/*.png
 var Hiring embed.FS
+
+// Report tiene el tablero de corcho y las chinchetas del Reporte del día
+// (gui/assets/report/REPORT_ASSETS.md).
+//
+//go:embed report/*.png
+var Report embed.FS
+
+// GameOver tiene los tres íconos del motivo de derrota (gui/assets/gameover/GAMEOVER_ASSETS.md).
+// El portapapeles de este panel reusa hiring_board.png (assets.Hiring): no
+// hay un PNG propio, como ya avisa GAMEOVER_ASSETS.md.
+//
+//go:embed gameover/*.png
+var GameOver embed.FS

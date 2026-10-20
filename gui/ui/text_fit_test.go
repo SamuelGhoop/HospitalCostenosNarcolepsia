@@ -6,6 +6,8 @@ import (
 	"testing"
 
 	"github.com/hajimehoshi/ebiten/v2/text/v2"
+
+	"github.com/SamuelGhoop/HospitalCostenosNarcolepsia/game"
 )
 
 // Press Start 2P es un tipo "de letrero" (cada letra ocupa su cuadro
@@ -14,9 +16,9 @@ import (
 // función que usa el dibujo), que ningún texto fijo de la interfaz se sale
 // de su caja. GAME_DESIGN §9.3 y §12.8.
 
-// TestButtonLabels_FitTheirBox: los botones de la escena de juego centran
-// su texto con textWidth, pero si el texto fuera más ancho que el botón,
-// el centrado daría un margen negativo y el texto saldría por los bordes.
+// TestButtonLabels_FitTheirBox: REPORTE y PAUSA centran su texto con
+// textWidth (smallFace); si fuera más ancho que el botón, el centrado
+// daría un margen negativo y el texto saldría por los bordes.
 func TestButtonLabels_FitTheirBox(t *testing.T) {
 	needFonts(t)
 	cases := []struct {
@@ -26,14 +28,35 @@ func TestButtonLabels_FitTheirBox(t *testing.T) {
 	}{
 		{"REPORTE", smallFace, reportButton.Dx()},
 		{"PAUSA", smallFace, pauseButton.Dx()},
-		{"SIGUIENTE DÍA", boldFace, dayOverButton.Dx()},
-		{"NUEVA PARTIDA", boldFace, newGameButton.Dx()},
-		{"MENÚ", boldFace, menuButton.Dx()},
 	}
 	for _, c := range cases {
 		t.Run(c.text, func(t *testing.T) {
 			if w := textWidth(c.text, c.face); w >= float64(c.w) {
 				t.Errorf("%q mide %.0f px; el botón mide %d px de ancho", c.text, w, c.w)
+			}
+		})
+	}
+}
+
+// TestGameOverAndDayOverButtonLabels_FitTheirBox: SIGUIENTE DÍA, NUEVA
+// PARTIDA y MENÚ (report_panel.go, gameover_panel.go) se dibujan con
+// drawPixelText a 24 px, centrados con pixelTextWidth, no con boldFace: la
+// vista aprobada de Figma los puso a ese tamaño (textStyle 24 px en las
+// tres), más grande que el resto de los botones de la interfaz.
+func TestGameOverAndDayOverButtonLabels_FitTheirBox(t *testing.T) {
+	needFonts(t)
+	cases := []struct {
+		text string
+		w    int
+	}{
+		{"SIGUIENTE DÍA", dayOverButton.Dx()},
+		{"NUEVA PARTIDA", newGameButton.Dx()},
+		{"MENÚ", menuButton.Dx()},
+	}
+	for _, c := range cases {
+		t.Run(c.text, func(t *testing.T) {
+			if w := pixelTextWidth(c.text, 24); w >= c.w {
+				t.Errorf("%q mide %d px a 24 px; el botón mide %d px de ancho", c.text, w, c.w)
 			}
 		})
 	}
@@ -125,15 +148,35 @@ func TestReportRows_FitThePaper(t *testing.T) {
 	}
 }
 
-// TestDayOverLines_FitTheBox: "Puntaje: N" y "Mejor racha: N" (§12.9),
-// centradas en el panel del fin de día (drawDayOver, game_scene.go), de
-// x=400 a x=880: con textFace a 16 px tienen que caber enteras.
-func TestDayOverLines_FitTheBox(t *testing.T) {
+// TestDayOverTitle_FitsItsCard: "REPORTE DEL DÍA N" (report_panel.go,
+// drawTitleCard) se centra con pixelTextWidth en la ficha del título
+// (480 px): con un día de tres cifras tiene que seguir cabiendo entera.
+func TestDayOverTitle_FitsItsCard(t *testing.T) {
 	needFonts(t)
-	const boxWidth = 880 - 400
-	for _, s := range []string{"Puntaje: 123456", "Mejor racha: 99"} {
-		if w := textWidth(s, textFace); w >= float64(boxWidth) {
-			t.Errorf("%q mide %.0f px; el panel del fin de día mide %d px de ancho", s, w, boxWidth)
+	title := fmt.Sprintf("REPORTE DEL DÍA %d", 999)
+	if w := pixelTextWidth(title, 24); w >= titleCardBox.Dx() {
+		t.Errorf("%q mide %d px; la ficha del título mide %d px de ancho", title, w, titleCardBox.Dx())
+	}
+}
+
+// TestGameOverReason_FitsTheColumn: el renglón del motivo
+// (gameover_panel.go) se parte en hasta dos renglones con wrapTwoLines,
+// igual que los subtítulos de la demo (TestDemoSubtitles_FitTheBox): el
+// test pide que CADA renglón quepa en la columna (612 px), no la frase
+// entera de una vez. Con una quiebra de números grandes, dos renglones.
+func TestGameOverReason_FitsTheColumn(t *testing.T) {
+	needFonts(t)
+	const boxWidth = gameOverColumnRight - gameOverColumnLeft
+	cases := []string{
+		gameOverReason(game.LostLicense, 0),
+		gameOverReason(game.Bankrupt, -1234567),
+		gameOverReason(game.HospitalCollapsed, 0),
+	}
+	for _, s := range cases {
+		for _, line := range wrapTwoLines(s, boxWidth, 16) {
+			if w := pixelTextWidth(line, 16); w >= boxWidth {
+				t.Errorf("%q (de %q) mide %d px; la columna del Game Over mide %d px de ancho", line, s, w, boxWidth)
+			}
 		}
 	}
 }

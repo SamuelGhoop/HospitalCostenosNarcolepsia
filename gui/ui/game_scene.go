@@ -270,13 +270,15 @@ func (s *GameScene) gameOverAnimOrOpen() *animPanel {
 	return s.gameOverAnim
 }
 
-// Botones de abajo a la derecha (§9.1) y de los paneles.
+// Botones de abajo a la derecha (§9.1) y de los paneles (Figma, vistas
+// aprobadas del Reporte del día y el Game Over, §9: "boton" de cada
+// frame).
 var (
 	reportButton  = image.Rect(1106, 672, 1186, 708)
 	pauseButton   = image.Rect(1194, 672, 1268, 708)
-	dayOverButton = image.Rect(520, 400, 760, 448)
-	newGameButton = image.Rect(380, 430, 620, 478)
-	menuButton    = image.Rect(660, 430, 900, 478)
+	dayOverButton = image.Rect(772, 606, 1212, 662)
+	newGameButton = image.Rect(334, 520, 714, 578)
+	menuButton    = image.Rect(726, 520, 946, 578)
 )
 
 // Draw dibuja por capas, como la demo: mapa → carros y humo → personajes y
@@ -421,47 +423,33 @@ func (s *GameScene) drawNotices(dst *ebiten.Image) int {
 	return y
 }
 
-// drawDayOver: a las 20:00 termina el turno (la nómina y el reporte del día
-// llegan en F4). El panel abre y cierra animado (drawAnimatedPanel,
-// anim.go), igual que la bolsa de empleo.
+// drawDayOver: a las 20:00 termina el turno y se paga la nómina (§5.8,
+// §9): el tablero de corcho con la ficha del título, el balance del día,
+// la nómina, los contratados, las cuatro consultas de la Sección 5, el
+// puntaje y el botón SIGUIENTE DÍA (vista aprobada en Figma, "Reporte A –
+// día con ganancia"/"Reporte B – día con pérdida"; el dibujo está en
+// report_panel.go, que no depende de GameScene: solo del DayReport del
+// último día cerrado y del puntaje actual). El panel abre y cierra
+// animado (drawAnimatedPanel, anim.go), igual que la bolsa de empleo.
+//
+// ⚠️ Pendiente (§12.9, "Mejor racha"): la vista aprobada de Figma no trae
+// un renglón para la mejor racha del día; se dejó de mostrar acá. El dato
+// sigue en DayReport.BestStreak por si Samuel lo quiere de vuelta en
+// algún lado.
 func (s *GameScene) drawDayOver(dst *ebiten.Image) {
 	drawAnimatedPanel(dst, s.dayOverAnimOrOpen(), pauseDim.A, func(c *ebiten.Image) {
-		box := image.Rect(400, 240, 880, 470)
-		panel(c, box, colPaper)
-		title := fmt.Sprintf("FIN DEL DÍA %d", s.snap.Day)
-		drawPixelText(c, title, ScreenWidth/2-pixelTextWidth(title, 24)/2, 280, 24, []textLayer{{0, 0, colInk}}, 1)
-		score := fmt.Sprintf("Puntaje: %d", s.snap.Score)
-		drawText(c, score, float64(ScreenWidth/2)-textWidth(score, textFace)/2, 340, textFace, colMuted)
-		// MEJOR RACHA del día (§12.9, DayReport.BestStreak): la racha de
-		// atención más alta que llegó a tener hoy, aunque se haya perdido
-		// después. g.DayReport() es del último día que CERRÓ (nómina ya
-		// pagada); acá se dibuja encima de ese cierre, así que es la de
-		// hoy.
-		best := fmt.Sprintf("Mejor racha: %d", s.g.DayReport().BestStreak)
-		drawText(c, best, float64(ScreenWidth/2)-textWidth(best, textFace)/2, 368, textFace, colMuted)
-		panel(c, dayOverButton, colBlue)
-		drawText(c, "SIGUIENTE DÍA", float64(dayOverButton.Min.X+(dayOverButton.Dx()-int(textWidth("SIGUIENTE DÍA", boldFace)))/2), float64(dayOverButton.Min.Y+12), boldFace, colWhite)
+		drawDayOverPanel(c, s.g.DayReport(), s.snap.Score)
 	})
 }
 
-// drawGameOver: la partida se perdió (§5.10): el motivo, el puntaje final y
-// los días; NUEVA PARTIDA o MENÚ. El panel abre y cierra animado, igual
-// que el fin de día.
+// drawGameOver: la partida se perdió (§5.10, §9): el portapapeles con el
+// ícono y el sello del motivo, los días sobrevividos, el desglose del
+// puntaje final (plata ÷ 10, estrellas × 200) y NUEVA PARTIDA o MENÚ
+// (vista aprobada en Figma, "Game Over C1/C2/C3"; el dibujo está en
+// gameover_panel.go, que solo depende de Snapshot). El panel abre y
+// cierra animado, igual que el fin de día.
 func (s *GameScene) drawGameOver(dst *ebiten.Image) {
 	drawAnimatedPanel(dst, s.gameOverAnimOrOpen(), pauseDim.A, func(c *ebiten.Image) {
-		box := image.Rect(340, 220, 940, 510)
-		panel(c, box, colPaper)
-		title := s.snap.GameOver.String()
-		drawPixelText(c, title, ScreenWidth/2-pixelTextWidth(title, 24)/2, 260, 24, append(outlined(2, colInk), textLayer{0, 0, colHUDRed}), 1)
-		for i, l := range []string{fmt.Sprintf("Puntaje final: %d", s.snap.FinalScore), fmt.Sprintf("Días: %d", s.snap.Day)} {
-			drawText(c, l, float64(ScreenWidth/2)-textWidth(l, textFace)/2, float64(320+i*34), textFace, colInk)
-		}
-		for _, b := range []struct {
-			r    image.Rectangle
-			text string
-		}{{newGameButton, "NUEVA PARTIDA"}, {menuButton, "MENÚ"}} {
-			panel(c, b.r, colBlue)
-			drawText(c, b.text, float64(b.r.Min.X+(b.r.Dx()-int(textWidth(b.text, boldFace)))/2), float64(b.r.Min.Y+12), boldFace, colWhite)
-		}
+		drawGameOverPanel(c, s.snap)
 	})
 }

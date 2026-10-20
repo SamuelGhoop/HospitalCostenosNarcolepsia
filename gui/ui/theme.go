@@ -52,6 +52,11 @@ var (
 	colWood     = color.RGBA{0xb9, 0x77, 0x3f, 0xff} // #b9773f portapapeles
 	colWoodDark = color.RGBA{0x8f, 0x5a, 0x2c, 0xff} // #8f5a2c sombra del portapapeles
 
+	// Reporte del día (Figma "Reporte A", §9): la ficha CONTRATADOS usa un
+	// papel amarillo pálido distinto del resto (#fbf8ef), para que se note
+	// que son gastos de hoy, no el balance acumulado.
+	colReportYellow = color.RGBA{0xff, 0xf2, 0xa6, 0xff} // #fff2a6 papel de la ficha CONTRATADOS
+
 	// Letreros de las habitaciones y burbujas "Zzz" (Personaje.dc.html).
 	colBadgeOccupied  = colRedDark   // #c4302b OCUPADA
 	colBadgeAvailable = colGreenDark // #1f8a3a DISPONIBLE

@@ -188,6 +188,10 @@ const (
 // Derrota (§5.10).
 const collapseLimit = 5 // pacientes desplomados o en el pasillo a la vez para que el hospital colapse
 
+// CollapseLimit es collapseLimit, exportada: la usa el Game Over de gui/ui
+// (§9, "N DORMIDOS SIN ATENDER A LA VEZ") para no repetir el número a mano.
+const CollapseLimit = collapseLimit
+
 // Apariencia (§7): cuántos valores tiene cada paleta. La interfaz decide qué
 // color es cada índice.
 const (
