@@ -36,23 +36,61 @@ func (s *GameScene) figureBox(f figure) image.Rectangle {
 	}
 }
 
-// figureAt es el personaje que está bajo p: si hay varios, el que se dibuja
-// encima (el de los pies más abajo). Los que van en camilla no cuentan.
-func (s *GameScene) figureAt(p image.Point) (figure, bool) {
-	var hits []figure
+// clickableFigures son los personajes que cuentan para el clic, el hover y
+// el imán: los mismos que antes (nadie en camilla).
+func (s *GameScene) clickableFigures() []figure {
+	var out []figure
 	for _, f := range s.figures {
 		if s.actorOf(f.id).exiting || (s.carryOf(f.id) != nil && f.id == s.carryOf(f.id).order.patient) {
 			continue
 		}
-		if p.In(s.figureBox(f)) {
+		out = append(out, f)
+	}
+	return out
+}
+
+// figureAt es el personaje que está bajo p: si hay varios, el que se dibuja
+// encima (el de los pies más abajo). Los que van en camilla no cuentan.
+//
+// BLOQUE 1 del pase de juice (GAME_DESIGN §12.10, pedido de Samuel el
+// 2026-10-19, "clics más fáciles"): la hitbox de cada uno crece +50 %
+// (hitboxGrowFactor, juice.go) alrededor de su caja actual, y si el clic no
+// cae en nadie así agrandado, se usa el imán (magnetFigureAt): el personaje
+// clicable más cercano por distancia al centro de su caja, dentro de
+// clickMagnetRadius píxeles de pantalla. No cambia la regla de despacho
+// (sigue siendo clic paciente → clic personal): esto solo decide A QUIÉN
+// apunta el clic, igual que antes.
+func (s *GameScene) figureAt(p image.Point) (figure, bool) {
+	figs := s.clickableFigures()
+	var hits []figure
+	for _, f := range figs {
+		if p.In(growRect(s.figureBox(f), hitboxGrowFactor)) {
 			hits = append(hits, f)
 		}
 	}
 	if len(hits) == 0 {
-		return figure{}, false
+		return s.magnetFigureAt(p, figs)
 	}
 	sort.SliceStable(hits, func(i, j int) bool { return s.pos[hits[i].id].y > s.pos[hits[j].id].y })
 	return hits[0], true
+}
+
+// magnetFigureAt es el imán (§12.10 BLOQUE 1): entre figs, el más cercano a
+// p por distancia al centro de su caja ACTUAL (sin agrandar: el imán ya hace
+// más fácil llegar a alguien, no hace falta agrandar dos veces), si queda a
+// clickMagnetRadius píxeles o menos. Sin nadie tan cerca, no hay imán.
+func (s *GameScene) magnetFigureAt(p image.Point, figs []figure) (figure, bool) {
+	best := math.Inf(1)
+	var closest figure
+	found := false
+	for _, f := range figs {
+		cx, cy := boxCenter(s.figureBox(f))
+		d := math.Hypot(float64(p.X)-cx, float64(p.Y)-cy)
+		if d <= clickMagnetRadius && d < best {
+			best, closest, found = d, f, true
+		}
+	}
+	return closest, found
 }
 
 // patientView y staffView buscan en la foto.
