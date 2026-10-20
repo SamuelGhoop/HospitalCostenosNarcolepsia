@@ -135,6 +135,7 @@ func (s *GameScene) click(p image.Point) {
 		if pv, _ := s.patientView(f.id); needsSomeone(pv.Stage) && s.selected != f.id {
 			s.selected = f.id
 			s.fx.punch(f.id, colWhite)
+			playSound(sfxClick) // bloque 7 (§12.10): "clic/selección"
 		} else {
 			s.selected = ""
 		}

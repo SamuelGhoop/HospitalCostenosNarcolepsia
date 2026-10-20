@@ -30,9 +30,18 @@ func (s *GameScene) applyJuiceEvent(e juiceEvent) {
 	case juiceDayBanner:
 		s.fx.dayBanner = newSweepBanner(hudDayLabel(e.amount), colHUDBlue, dayBannerSize,
 			dayBannerEnterTicks, dayBannerHoldTicks, dayBannerExitTicks)
+		// Bloque 7 (§12.10): "banner de día". Reusa "open" (el barrido hacia
+		// arriba de abrir un portapapeles, §10.11): no hay un sonido propio
+		// de "empieza el día" todavía y la idea de "algo se abre" le cae
+		// bien a un día nuevo, sin inventar un efecto más.
+		playSound(sfxOpen)
 	case juiceRushBanner:
 		s.fx.rushBanner = newSweepBanner("¡HORA PICO!", colOrange, rushBannerSize,
 			rushBannerEnterTicks, rushBannerHoldTicks, rushBannerExitTicks)
+		// El sonido de la hora pico (sfxRush) ya suena solo: gameSoundEvents
+		// (sound_events.go) lo dispara con la misma condición exacta
+		// (!prev.RushHour && cur.RushHour, §10.11, de antes de este pase de
+		// juice). No hace falta repetirlo acá.
 	}
 }
 
