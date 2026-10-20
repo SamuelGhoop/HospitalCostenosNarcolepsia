@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"image"
+	"image/color"
 	"math/rand"
 	"sort"
 
@@ -48,8 +49,12 @@ type GameScene struct {
 
 	// fx es el pase de "juice" (§12.10, pedido de Samuel el 2026-10-19):
 	// shake, hit-stop, squash&stretch, partículas y banners. Puramente
-	// visual/sonoro; nunca toca game.Game.
-	fx juiceFX
+	// visual/sonoro; nunca toca game.Game. juicePrev es la foto de antes,
+	// para detectJuiceEvents (juice_events.go); igual que soundTracker, la
+	// primera foto no deja ningún evento (no hay "antes" con qué comparar).
+	fx           juiceFX
+	juicePrev    game.Snapshot
+	juicePrevSet bool
 
 	// Los paneles del fin del día y del Game Over abren y cierran animados,
 	// como la bolsa de empleo (anim.go, pedido de Samuel el 2026-10-17):
@@ -136,13 +141,30 @@ func (s *GameScene) update(in input) (Scene, error) {
 	}
 
 	s.sync()
-	s.fx.step() // pase de juice (§12.10): shake, hit-stop, squash, líneas...
-	if !s.fx.hitStop.active() {
-		// Hit-stop (bloque 4): congela las animaciones de la interfaz un
-		// puñado de cuadros; Game.Tick ya corrió más arriba (s.g.Snapshot
-		// lee lo de la goroutine motor), nunca se detiene.
-		s.animate()
+
+	// Bloque 4 del pase de juice (§12.10): detecta cobro/racha/alta/enojo
+	// comparando la foto de antes con la de ahora (igual que sound_events.go)
+	// y los anima. Después de sync() para que s.pos ya tenga a todos en su
+	// sitio de este tick (el cobro, el alta y el enojo necesitan la posición
+	// en pantalla del paciente).
+	if s.juicePrevSet {
+		for _, e := range detectJuiceEvents(s.juicePrev, s.snap) {
+			s.applyJuiceEvent(e)
+		}
 	}
+	s.juicePrev, s.juicePrevSet = s.snap, true
+
+	s.fx.step() // pase de juice (§12.10): shake, hit-stop, squash, líneas...
+	// animate() SIEMPRE corre, hit-stop activo o no (GAME_DESIGN §10.8: el
+	// settle/dodge de quién se queda quieto dónde depende del tick exacto en
+	// que cada uno llega a su destino; saltarse animate() unos cuadros movía
+	// esas decisiones y dejaba, rara vez, a dos quietos encimados —lo
+	// detectó TestNobodyStandsOnAnother_GameSeeds—). El hit-stop congela el
+	// CUADRO que se ve (Draw, más abajo: mientras esté activo, reusa el
+	// lienzo del mundo de la vez pasada en lugar de dibujar uno nuevo), no
+	// el movimiento de verdad: la animación sigue su curso por dentro y, al
+	// terminar el hit-stop, se ve de golpe dónde quedó.
+	s.animate()
 	s.door.step(s.snap.DoorOpen)
 
 	// Los paneles del fin del día y de la derrota se llevan la entrada.
@@ -306,13 +328,27 @@ var (
 // la plata y la hora).
 func (s *GameScene) Draw(screen *ebiten.Image) {
 	canvas := worldCanvas()
-	canvas.Clear()
-	s.drawWorld(canvas)
+	if !s.fx.hitStop.active() {
+		canvas.Clear()
+		s.drawWorld(canvas)
+	}
+	// Con el hit-stop activo, canvas se deja tal cual: el cuadro de la vez
+	// pasada (worldCanvas es el mismo lienzo reusado entre Draw) se repite
+	// sin dibujar uno nuevo, el "congelado" de verdad (BLOQUE 4, §12.10). El
+	// movimiento de abajo (animate(), update()) no se toca para nada.
 
 	dx, dy := s.fx.shake.offset()
 	op := &ebiten.DrawImageOptions{Filter: ebiten.FilterNearest}
 	op.GeoM.Translate(float64(dx), float64(dy))
 	screen.DrawImage(canvas, op)
+
+	// El flash blanco del cobro (bloque 4, §12.10): de pantalla completa,
+	// por eso va directo sobre screen, no sobre el mundo que tiembla.
+	if s.fx.screenFlash.active() {
+		a := s.fx.screenFlash.alpha()
+		c := s.fx.screenFlash.col
+		fillRect(screen, image.Rect(0, 0, ScreenWidth, ScreenHeight), color.RGBA{c.R, c.G, c.B, uint8(float32(c.A) * a)})
+	}
 
 	// Los avisos del juego (errores, altas) van primero para saber dónde
 	// terminan: los avisos de reputación con motivo (hud.go, §12.8) no se
@@ -322,6 +358,19 @@ func (s *GameScene) Draw(screen *ebiten.Image) {
 	noticesBottom := s.drawNotices(screen)
 	s.hud.draw(screen, s.snap, noticesBottom)
 	s.drawButtons(screen)
+
+	// Bloque 4 (§12.10): el banner de racha y la estrella que cae del HUD,
+	// sin temblar (van sobre la barra, sin seguir a ningún personaje).
+	if s.fx.streak != nil {
+		drawStreakBanner(screen, s.fx.streak)
+	}
+	if s.fx.streakLostText != nil {
+		drawFloatText(screen, s.fx.streakLostText)
+	}
+	for _, st := range s.fx.fallingStars {
+		drawFallingStar(screen, st)
+	}
+
 	if s.hover != "" && !s.shift {
 		if f, ok := s.figure(s.hover); ok {
 			s.drawTooltip(screen, f)
@@ -417,10 +466,28 @@ func (s *GameScene) drawWorld(dst *ebiten.Image) {
 	// El aviso de desplome (bloque 3, §12.10): la nube de polvo, por debajo
 	// del "!" (que va bien arriba, sobre la cabeza).
 	for _, p := range s.fx.dust {
-		drawDust(dst, p)
+		drawParticle(dst, p)
 	}
 	for _, c := range s.fx.collapses {
 		drawExclaim(dst, c)
+	}
+
+	// Bloque 4 (§12.10): lo que pasa sobre un paciente en particular (el
+	// "+$350" del cobro, el confeti/corazones del alta, el humo del
+	// enojo) tiembla con el mundo, igual que el resto de lo que está "en
+	// el mapa". El banner de racha y la estrella que cae del HUD van
+	// aparte, sin temblar (Draw, más abajo).
+	for _, f := range s.fx.payments {
+		drawFloatText(dst, f)
+	}
+	for _, p := range s.fx.discharge {
+		drawParticle(dst, p)
+	}
+	for _, p := range s.fx.angrySmoke {
+		drawParticle(dst, p)
+	}
+	for _, p := range s.fx.sparks {
+		drawParticle(dst, p)
 	}
 }
 

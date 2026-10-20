@@ -221,6 +221,18 @@ func layoutHUD(repText, moneyText, dayText, clockText string) hudLayout {
 	return l
 }
 
+// hudStarsRect es el rectángulo de las 5 estrellas (el mismo que calcula
+// layoutHUD en l.stars, pero sin tener que formatear ningún texto: no
+// depende de nada que cambie entre fotos). Lo usa el pase de juice (§12.10,
+// BLOQUE 4) para saber de dónde se desprende la estrella cuando alguien se
+// va enojado.
+func hudStarsRect() image.Rectangle {
+	mid := hudHeight / 2
+	w, h := (5*13-2)*hudIconScale, len(hudStar)*hudIconScale
+	y := mid - h/2
+	return image.Rect(hudPad, y, hudPad+w, y+h)
+}
+
 // rushHourText es el letrero de la hora pico (§12.9).
 const rushHourText = "HORA PICO"
 

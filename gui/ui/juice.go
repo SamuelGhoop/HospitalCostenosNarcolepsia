@@ -79,3 +79,60 @@ const (
 // congelada; nunca el reloj del juego (Game.Tick sigue en su propia
 // goroutine). Se usa en el cobro de una revisión (bloque 4).
 const hitStopTicks = 6
+
+// ─── BLOQUE 4: cobro, racha, alta y enojo ──────────────────────────────
+
+// Cobro (juice_payoff.go): hit-stop (hitStopTicks) + flash blanco de
+// pantalla breve y de alpha bajo + "+$350" verde que sube sobre el
+// paciente y se desvanece.
+const (
+	paymentFlashTicks = hitStopTicks // el flash dura lo mismo que el hit-stop
+	paymentFlashAlpha = 90           // de 255: alpha bajo
+	paymentPopupTicks = 60           // 1 s: sube y se desvanece
+	paymentPopupRise  = 28           // px que sube
+)
+
+// Racha: el banner grande "¡RACHA ×N!" (N es el multiplicador, como ya
+// muestra la barra) con rebote elástico y chispas; "RACHA PERDIDA" cae y se
+// desvanece.
+const (
+	streakBannerBaseSize  = 32
+	streakBannerPopTicks  = 14 // 0,23 s: el rebote elástico
+	streakBannerTicks     = 54 // ~0,9 s en total
+	streakBannerFadeTicks = 14
+
+	streakSparkCount     = 8
+	streakSparkLifeTicks = 24
+	streakSparkSpeed     = 2.2
+
+	streakLostBannerTicks = 50 // cae y se desvanece
+	streakLostFall        = 36 // px que cae (riseTotal negativo: ver floatText)
+)
+
+// streakBannerPos: centro-arriba del mapa, debajo de la barra.
+var streakBannerPos = vec{float64(ScreenWidth) / 2, 140}
+
+// Alta: corazones y confeti multicolor que saltan sobre el paciente.
+const (
+	dischargeParticleCount = 14
+	dischargeLifeMinTicks  = 30
+	dischargeLifeMaxTicks  = 45
+	dischargeUpSpeed       = 2.4
+	dischargeSpread        = 1.6
+	dischargeGravity       = 0.08
+	dischargeSize          = 4
+)
+
+// Enojo: nubecita de humo rojo sobre la cabeza y una estrella que se
+// desprende del contador de reputación del HUD y cae girando.
+const (
+	angrySmokeCount     = 6
+	angrySmokeLifeTicks = 45
+	angrySmokeDrift     = 0.5
+	angrySmokeRise      = 0.35 // gravedad negativa: flota hacia arriba
+	angrySmokeSize      = 5
+
+	fallingStarTicks   = 50
+	fallingStarSpin    = 0.22 // rad/tick
+	fallingStarGravity = 0.12
+)

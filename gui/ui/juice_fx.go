@@ -25,7 +25,17 @@ type juiceFX struct {
 	// juice_collapse.go): el "!" y la burbuja agrandada, por paciente, y la
 	// nube de polvo, compartida (no sigue a nadie en particular).
 	collapses map[string]*collapseFlourish
-	dust      []*dustParticle
+	dust      []*particle
+
+	// BLOQUE 4 (§12.10, juice_payoff.go): cobro, racha, alta y enojo.
+	screenFlash    flash          // el flash blanco del cobro
+	payments       []*floatText   // "+$350" sobre el paciente
+	streak         *streakBanner  // "¡RACHA ×N!"; nil si no hay ninguno en pantalla
+	sparks         []*particle    // chispas de la racha
+	streakLostText *floatText     // "RACHA PERDIDA"; nil si no hay ninguno
+	discharge      []*particle    // corazones y confeti del alta
+	angrySmoke     []*particle    // humo rojo de "se fue enojado"
+	fallingStars   []*fallingStar // estrella que se desprende del HUD
 }
 
 func newJuiceFX(seed int64) juiceFX {
@@ -58,13 +68,50 @@ func (fx *juiceFX) step() {
 			delete(fx.collapses, id)
 		}
 	}
-	keptDust := fx.dust[:0]
-	for _, p := range fx.dust {
-		if p.step() {
-			keptDust = append(keptDust, p)
+	fx.dust = stepParticles(fx.dust)
+
+	// BLOQUE 4 (§12.10).
+	fx.screenFlash.step()
+	fx.payments = stepFloatTexts(fx.payments)
+	if fx.streak != nil && !fx.streak.step() {
+		fx.streak = nil
+	}
+	fx.sparks = stepParticles(fx.sparks)
+	if fx.streakLostText != nil && !fx.streakLostText.step() {
+		fx.streakLostText = nil
+	}
+	fx.discharge = stepParticles(fx.discharge)
+	fx.angrySmoke = stepParticles(fx.angrySmoke)
+	keptStars := fx.fallingStars[:0]
+	for _, st := range fx.fallingStars {
+		if st.step() {
+			keptStars = append(keptStars, st)
 		}
 	}
-	fx.dust = keptDust
+	fx.fallingStars = keptStars
+}
+
+// stepParticles avanza cada partícula y descarta las que ya murieron
+// (reusado por el polvo, las chispas, el confeti/corazones y el humo).
+func stepParticles(ps []*particle) []*particle {
+	kept := ps[:0]
+	for _, p := range ps {
+		if p.step() {
+			kept = append(kept, p)
+		}
+	}
+	return kept
+}
+
+// stepFloatTexts hace lo mismo con los floatText (el "+$350" del cobro).
+func stepFloatTexts(fs []*floatText) []*floatText {
+	kept := fs[:0]
+	for _, f := range fs {
+		if f.step() {
+			kept = append(kept, f)
+		}
+	}
+	return kept
 }
 
 // punch arranca (o reinicia) el squash&stretch + destello de id, con el
@@ -140,9 +187,14 @@ func (s *screenShake) offset() (dx, dy int) {
 
 // ─── hitStop ─────────────────────────────────────────────────────────────
 
-// hitStop congela las animaciones de la interfaz (nunca Game.Tick, que
-// corre en su propia goroutine): mientras ticksLeft > 0, GameScene.update
-// no llama a s.animate() (BLOQUE 4, §12.10).
+// hitStop congela el CUADRO que se ve (nunca Game.Tick, que corre en su
+// propia goroutine, ni animate(), que sigue moviendo a todos por dentro):
+// mientras ticksLeft > 0, GameScene.Draw reusa el lienzo del mundo de la
+// vez pasada en lugar de dibujar uno nuevo (BLOQUE 4, §12.10). Se eligió
+// así (congelar el dibujo, no el movimiento) porque saltarse animate()
+// unos cuadros corría las decisiones de "dónde se queda quieto cada uno"
+// (settle/dodge, GAME_DESIGN §10.8) y dejaba, rara vez, a dos personajes
+// encimados (lo detectó TestNobodyStandsOnAnother_GameSeeds).
 type hitStop struct{ ticksLeft int }
 
 // trigger pide ticks de hit-stop: si ya había más por correr, no lo acorta.
@@ -158,6 +210,36 @@ func (h *hitStop) step() {
 	if h.ticksLeft > 0 {
 		h.ticksLeft--
 	}
+}
+
+// ─── flash: un destello de pantalla completa ───────────────────────────
+
+// flash es un color que se desvanece en total ticks (el flash blanco del
+// cobro, BLOQUE 4). alpha() ya viene lista para pintarla encima de todo.
+type flash struct {
+	col              color.RGBA
+	ticksLeft, total int
+}
+
+// trigger arranca (o reinicia) el destello.
+func (f *flash) trigger(c color.RGBA, ticks int) {
+	f.col, f.ticksLeft, f.total = c, ticks, ticks
+}
+
+func (f *flash) step() {
+	if f.ticksLeft > 0 {
+		f.ticksLeft--
+	}
+}
+
+func (f *flash) active() bool { return f.ticksLeft > 0 }
+
+// alpha baja en línea recta de 1 a 0.
+func (f *flash) alpha() float32 {
+	if f.total == 0 {
+		return 0
+	}
+	return float32(f.ticksLeft) / float32(f.total)
 }
 
 // ─── figurePunch: squash & stretch + destello ──────────────────────────

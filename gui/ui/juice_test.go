@@ -186,7 +186,7 @@ func TestCollapseFlourish_LastsItsTicksAndSettlesAfterThePop(t *testing.T) {
 // El polvo cae (gravedad) y se desvanece con su vida, sin volverse a subir
 // de opacidad.
 func TestDustParticle_FallsAndFadesOut(t *testing.T) {
-	p := &dustParticle{vel: vec{0, -1}, life: 10, total: 10}
+	p := &particle{vel: vec{0, -1}, life: 10, total: 10, gravity: dustGravity}
 	prevVY := p.vel.y
 	prevAlpha := p.alpha()
 	for p.step() {
@@ -200,6 +200,92 @@ func TestDustParticle_FallsAndFadesOut(t *testing.T) {
 	}
 	if p.life != 0 {
 		t.Errorf("life terminó en %d; se esperaba 0", p.life)
+	}
+}
+
+// ─── BLOQUE 4: cobro, racha, alta y enojo ───────────────────────────────
+
+// floatText sube (riseTotal positivo) y se desvanece hasta el final.
+func TestFloatText_RisesAndFadesToZero(t *testing.T) {
+	f := &floatText{pos: vec{0, 100}, total: 10, riseTotal: 20}
+	prevY, prevAlpha := f.y(), f.alpha()
+	if prevY != 100 || prevAlpha != 1 {
+		t.Fatalf("en el primer tick: y=%v alpha=%v; se esperaba y=100 alpha=1", prevY, prevAlpha)
+	}
+	for f.step() {
+		if f.y() >= prevY {
+			t.Fatalf("no subió: y pasó de %v a %v", prevY, f.y())
+		}
+		if f.alpha() > prevAlpha {
+			t.Fatalf("la opacidad subió: %v → %v", prevAlpha, f.alpha())
+		}
+		prevY, prevAlpha = f.y(), f.alpha()
+	}
+	if f.ticks != f.total {
+		t.Errorf("terminó a los %d ticks; se esperaban %d", f.ticks, f.total)
+	}
+}
+
+// floatText con riseTotal negativo CAE en vez de subir ("RACHA PERDIDA").
+func TestFloatText_NegativeRiseFallsInstead(t *testing.T) {
+	f := &floatText{pos: vec{0, 100}, total: 10, riseTotal: -20}
+	f.step()
+	if f.y() <= 100 {
+		t.Errorf("y() = %v; con riseTotal negativo se esperaba que bajara de 100", f.y())
+	}
+}
+
+// El banner de racha dura streakBannerTicks y, pasado el rebote
+// (streakBannerPopTicks), ya está en su tamaño normal.
+func TestStreakBanner_LastsItsTicksAndSettlesAfterThePop(t *testing.T) {
+	b := &streakBanner{}
+	for i := 0; i < streakBannerPopTicks; i++ {
+		b.step()
+	}
+	if got := b.scale(); got != 1 {
+		t.Errorf("scale() tras el rebote = %v; se esperaba 1", got)
+	}
+	remaining, alive := 0, true
+	for alive {
+		alive = b.step()
+		remaining++
+	}
+	if total := streakBannerPopTicks + remaining; total != streakBannerTicks {
+		t.Errorf("duró %d ticks en total; se esperaban %d", total, streakBannerTicks)
+	}
+}
+
+// Más racha, color más cálido (amarillo → naranja → rojo).
+func TestStreakBannerColor_WarmerAtHigherStreak(t *testing.T) {
+	if c := streakBannerColor(100); c != colYellow {
+		t.Errorf("×1 = %v; se esperaba amarillo", c)
+	}
+	if c := streakBannerColor(150); c != colOrange {
+		t.Errorf("×1,5 = %v; se esperaba naranja", c)
+	}
+	if c := streakBannerColor(200); c != colRed {
+		t.Errorf("×2 = %v; se esperaba rojo", c)
+	}
+}
+
+// La estrella que cae gira, cae (gravedad) y se desvanece hasta el final.
+func TestFallingStar_SpinsFallsAndFades(t *testing.T) {
+	s := &fallingStar{vel: vec{0, 0}}
+	prevAngle, prevY, prevAlpha := s.angle, s.pos.y, s.alpha()
+	for s.step() {
+		if s.angle <= prevAngle {
+			t.Fatalf("el ángulo no avanzó: %v → %v", prevAngle, s.angle)
+		}
+		if s.pos.y < prevY {
+			t.Fatalf("y bajó en vez de caer: %v → %v", prevY, s.pos.y)
+		}
+		if s.alpha() > prevAlpha {
+			t.Fatalf("la opacidad subió: %v → %v", prevAlpha, s.alpha())
+		}
+		prevAngle, prevY, prevAlpha = s.angle, s.pos.y, s.alpha()
+	}
+	if s.ticks != fallingStarTicks {
+		t.Errorf("terminó a los %d ticks; se esperaban %d", s.ticks, fallingStarTicks)
 	}
 }
 

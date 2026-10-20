@@ -1,7 +1,6 @@
 package ui
 
 import (
-	"image"
 	"image/color"
 	"math"
 
@@ -83,31 +82,6 @@ func easeOutBack(t float64) float64 {
 	return 1 + c3*t*t*t + c1*t*t
 }
 
-// dustParticle es una mota de polvo gris que se abre a los lados, sube un
-// poco y cae (gravedad), desvaneciéndose con su vida.
-type dustParticle struct {
-	pos, vel    vec
-	life, total int
-}
-
-func (p *dustParticle) step() (alive bool) {
-	p.pos.x += p.vel.x
-	p.pos.y += p.vel.y
-	p.vel.y += dustGravity
-	p.life--
-	return p.life > 0
-}
-
-func (p *dustParticle) alpha() float32 { return float32(p.life) / float32(p.total) }
-
-// drawDust dibuja una mota como un cuadrito gris sin suavizar (pixel art
-// nítido: posición entera).
-func drawDust(dst *ebiten.Image, p *dustParticle) {
-	c := color.RGBA{colLightGray.R, colLightGray.G, colLightGray.B, uint8(255 * p.alpha())}
-	x, y := int(math.Round(p.pos.x)), int(math.Round(p.pos.y))
-	fillRect(dst, image.Rect(x, y, x+dustSize, y+dustSize), c)
-}
-
 // drawExclaim dibuja el "!" rojo grande de c, centrado en c.pos, con su
 // rebote y su desvanecido.
 func drawExclaim(dst *ebiten.Image, c *collapseFlourish) {
@@ -131,11 +105,9 @@ func (fx *juiceFX) collapse(id string, head, feet vec) {
 	for i := 0; i < n; i++ {
 		angle := fx.rng.Float64()*2 - 1 // -1..1
 		life := dustLifeMinTicks + fx.rng.Intn(dustLifeMaxTicks-dustLifeMinTicks+1)
-		fx.dust = append(fx.dust, &dustParticle{
-			pos:   feet,
-			vel:   vec{angle * dustSpreadSpeed, -fx.rng.Float64() * dustUpSpeed},
-			life:  life,
-			total: life,
+		fx.dust = append(fx.dust, &particle{
+			pos: feet, vel: vec{angle * dustSpreadSpeed, -fx.rng.Float64() * dustUpSpeed},
+			life: life, total: life, col: colLightGray, size: dustSize, gravity: dustGravity,
 		})
 	}
 }
