@@ -205,9 +205,10 @@ func (g *Game) reportLocked() Report {
 // PayrollLine es lo que se le pagó a un miembro del personal en la nómina de
 // un día (§5.8).
 type PayrollLine struct {
-	Name     string
-	IsDoctor bool
-	Salary   int
+	Name      string
+	IsDoctor  bool
+	Salary    int
+	RoleLabel string // "Médico"/"Médica"/"Camillero"/"Camillera" (§9, NÓMINA): el mismo de CandidateView/HireLine
 }
 
 // DayReport es el Shift Report diario (§5.8 y §6): el balance del día que

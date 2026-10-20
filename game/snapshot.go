@@ -28,6 +28,8 @@ type Snapshot struct {
 	GameOver          GameOver           // NotOver mientras la partida sigue
 	Score             int                // puntaje acumulado (§5.10)
 	FinalScore        int                // puntaje final, solo con la partida perdida; 0 mientras sigue
+	MoneyScore        int                // "PLATA ÷ 10" del Game Over (§9); 0 mientras la partida sigue
+	StarScore         int                // "ESTRELLAS × 200" del Game Over (§9); 0 mientras la partida sigue
 }
 
 // StaffMemberView es la foto de un miembro del personal en el modo juego.
@@ -81,7 +83,8 @@ func (g *Game) Snapshot() Snapshot {
 		ReputationChanges: append([]ReputationChange(nil), g.repChanges...),
 	}
 	if g.over != NotOver {
-		snap.FinalScore = g.finalScoreLocked()
+		snap.MoneyScore, snap.StarScore = g.finalScoreBreakdownLocked()
+		snap.FinalScore = g.score + snap.MoneyScore + snap.StarScore
 	}
 	for _, r := range g.h.Rooms() {
 		snap.Rooms = append(snap.Rooms, roomViewOf(r))

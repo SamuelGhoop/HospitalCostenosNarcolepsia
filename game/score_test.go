@@ -54,4 +54,24 @@ func TestScore_FinalScoreWhenTheGameIsLost(t *testing.T) {
 	if snap.FinalScore != 965 {
 		t.Errorf("puntaje final = %d; se esperaba 100 + 245 + 620 = 965", snap.FinalScore)
 	}
+	// El Game Over (§9, PLATA ÷ 10 / ESTRELLAS × 200) muestra las dos partes
+	// por separado, no solo la suma: tienen que salir de Snapshot con la
+	// misma cuenta que ya hace FinalScore, para no repetir las constantes de
+	// game/config.go afuera del paquete.
+	if snap.MoneyScore != 245 || snap.StarScore != 620 {
+		t.Errorf("desglose del puntaje final = (plata %d, estrellas %d); se esperaba (245, 620)", snap.MoneyScore, snap.StarScore)
+	}
+	if snap.MoneyScore+snap.StarScore+snap.Score != snap.FinalScore {
+		t.Errorf("el desglose (%d + %d + %d) no suma FinalScore (%d)", snap.Score, snap.MoneyScore, snap.StarScore, snap.FinalScore)
+	}
+}
+
+// Mientras la partida sigue (GameOver == NotOver) el desglose del puntaje
+// final queda en 0, como FinalScore: todavía no hay nada que mostrar.
+func TestScore_MoneyAndStarScoreAreZeroWhileThePartyContinues(t *testing.T) {
+	g := newGame(t)
+	snap := g.Snapshot()
+	if snap.MoneyScore != 0 || snap.StarScore != 0 {
+		t.Errorf("con la partida en curso (plata %d, estrellas %d); se esperaba (0, 0)", snap.MoneyScore, snap.StarScore)
+	}
 }

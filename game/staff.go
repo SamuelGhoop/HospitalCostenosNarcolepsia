@@ -29,6 +29,7 @@ type StaffMember struct {
 	onCall bool              // "de guardia": true solo durante el despacho que eligió el jugador
 	look   Appearance        // cómo se ve (la interfaz lo dibuja así; en F4, el mismo de la bolsa de empleo)
 	salary int               // sueldo diario, fijado al contratarlo (§5.8); se paga en la nómina de las 20:00
+	female bool              // mismo sorteo que decide "Dr."/"Dra." en el nombre: para roleLabel() en el Reporte del día (§9)
 }
 
 // doctorSalary y orderlySalary son la fórmula de la nómina (§5.8): médico
@@ -48,13 +49,13 @@ func orderlySalary(speed int) int {
 var _ hospital.Attender = (*StaffMember)(nil)
 
 // newDoctorMember envuelve a un médico real.
-func newDoctorMember(d *hospital.Doctor, speed, skill int) *StaffMember {
-	return &StaffMember{inner: d, doctor: d, speed: speed, skill: skill}
+func newDoctorMember(d *hospital.Doctor, speed, skill int, female bool) *StaffMember {
+	return &StaffMember{inner: d, doctor: d, speed: speed, skill: skill, female: female}
 }
 
 // newOrderlyMember envuelve a un camillero real.
-func newOrderlyMember(o *hospital.Orderly, speed int) *StaffMember {
-	return &StaffMember{inner: o, speed: speed}
+func newOrderlyMember(o *hospital.Orderly, speed int, female bool) *StaffMember {
+	return &StaffMember{inner: o, speed: speed, female: female}
 }
 
 // ID y Name se delegan al Doctor u Orderly real, que los tiene promovidos de
@@ -77,6 +78,11 @@ func (s *StaffMember) IsAvailable() bool { return s.onCall }
 
 // isDoctor dice si es médico (false = camillero).
 func (s *StaffMember) isDoctor() bool { return s.doctor != nil }
+
+// roleLabel es el rol con género para el Reporte del día (§9, NÓMINA): el
+// mismo texto y la misma función (roleLabel, hiring.go) que ya usa la hoja
+// del candidato en CandidateView.RoleLabel.
+func (s *StaffMember) roleLabel() string { return roleLabel(s.isDoctor(), s.female) }
 
 // walkTime es lo que tarda en llegar a donde lo mandan: (8 − rapidez) s,
 // de 3 a 7 s (§5.5).
@@ -145,9 +151,10 @@ func (g *Game) findStaffLocked(id string) (*StaffMember, error) {
 // siguiente (D-01, D-02…). Todavía no lo contrata.
 func (g *Game) newDoctorLocked(speed, skill int) *StaffMember {
 	g.doctorCount++
-	d := hospital.NewDoctor(fmt.Sprintf("D-%02d", g.doctorCount), doctorName(g.rng),
+	name, female := doctorNameAndGender(g.rng) // female: para roleLabel() en el Reporte del día (§9)
+	d := hospital.NewDoctor(fmt.Sprintf("D-%02d", g.doctorCount), name,
 		randomAge(g.rng, staffMinAge, staffMaxAge), doctorSpecialty)
-	m := newDoctorMember(d, speed, skill)
+	m := newDoctorMember(d, speed, skill, female)
 	m.look = RandomAppearance(g.looks)
 	m.salary = doctorSalary(speed, skill)
 	return m
@@ -156,10 +163,10 @@ func (g *Game) newDoctorLocked(speed, skill int) *StaffMember {
 // newOrderlyLocked crea un camillero al azar (C-01, C-02…), envuelto.
 func (g *Game) newOrderlyLocked(speed int) *StaffMember {
 	g.orderlyCount++
-	name, _ := randomName(g.rng) // _ : al camillero no se le pone título
+	name, female := randomName(g.rng) // female: para roleLabel() en el Reporte del día (§9)
 	o := hospital.NewOrderly(fmt.Sprintf("C-%02d", g.orderlyCount), name,
 		randomAge(g.rng, staffMinAge, staffMaxAge))
-	m := newOrderlyMember(o, speed)
+	m := newOrderlyMember(o, speed, female)
 	m.look = RandomAppearance(g.looks)
 	m.salary = orderlySalary(speed)
 	return m

@@ -263,6 +263,34 @@ func TestPayroll_DayReportTracksIncomeAndHires(t *testing.T) {
 	if len(r.Hires) != 1 || r.Hires[0].Name != c.Name || r.Hires[0].Cost != c.Cost {
 		t.Errorf("contrataciones del día = %+v; se esperaba una, %q por $%d", r.Hires, c.Name, c.Cost)
 	}
+	// El reporte del día (Reporte A/B de Figma, CONTRATADOS) dice el rol con
+	// género ("MÉDICA", no "MÉDICO"): el mismo RoleLabel que ya mostraba la
+	// hoja del candidato, no uno recalculado aparte.
+	if r.Hires[0].RoleLabel != c.RoleLabel {
+		t.Errorf("CONTRATADOS: RoleLabel = %q; se esperaba %q (el mismo de la hoja)", r.Hires[0].RoleLabel, c.RoleLabel)
+	}
+}
+
+// §9 (Reporte del día, NÓMINA): cada línea de la nómina dice el rol con
+// género, igual que la hoja del candidato ("MÉDICO"/"MÉDICA"/"CAMILLERO"/
+// "CAMILLERA"), aunque el personal inicial no salió de la bolsa de empleo.
+func TestPayroll_DayReportRoleLabelsMatchGender(t *testing.T) {
+	g := newQuietGame(t)
+	tickFor(g, 300*time.Second)
+
+	r := g.DayReport()
+	valid := map[bool][]string{true: {"Médico", "Médica"}, false: {"Camillero", "Camillera"}}
+	for _, line := range r.Payroll {
+		ok := false
+		for _, want := range valid[line.IsDoctor] {
+			if line.RoleLabel == want {
+				ok = true
+			}
+		}
+		if !ok {
+			t.Errorf("nómina de %q (médico=%v): RoleLabel = %q; se esperaba uno de %v", line.Name, line.IsDoctor, line.RoleLabel, valid[line.IsDoctor])
+		}
+	}
 }
 
 // §5.8 y §5.10: si la nómina deja la plata en negativo, la partida pierde

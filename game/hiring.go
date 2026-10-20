@@ -63,9 +63,10 @@ func (c *candidate) view(money int) CandidateView {
 // HireLine es una contratación hecha durante un día (§6); queda en el
 // DayReport (report.go) del día en que se hizo.
 type HireLine struct {
-	Name     string
-	IsDoctor bool
-	Cost     int
+	Name      string
+	IsDoctor  bool
+	Cost      int
+	RoleLabel string // "Médico"/"Médica"/"Camillero"/"Camillera" (§9, CONTRATADOS): el mismo de CandidateView
 }
 
 // CandidateView es la ficha de un candidato que dibuja la bolsa de empleo
@@ -154,14 +155,14 @@ func (g *Game) hireFromCandidateLocked(c *candidate) *StaffMember {
 	if c.isDoctor {
 		g.doctorCount++
 		d := hospital.NewDoctor(fmt.Sprintf("D-%02d", g.doctorCount), c.name, c.age, c.specialty)
-		m := newDoctorMember(d, c.speed, c.skill)
+		m := newDoctorMember(d, c.speed, c.skill, c.female)
 		m.look = c.look
 		m.salary = c.salary
 		return m
 	}
 	g.orderlyCount++
 	o := hospital.NewOrderly(fmt.Sprintf("C-%02d", g.orderlyCount), c.name, c.age)
-	m := newOrderlyMember(o, c.speed)
+	m := newOrderlyMember(o, c.speed, c.female)
 	m.look = c.look
 	m.salary = c.salary
 	return m
@@ -196,7 +197,7 @@ func (g *Game) Hire(i int) error {
 		return err
 	}
 	g.money -= c.salary
-	g.dayHires = append(g.dayHires, HireLine{Name: m.Name(), IsDoctor: c.isDoctor, Cost: c.salary})
+	g.dayHires = append(g.dayHires, HireLine{Name: m.Name(), IsDoctor: c.isDoctor, Cost: c.salary, RoleLabel: roleLabel(c.isDoctor, c.female)})
 	// Sale de la lista del día (§6): se recorta el slice en el índice i.
 	g.candidates = append(g.candidates[:i], g.candidates[i+1:]...)
 	return nil

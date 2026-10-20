@@ -44,7 +44,7 @@ func (g *Game) payPayrollLocked() {
 	var lines []PayrollLine
 	total := 0
 	for _, s := range g.staff {
-		lines = append(lines, PayrollLine{Name: s.Name(), IsDoctor: s.isDoctor(), Salary: s.salary})
+		lines = append(lines, PayrollLine{Name: s.Name(), IsDoctor: s.isDoctor(), Salary: s.salary, RoleLabel: s.roleLabel()})
 		total += s.salary
 	}
 	startMoney := g.dayStartMoney

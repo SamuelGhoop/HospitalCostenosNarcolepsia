@@ -47,6 +47,29 @@ func TestNew_EveryAttenderInTheHospitalIsWrapped(t *testing.T) {
 	}
 }
 
+// El personal inicial (no sale de la bolsa de empleo) también lleva su
+// roleLabel() de acuerdo al género de su nombre, igual que un candidato
+// contratado (TestCandidateRoleLabel_MatchesTheNameGender, en
+// hiring_internal_test.go).
+func TestStaffRoleLabel_MatchesTheNameGender(t *testing.T) {
+	g := newInternalGame(t)
+	for _, s := range g.staff {
+		parts := strings.Fields(s.Name())
+		first := parts[0]
+		if s.isDoctor() { // el médico lleva "Dr./Dra." antes del nombre
+			first = parts[1]
+		}
+		female := slices.Contains(femaleFirstNames, first)
+		if s.female != female {
+			t.Fatalf("%s: female = %v, pero el nombre %q es de la lista femenina = %v", s.Name(), s.female, first, female)
+		}
+		want := roleLabel(s.isDoctor(), female)
+		if got := s.roleLabel(); got != want {
+			t.Errorf("%s (médico=%v, femenino=%v): roleLabel() = %q; se esperaba %q", s.Name(), s.isDoctor(), female, got, want)
+		}
+	}
+}
+
 // Los médicos llevan "Dra." o "Dr." según la lista de la que sale el nombre.
 func TestDoctorName_TitleMatchesTheFirstName(t *testing.T) {
 	rng := rand.New(rand.NewSource(1))

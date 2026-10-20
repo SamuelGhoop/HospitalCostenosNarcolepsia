@@ -47,11 +47,16 @@ func (g *Game) checkDefeatLocked() {
 	}
 }
 
-// finalScoreLocked es el puntaje final (§5.10): el acumulado + plata ÷ 10 +
-// estrellas × 200. La reputación está en centésimas de estrella, así que
-// las estrellas × 200 son reputation × 200 / 100 (aritmética entera).
-func (g *Game) finalScoreLocked() int {
-	return g.score + g.money/finalMoneyDivisor + g.reputation*finalStarPoints/100
+// finalScoreBreakdownLocked son las dos partes que se suman al acumulado
+// para el puntaje final (§5.10, §9 "PLATA ÷ 10" y "ESTRELLAS × 200" del
+// Game Over): plata ÷ 10 y estrellas × 200. La reputación está en
+// centésimas de estrella, así que las estrellas × 200 son
+// reputation × 200 / 100 (aritmética entera). Vive en su propia función
+// (Snapshot la suma a g.score para FinalScore) para que la interfaz pueda
+// mostrar cada parte por separado sin repetir las constantes de
+// game/config.go afuera del paquete.
+func (g *Game) finalScoreBreakdownLocked() (moneyScore, starScore int) {
+	return g.money / finalMoneyDivisor, g.reputation * finalStarPoints / 100
 }
 
 // loseLocked termina la partida. Desde aquí Tick no hace nada y las
