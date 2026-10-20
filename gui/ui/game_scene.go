@@ -46,6 +46,11 @@ type GameScene struct {
 	// sonidos acordes, que la vida está ahí").
 	sound soundTracker
 
+	// fx es el pase de "juice" (§12.10, pedido de Samuel el 2026-10-19):
+	// shake, hit-stop, squash&stretch, partículas y banners. Puramente
+	// visual/sonoro; nunca toca game.Game.
+	fx juiceFX
+
 	// Los paneles del fin del día y del Game Over abren y cierran animados,
 	// como la bolsa de empleo (anim.go, pedido de Samuel el 2026-10-17):
 	// nil mientras no hace falta ninguno; se crean la primera vez que
@@ -86,7 +91,7 @@ var newGameSceneFn = NewGameScene
 // tests la avanzan llamando g.Tick a mano.
 func newGameScene(g *game.Game) *GameScene {
 	s := &GameScene{world: newWorld(), g: g, actors: map[string]*actor{}, standing: spotBook{}, lying: spotBook{},
-		noticeSeen: map[string]int{}, scenery: newScenery(rand.New(rand.NewSource(seedSource())))}
+		noticeSeen: map[string]int{}, scenery: newScenery(rand.New(rand.NewSource(seedSource()))), fx: newJuiceFX(seedSource())}
 	s.snap = g.Snapshot()
 	s.hud.update(s.snap)
 	s.sync()
@@ -131,7 +136,13 @@ func (s *GameScene) update(in input) (Scene, error) {
 	}
 
 	s.sync()
-	s.animate()
+	s.fx.step() // pase de juice (§12.10): shake, hit-stop, squash, líneas...
+	if !s.fx.hitStop.active() {
+		// Hit-stop (bloque 4): congela las animaciones de la interfaz un
+		// puñado de cuadros; Game.Tick ya corrió más arriba (s.g.Snapshot
+		// lee lo de la goroutine motor), nunca se detiene.
+		s.animate()
+	}
 	s.door.step(s.snap.DoorOpen)
 
 	// Los paneles del fin del día y de la derrota se llevan la entrada.
@@ -286,72 +297,22 @@ var (
 // Draw dibuja por capas, como la demo: mapa → carros y humo → personajes y
 // camillas → copas de las palmeras → cobijas → rótulos → barra, botones,
 // avisos y ficha → paneles.
+//
+// BLOQUE 2 del pase de juice (§12.10): el mundo (todo lo de drawWorld) se
+// dibuja aparte, en worldCanvas, y se pega en la pantalla con el offset
+// entero del shake (s.fx.shake); el HUD, los botones, los avisos, la ficha y
+// los paneles se dibujan directo sobre la pantalla, sin temblar (decisión
+// de Samuel, "no al HUD si queda raro": temblando se alcanzaba a leer mal
+// la plata y la hora).
 func (s *GameScene) Draw(screen *ebiten.Image) {
-	drawMap(screen)
-	drawMainDoor(screen, s.door.open)
-	s.scenery.draw(screen)
+	canvas := worldCanvas()
+	canvas.Clear()
+	s.drawWorld(canvas)
 
-	type drawable struct {
-		y    float64
-		draw func()
-	}
-	var items []drawable
-	lyingIn := map[int]bool{}
-	for _, f := range s.figures {
-		if f.patient && s.onBed(f) {
-			lyingIn[f.room] = true
-		}
-		y := s.pos[f.id].y + figHeight
-		if c := s.carryOf(f.id); c != nil && c.visible() && f.id == c.order.patient {
-			if c.riding() {
-				continue // va sobre la camilla: se dibuja con ella
-			}
-			y = float64(c.fp.Max.Y) + 0.5
-		}
-		items = append(items, drawable{y, func() {
-			drawFigureBody(screen, f, s.pos[f.id], s.anims[f.id], s.staff[f.id])
-		}})
-	}
-	for _, c := range s.others {
-		if !c.visible() {
-			continue
-		}
-		items = append(items, drawable{float64(c.fp.Max.Y), func() {
-			p, _ := s.figure(c.order.patient)
-			drawStretcher(screen, c.fp, c.dir)
-			if c.riding() {
-				drawRider(screen, p, s.anims[p.id], c.fp, c.dir)
-			}
-		}})
-	}
-	sort.SliceStable(items, func(i, j int) bool { return items[i].y < items[j].y })
-	for _, it := range items {
-		it.draw()
-	}
-	drawPalmCrowns(screen)
-	drawBlankets(screen, s.snap.Rooms, lyingIn)
-	drawNeedDoctorIcons(screen, s.snap.Patients, s.ticks)
-
-	for _, o := range roomBadges(s.snap.Rooms) {
-		drawOverlay(screen, o)
-	}
-	for _, f := range s.figures {
-		if s.actorOf(f.id).exiting {
-			continue
-		}
-		if f.id == s.selected { // el elegido, con un marco amarillo alrededor
-			box := s.figureBox(f).Inset(-4)
-			for _, edge := range []image.Rectangle{
-				{box.Min, image.Pt(box.Max.X, box.Min.Y+3)}, {image.Pt(box.Min.X, box.Max.Y-3), box.Max},
-				{box.Min, image.Pt(box.Min.X+3, box.Max.Y)}, {image.Pt(box.Max.X-3, box.Min.Y), box.Max},
-			} {
-				fillRect(screen, edge, colYellow)
-			}
-		}
-		for _, o := range s.gameOverlays(f, s.shift || f.id == s.hover || f.id == s.selected) {
-			drawOverlay(screen, o)
-		}
-	}
+	dx, dy := s.fx.shake.offset()
+	op := &ebiten.DrawImageOptions{Filter: ebiten.FilterNearest}
+	op.GeoM.Translate(float64(dx), float64(dy))
+	screen.DrawImage(canvas, op)
 
 	// Los avisos del juego (errores, altas) van primero para saber dónde
 	// terminan: los avisos de reputación con motivo (hud.go, §12.8) no se
@@ -371,6 +332,86 @@ func (s *GameScene) Draw(screen *ebiten.Image) {
 		s.drawGameOver(screen)
 	case s.snap.DayOver:
 		s.drawDayOver(screen)
+	}
+}
+
+// drawWorld dibuja el mapa, los personajes, las camillas y sus rótulos:
+// todo lo que tiembla con el shake de pantalla. dst es worldCanvas, no la
+// pantalla real (Draw la pega después, con el offset del temblor).
+func (s *GameScene) drawWorld(dst *ebiten.Image) {
+	drawMap(dst)
+	drawMainDoor(dst, s.door.open)
+	s.scenery.draw(dst)
+
+	type drawable struct {
+		y    float64
+		draw func()
+	}
+	var items []drawable
+	lyingIn := map[int]bool{}
+	for _, f := range s.figures {
+		if f.patient && s.onBed(f) {
+			lyingIn[f.room] = true
+		}
+		y := s.pos[f.id].y + figHeight
+		if c := s.carryOf(f.id); c != nil && c.visible() && f.id == c.order.patient {
+			if c.riding() {
+				continue // va sobre la camilla: se dibuja con ella
+			}
+			y = float64(c.fp.Max.Y) + 0.5
+		}
+		items = append(items, drawable{y, func() {
+			pivot := vec{s.pos[f.id].x + figWidth/2, s.pos[f.id].y + figHeight}
+			drawSquashed(dst, s.fx.punches[f.id], pivot, func(c *ebiten.Image) {
+				drawFigureBody(c, f, s.pos[f.id], s.anims[f.id], s.staff[f.id])
+			})
+		}})
+	}
+	for _, c := range s.others {
+		if !c.visible() {
+			continue
+		}
+		items = append(items, drawable{float64(c.fp.Max.Y), func() {
+			p, _ := s.figure(c.order.patient)
+			drawStretcher(dst, c.fp, c.dir)
+			if c.riding() {
+				drawRider(dst, p, s.anims[p.id], c.fp, c.dir)
+			}
+		}})
+	}
+	sort.SliceStable(items, func(i, j int) bool { return items[i].y < items[j].y })
+	for _, it := range items {
+		it.draw()
+	}
+	drawPalmCrowns(dst)
+	drawBlankets(dst, s.snap.Rooms, lyingIn)
+	drawNeedDoctorIcons(dst, s.snap.Patients, s.ticks)
+
+	for _, o := range roomBadges(s.snap.Rooms) {
+		drawOverlay(dst, o)
+	}
+	for _, f := range s.figures {
+		if s.actorOf(f.id).exiting {
+			continue
+		}
+		if f.id == s.selected { // el elegido, con un marco amarillo alrededor
+			box := s.figureBox(f).Inset(-4)
+			for _, edge := range []image.Rectangle{
+				{box.Min, image.Pt(box.Max.X, box.Min.Y+3)}, {image.Pt(box.Min.X, box.Max.Y-3), box.Max},
+				{box.Min, image.Pt(box.Min.X+3, box.Max.Y)}, {image.Pt(box.Max.X-3, box.Min.Y), box.Max},
+			} {
+				fillRect(dst, edge, colYellow)
+			}
+		}
+		for _, o := range s.gameOverlays(f, s.shift || f.id == s.hover || f.id == s.selected) {
+			drawOverlay(dst, o)
+		}
+	}
+
+	// Las líneas punteadas de un despacho exitoso (bloque 2, §12.10): por
+	// encima de los rótulos, igual que el marco de selección.
+	for _, l := range s.fx.lines {
+		drawDashLine(dst, l)
 	}
 }
 

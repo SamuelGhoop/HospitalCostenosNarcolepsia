@@ -41,3 +41,41 @@ func growRect(r image.Rectangle, factor float64) image.Rectangle {
 func boxCenter(r image.Rectangle) (x, y float64) {
 	return float64(r.Min.X+r.Max.X) / 2, float64(r.Min.Y+r.Max.Y) / 2
 }
+
+// ─── BLOQUE 2: clics contundentes ──────────────────────────────────────
+
+// Squash & stretch del personaje clicado (figurePunch, juice_fx.go):
+// squashTicks ~120 ms a 60 ticks/s, squashFlashTicks "2 cuadros" de destello
+// (blanco si el clic sirvió, rojo si fue inválido) y squashAmount cuánto se
+// aplasta y estira (18 %, FUERTE/ARCADE).
+const (
+	squashTicks      = 7
+	squashFlashTicks = 2
+	squashAmount     = 0.18
+)
+
+// Línea punteada del despacho exitoso (dashLine, juice_fx.go): se desvanece
+// en dispatchLineTicks (0,6 s) y sus guiones avanzan dashSpeed px por tick.
+const (
+	dispatchLineTicks = 36 // 0,6 s a 60 ticks/s
+	dashLen           = 6.0
+	dashGap           = 4.0
+	dashWidth         = 2.0
+	dashSpeed         = 2.0
+)
+
+// Shake de pantalla (screenShake, juice_fx.go): decae a 0 en shakeDecayTicks
+// (~0,3 s, FUERTE/ARCADE). Las magnitudes de cada evento, de más chico a más
+// grande: shakeCollapse (desplome, bloque 3), shakeInvalidClick (clic
+// inválido, bloque 2) y shakeAngry (se va enojado, bloque 4, "shake fuerte").
+const (
+	shakeDecayTicks   = 18 // 0,3 s a 60 ticks/s
+	shakeCollapse     = 3.5
+	shakeInvalidClick = 7.0
+	shakeAngry        = 8.0
+)
+
+// Hit-stop (hitStop, juice_fx.go): ~6 cuadros (100 ms) con la interfaz
+// congelada; nunca el reloj del juego (Game.Tick sigue en su propia
+// goroutine). Se usa en el cobro de una revisión (bloque 4).
+const hitStopTicks = 6

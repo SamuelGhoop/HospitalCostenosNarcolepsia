@@ -119,6 +119,12 @@ func needsSomeone(st game.Stage) bool {
 
 // click es el clic izquierdo en p: elige un paciente que necesita a alguien
 // o, con uno elegido, manda a quien se clicó. Clic en otro sitio, nada.
+//
+// BLOQUE 2 del pase de juice (§12.10): todo clic que de verdad le pega a
+// alguien deja su squash&stretch + destello blanco (s.fx.punch). Si el clic
+// manda a alguien (Dispatch), un despacho exitoso deja además la línea
+// punteada hasta el paciente; uno inválido tiñe el destello de rojo y
+// tiembla la pantalla (s.fx.invalidClick).
 func (s *GameScene) click(p image.Point) {
 	f, ok := s.figureAt(p)
 	switch {
@@ -127,12 +133,23 @@ func (s *GameScene) click(p image.Point) {
 	case f.patient:
 		if pv, _ := s.patientView(f.id); needsSomeone(pv.Stage) && s.selected != f.id {
 			s.selected = f.id
+			s.fx.punch(f.id, colWhite)
 		} else {
 			s.selected = ""
 		}
 	case s.selected != "":
+		from, _ := s.figure(s.selected)
+		fx0, fy0 := boxCenter(s.figureBox(from))
+		tx0, ty0 := boxCenter(s.figureBox(f))
 		if err := s.g.Dispatch(s.selected, f.id); err != nil {
 			s.say(err.Error())
+			s.fx.punch(f.id, colRed)
+			s.fx.invalidClick()
+			playSound(sfxInvalid)
+		} else {
+			s.fx.punch(f.id, colWhite)
+			s.fx.dispatchSuccess(vec{fx0, fy0}, vec{tx0, ty0})
+			playSound(sfxDispatch)
 		}
 		s.selected = ""
 	default:
@@ -149,7 +166,12 @@ func (s *GameScene) rightClick(p image.Point) {
 	}
 	if err := s.g.WakeEarly(f.id); err != nil {
 		s.say(err.Error())
+		s.fx.punch(f.id, colRed)
+		s.fx.invalidClick()
+		playSound(sfxInvalid)
+		return
 	}
+	s.fx.punch(f.id, colWhite)
 }
 
 // say muestra un aviso de la escena (los errores del juego, "Próximamente").
