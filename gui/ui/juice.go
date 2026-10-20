@@ -161,3 +161,23 @@ const (
 	starBreakSpeed     = 1.8
 	starBreakGravity   = 0.12
 )
+
+// ─── BLOQUE 6: banners de día y hora pico ───────────────────────────────
+
+// Los dos banners (juice_banners.go) son el mismo mecanismo (sweepBanner):
+// entran deslizando desde la izquierda, se quedan quietos en el centro y
+// siguen deslizando hasta salir por la derecha ("barren" la pantalla).
+// "DÍA N" se queda ~1,2 s; "¡HORA PICO!" casi no se detiene, de pasada.
+const (
+	dayBannerEnterTicks = 15 // 0,25 s
+	dayBannerHoldTicks  = 72 // 1,2 s
+	dayBannerExitTicks  = 15
+	dayBannerSize       = 40
+	dayBannerY          = 220
+
+	rushBannerEnterTicks = 18
+	rushBannerHoldTicks  = 18 // 0,3 s: casi no se detiene, "barre" de lado a lado
+	rushBannerExitTicks  = 18
+	rushBannerSize       = 36
+	rushBannerY          = 280
+)

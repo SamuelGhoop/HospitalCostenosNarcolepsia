@@ -73,6 +73,30 @@ func TestDetectJuiceEvents(t *testing.T) {
 			cur:  game.Snapshot{ReputationChanges: []game.ReputationChange{{Delta: -50, Reason: "P-003 lleva 30 s esperando revisión"}}},
 			want: nil,
 		},
+		{
+			name: "empieza un día nuevo: banner de día",
+			prev: game.Snapshot{Day: 1},
+			cur:  game.Snapshot{Day: 2},
+			want: []juiceEvent{{kind: juiceDayBanner, amount: 2}},
+		},
+		{
+			name: "el mismo día no deja banner",
+			prev: game.Snapshot{Day: 2},
+			cur:  game.Snapshot{Day: 2},
+			want: nil,
+		},
+		{
+			name: "entra una hora pico: banner de hora pico",
+			prev: game.Snapshot{RushHour: false},
+			cur:  game.Snapshot{RushHour: true},
+			want: []juiceEvent{{kind: juiceRushBanner}},
+		},
+		{
+			name: "la hora pico ya estaba activa no vuelve a salir",
+			prev: game.Snapshot{RushHour: true},
+			cur:  game.Snapshot{RushHour: true},
+			want: nil,
+		},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

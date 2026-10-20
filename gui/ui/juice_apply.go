@@ -27,6 +27,12 @@ func (s *GameScene) applyJuiceEvent(e juiceEvent) {
 		s.fx.starShimmer()
 	case juiceStarDown:
 		s.fx.starBreak()
+	case juiceDayBanner:
+		s.fx.dayBanner = newSweepBanner(hudDayLabel(e.amount), colHUDBlue, dayBannerSize,
+			dayBannerEnterTicks, dayBannerHoldTicks, dayBannerExitTicks)
+	case juiceRushBanner:
+		s.fx.rushBanner = newSweepBanner("¡HORA PICO!", colOrange, rushBannerSize,
+			rushBannerEnterTicks, rushBannerHoldTicks, rushBannerExitTicks)
 	}
 }
 

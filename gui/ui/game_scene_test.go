@@ -356,6 +356,23 @@ func TestApplyJuiceEvent_StarShimmerAndBreak(t *testing.T) {
 	}
 }
 
+// BLOQUE 6 del pase de juice (§12.10): aplicar el evento de día/hora pico
+// deja el banner correspondiente listo para dibujarse.
+func TestApplyJuiceEvent_DayAndRushBanners(t *testing.T) {
+	s := newTestGameScene(t)
+	if s.fx.dayBanner != nil || s.fx.rushBanner != nil {
+		t.Fatal("ya había un banner antes de aplicar nada")
+	}
+	s.applyJuiceEvent(juiceEvent{kind: juiceDayBanner, amount: 3})
+	if s.fx.dayBanner == nil || s.fx.dayBanner.text != "DÍA 3" {
+		t.Errorf("dayBanner = %+v; se esperaba el texto \"DÍA 3\"", s.fx.dayBanner)
+	}
+	s.applyJuiceEvent(juiceEvent{kind: juiceRushBanner})
+	if s.fx.rushBanner == nil || s.fx.rushBanner.text != "¡HORA PICO!" {
+		t.Errorf("rushBanner = %+v; se esperaba \"¡HORA PICO!\"", s.fx.rushBanner)
+	}
+}
+
 // Los errores del juego salen como aviso: mandar al médico a recoger a
 // alguien cuando hay un camillero libre (§5.5: recoger le toca al camillero).
 func TestGameScene_DispatchErrorsBecomeNotices(t *testing.T) {

@@ -289,6 +289,53 @@ func TestFallingStar_SpinsFallsAndFades(t *testing.T) {
 	}
 }
 
+// ─── BLOQUE 6: banners de día y hora pico ──────────────────────────────
+
+// sweepBanner barre de izquierda a derecha sin volver atrás y dura justo
+// enter+hold+exit ticks.
+func TestSweepBanner_SweepsLeftToRightWithoutGoingBack(t *testing.T) {
+	b := newSweepBanner("DÍA 2", colHUDBlue, 32, 10, 20, 10)
+	prev := b.centerX(50)
+	if prev >= float64(ScreenWidth)/2 {
+		t.Fatalf("centerX en el primer tick = %v; se esperaba afuera a la izquierda", prev)
+	}
+	ticks, alive := 0, true
+	for alive {
+		alive = b.step()
+		cur := b.centerX(50)
+		if cur < prev {
+			t.Fatalf("tick %d: centerX retrocedió de %v a %v", ticks, prev, cur)
+		}
+		prev = cur
+		ticks++
+	}
+	if ticks != 10+20+10 {
+		t.Errorf("duró %d ticks; se esperaban %d", ticks, 40)
+	}
+	if prev <= float64(ScreenWidth)/2 {
+		t.Errorf("al final centerX = %v; se esperaba afuera a la derecha", prev)
+	}
+}
+
+// Mientras se sostiene (la fase del medio), centerX no se mueve: queda
+// quieto en el centro de la pantalla.
+func TestSweepBanner_HoldsStillInTheMiddle(t *testing.T) {
+	b := newSweepBanner("¡HORA PICO!", colOrange, 32, 5, 10, 5)
+	for i := 0; i < 5; i++ {
+		b.step()
+	}
+	mid := b.centerX(50)
+	for i := 0; i < 9; i++ {
+		b.step()
+		if got := b.centerX(50); got != mid {
+			t.Errorf("tick %d de la sostenida: centerX = %v; se esperaba %v (quieto)", i, got, mid)
+		}
+	}
+	if mid != float64(ScreenWidth)/2 {
+		t.Errorf("centerX sostenido = %v; se esperaba el centro de la pantalla (%v)", mid, float64(ScreenWidth)/2)
+	}
+}
+
 // La línea de despacho se desvanece en dispatchLineTicks y nunca sube de
 // opacidad.
 func TestDashLine_FadesToZero(t *testing.T) {

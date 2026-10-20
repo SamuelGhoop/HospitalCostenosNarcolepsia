@@ -42,6 +42,11 @@ type juiceFX struct {
 	// en el mapa y tiembla con él), salen de hudStarsCenter, un punto de
 	// pantalla fijo, así que se dibujan sin temblar, después del HUD.
 	hudSparks []*particle
+
+	// dayBanner y rushBanner (BLOQUE 6, §12.10, juice_banners.go): nil
+	// mientras no hay ninguno en pantalla.
+	dayBanner  *sweepBanner
+	rushBanner *sweepBanner
 }
 
 func newJuiceFX(seed int64) juiceFX {
@@ -98,6 +103,14 @@ func (fx *juiceFX) step() {
 		}
 	}
 	fx.fallingStars = keptStars
+
+	// BLOQUE 6 (§12.10).
+	if fx.dayBanner != nil && !fx.dayBanner.step() {
+		fx.dayBanner = nil
+	}
+	if fx.rushBanner != nil && !fx.rushBanner.step() {
+		fx.rushBanner = nil
+	}
 }
 
 // stepParticles avanza cada partícula y descarta las que ya murieron

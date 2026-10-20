@@ -23,6 +23,8 @@ const (
 	juiceAngry                       // alguien se fue enojado (bloque 4)
 	juiceStarUp                      // la reputación subió, sin ser alta (bloque 5)
 	juiceStarDown                    // la reputación bajó, sin ser un enojo (bloque 5)
+	juiceDayBanner                   // empezó un día nuevo (bloque 6): amount es el día
+	juiceRushBanner                  // entró una hora pico (bloque 6)
 )
 
 // juiceEvent trae lo que hace falta para dibujarlo: a quién (patientID, si
@@ -77,6 +79,17 @@ func detectJuiceEvents(prev, cur game.Snapshot) []juiceEvent {
 		case c.Delta < 0:
 			out = append(out, juiceEvent{kind: juiceStarDown, patientID: id})
 		}
+	}
+
+	// BLOQUE 6: el banner de día no sale el día 1 (al abrir una partida
+	// nueva no hay "antes" con qué compararlo: igual que el resto de estos
+	// eventos basados en snapshot-diff, por ejemplo gameSoundEvents tampoco
+	// deja sonar nada en el primerísimo tick).
+	if cur.Day != prev.Day {
+		out = append(out, juiceEvent{kind: juiceDayBanner, amount: cur.Day})
+	}
+	if !prev.RushHour && cur.RushHour {
+		out = append(out, juiceEvent{kind: juiceRushBanner})
 	}
 	return out
 }

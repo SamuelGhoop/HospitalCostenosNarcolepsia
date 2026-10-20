@@ -375,6 +375,16 @@ func (s *GameScene) Draw(screen *ebiten.Image) {
 		drawParticle(screen, p)
 	}
 
+	// Bloque 6 (§12.10): los banners de día y hora pico, encima de todo lo
+	// demás (son avisos grandes, de pantalla completa) salvo los paneles de
+	// fin de día/Game Over, que van después y los tapan si hace falta.
+	if s.fx.dayBanner != nil {
+		drawSweepBanner(screen, s.fx.dayBanner, dayBannerY)
+	}
+	if s.fx.rushBanner != nil {
+		drawSweepBanner(screen, s.fx.rushBanner, rushBannerY)
+	}
+
 	if s.hover != "" && !s.shift {
 		if f, ok := s.figure(s.hover); ok {
 			s.drawTooltip(screen, f)
